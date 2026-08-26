@@ -1,0 +1,15 @@
+server:
+  port: 8080
+
+mysql:
+  host: localhost
+  port: 3306
+  database: jobpilot
+  user: jobpilot
+
+redis:
+  host: localhost
+  port: 6379
+
+log:
+  level: info

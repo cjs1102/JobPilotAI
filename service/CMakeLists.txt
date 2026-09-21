@@ -4,13 +4,14 @@ project(jobpilot_service CXX)
 
 add_executable(jobpilot_service
     src/main.cpp
-    src/health_stub.cpp
+    src/router.cpp
 )
 
 target_include_directories(jobpilot_service
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
 target_link_libraries(jobpilot_service
     PRIVATE
         jobpilot_core

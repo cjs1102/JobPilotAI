@@ -6,6 +6,7 @@ mysql:
   port: 3306
   database: jobpilot
   user: jobpilot
+  max_conn: 10
 
 redis:
   host: localhost

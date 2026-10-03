@@ -1,32 +1,72 @@
-# build
+# Build output
 build/
 service/build/
+cmake-build-*/
 
-# vscode
+# IDE and local editor state
 .vscode/
+.idea/
+.clangd/
+*.swp
+*.swo
+*~
 
-# cmake
+# CMake and build-system generated files
 CMakeCache.txt
 CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+CMakeUserPresets.json
+compile_commands.json
+.ninja_deps
+.ninja_log
 
-# env
+# Local environment and secrets
 .env
+.env.*
+!.env.example
+*.local.yaml
+*.local.yml
+config.local.yaml
 
-# python
+# Python
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# logs
+# Logs, dumps, and temporary files
+logs/
 *.log
-# binaries
+core
+core.*
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Compiled artifacts
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.lib
 *.o
 *.obj
+*.d
 *.exe
 
-# cmake generated
-cmake-build-*/
-CMakeUserPresets.json
-
-# coverage
+# Coverage and profiling output
 coverage/
 *.gcda
 *.gcno
+*.gcov
+coverage.info
+lcov.info
+perf.data
+perf.data.*
+callgrind.out.*
+massif.out.*
+valgrind.log

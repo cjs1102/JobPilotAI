@@ -5,10 +5,10 @@ services:
     container_name: jobpilot-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: jobpilot
-      MYSQL_USER: jobpilot
-      MYSQL_PASSWORD: jobpilot
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-jobpilot}
+      MYSQL_USER: ${MYSQL_USER:-jobpilot}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
     ports:
       - "3306:3306"
     volumes:

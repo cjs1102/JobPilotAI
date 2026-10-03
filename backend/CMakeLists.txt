@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(jobpilot_core CXX)
+project(jobpilot_core C CXX)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(MYSQLCLIENT REQUIRED IMPORTED_TARGET mysqlclient)
+find_package(GTest CONFIG REQUIRED)
+find_package(hiredis CONFIG REQUIRED)
+
+add_subdirectory(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libbcrypt
+    libbcrypt
+)
 
 add_library(jobpilot_core STATIC
     src/core/core.cpp
@@ -16,12 +26,23 @@ add_library(jobpilot_core STATIC
     src/http/http_response.cpp
     src/http/http_router.cpp
     src/http/http_server.cpp
+    src/database/mysql_pool.cpp
+    src/database/sql_result.cpp
+    src/cache/redis_client.cpp
+    src/cache/session_manager.cpp
 )
 
 target_include_directories(jobpilot_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+target_link_libraries(jobpilot_core
+    PUBLIC
+        PkgConfig::MYSQLCLIENT
+        hiredis::hiredis
+)
+
 add_executable(test_event_loop
     tests/test_event_loop.cpp
 
@@ -174,3 +195,59 @@ add_test(
     NAME thread_pool_test
     COMMAND test_thread_pool
 )
+
+add_executable(test_mysql_pool
+    tests/test_mysql_pool.cpp
+)
+
+target_link_libraries(test_mysql_pool
+    PRIVATE
+        jobpilot_core
+)
+
+add_test(
+    NAME mysql_pool_test
+    COMMAND test_mysql_pool
+)
+
+add_executable(test_sql_result
+    tests/test_sql_result.cpp
+)
+
+target_link_libraries(test_sql_result
+    PRIVATE
+        jobpilot_core
+        GTest::gtest_main
+)
+
+add_executable(test_redis_client
+    tests/test_redis_client.cpp
+)
+
+target_link_libraries(test_redis_client
+    PRIVATE
+        jobpilot_core
+)
+
+add_test(
+    NAME redis_client_test
+    COMMAND test_redis_client
+)
+
+add_executable(test_bcrypt
+    tests/test_bcrypt.cpp
+)
+
+target_link_libraries(test_bcrypt
+    PRIVATE
+        jobpilot_bcrypt
+)
+
+add_test(
+    NAME bcrypt_test
+    COMMAND test_bcrypt
+)
+
+include(GoogleTest)
+
+gtest_discover_tests(test_sql_result)

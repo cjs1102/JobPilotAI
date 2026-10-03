@@ -43,6 +43,11 @@ target_link_libraries(jobpilot_core
         hiredis::hiredis
 )
 
+# Tests use <cassert>. Keep their checks active in Release builds.
+add_compile_options(
+    $<$<COMPILE_LANGUAGE:CXX>:-UNDEBUG>
+)
+
 add_executable(test_event_loop
     tests/test_event_loop.cpp
 

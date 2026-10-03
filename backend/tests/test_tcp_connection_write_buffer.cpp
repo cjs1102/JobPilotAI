@@ -1,13 +1,14 @@
-#include <cassert>
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
+#include <cstring>
 #include <fcntl.h>
 #include <iostream>
 #include <mutex>
 #include <string>
 #include <thread>
-#include <algorithm>
+
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -16,15 +17,42 @@
 
 using namespace jobpilot::core;
 
+namespace
+{
+
+    bool Check(
+        bool condition,
+        const char *message)
+    {
+        if (!condition)
+        {
+            std::cerr << message << std::endl;
+            return false;
+        }
+
+        return true;
+    }
+
+} // namespace
+
 int main()
 {
     int sockets[2] = {-1, -1};
 
-    assert(::socketpair(
-        AF_UNIX,
-        SOCK_STREAM,
-        0,
-        sockets) == 0);
+    // 创建 socketpair
+    if (::socketpair(
+            AF_UNIX,
+            SOCK_STREAM,
+            0,
+            sockets) != 0)
+    {
+        std::cerr
+            << "socketpair failed: "
+            << std::strerror(errno)
+            << std::endl;
+
+        return 1;
+    }
 
     // 将 TcpConnection 使用的 socket 设置为非阻塞
     const int flags = ::fcntl(
@@ -32,22 +60,55 @@ int main()
         F_GETFL,
         0);
 
-    assert(flags >= 0);
+    if (flags < 0)
+    {
+        std::cerr
+            << "fcntl(F_GETFL) failed: "
+            << std::strerror(errno)
+            << std::endl;
 
-    assert(::fcntl(
-        sockets[0],
-        F_SETFL,
-        flags | O_NONBLOCK) == 0);
+        ::close(sockets[0]);
+        ::close(sockets[1]);
+
+        return 1;
+    }
+
+    if (::fcntl(
+            sockets[0],
+            F_SETFL,
+            flags | O_NONBLOCK) < 0)
+    {
+        std::cerr
+            << "fcntl(F_SETFL) failed: "
+            << std::strerror(errno)
+            << std::endl;
+
+        ::close(sockets[0]);
+        ::close(sockets[1]);
+
+        return 1;
+    }
 
     // 尽可能减小发送缓冲区，便于触发 EAGAIN
     int sendBufferSize = 4096;
 
-    assert(::setsockopt(
-        sockets[0],
-        SOL_SOCKET,
-        SO_SNDBUF,
-        &sendBufferSize,
-        sizeof(sendBufferSize)) == 0);
+    if (::setsockopt(
+            sockets[0],
+            SOL_SOCKET,
+            SO_SNDBUF,
+            &sendBufferSize,
+            sizeof(sendBufferSize)) != 0)
+    {
+        std::cerr
+            << "setsockopt(SO_SNDBUF) failed: "
+            << std::strerror(errno)
+            << std::endl;
+
+        ::close(sockets[0]);
+        ::close(sockets[1]);
+
+        return 1;
+    }
 
     // 预先填满发送缓冲区
     const std::string filler(1024, 'F');
@@ -63,19 +124,39 @@ int main()
 
         if (written > 0)
         {
-            fillerBytes += static_cast<std::size_t>(written);
+            fillerBytes +=
+                static_cast<std::size_t>(written);
+
             continue;
         }
 
-        if (written < 0 && errno == EAGAIN)
+        if (written < 0 &&
+            (errno == EAGAIN ||
+             errno == EWOULDBLOCK))
         {
             break;
         }
 
-        assert(false);
+        std::cerr
+            << "write filler failed: "
+            << std::strerror(errno)
+            << std::endl;
+
+        ::close(sockets[0]);
+        ::close(sockets[1]);
+
+        return 1;
     }
 
-    assert(fillerBytes > 0);
+    if (!Check(
+            fillerBytes > 0,
+            "failed to fill socket send buffer"))
+    {
+        ::close(sockets[0]);
+        ::close(sockets[1]);
+
+        return 1;
+    }
 
     const std::string message(
         256 * 1024,
@@ -87,53 +168,69 @@ int main()
     bool sendIssued = false;
     bool writeCompleted = false;
     bool loopFinished = false;
+    bool testFailed = false;
 
-    std::thread loopThread([&]() {
-        EventLoop loop;
+    std::thread loopThread(
+        [&]()
+        {
+            EventLoop loop;
 
-        auto connection = std::make_shared<TcpConnection>(
-            &loop,
-            "write-buffer-test",
-            sockets[0]);
+            auto connection =
+                std::make_shared<TcpConnection>(
+                    &loop,
+                    "write-buffer-test",
+                    sockets[0]);
 
-        connection->SetConnectionCallback(
-            [&](const TcpConnection::Ptr& conn) {
-                assert(conn->IsConnected());
-
-                conn->SetWriteCompleteCallback(
-                    [&](const TcpConnection::Ptr&) {
+            connection->SetConnectionCallback(
+                [&](const TcpConnection::Ptr &conn)
+                {
+                    if (!conn->IsConnected())
+                    {
                         {
                             std::lock_guard<std::mutex> lock(mutex);
-                            writeCompleted = true;
+                            testFailed = true;
                         }
 
                         condition.notify_one();
                         loop.Quit();
-                    });
+                        return;
+                    }
 
-                conn->Send(message);
+                    conn->SetWriteCompleteCallback(
+                        [&](const TcpConnection::Ptr &)
+                        {
+                            {
+                                std::lock_guard<std::mutex> lock(mutex);
+                                writeCompleted = true;
+                            }
 
-                {
-                    std::lock_guard<std::mutex> lock(mutex);
-                    sendIssued = true;
-                }
+                            condition.notify_one();
+                            loop.Quit();
+                        });
 
-                condition.notify_one();
-            });
+                    conn->Send(message);
 
-        connection->EstablishConnection();
+                    {
+                        std::lock_guard<std::mutex> lock(mutex);
+                        sendIssued = true;
+                    }
 
-        loop.Loop();
+                    condition.notify_one();
+                });
 
-        connection->ConnectDestroyed();
+            connection->EstablishConnection();
 
-        {
-            std::lock_guard<std::mutex> lock(mutex);
-            loopFinished = true;
-        }
+            loop.Loop();
 
-        condition.notify_one();
-    });
+            connection->ConnectDestroyed();
+
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                loopFinished = true;
+            }
+
+            condition.notify_one();
+        });
 
     // 等待 Send() 已经被调用
     {
@@ -142,11 +239,40 @@ int main()
         const bool ready = condition.wait_for(
             lock,
             std::chrono::seconds(2),
-            [&]() {
-                return sendIssued;
+            [&]()
+            {
+                return sendIssued || testFailed;
             });
 
-        assert(ready);
+        if (!ready)
+        {
+            std::cerr
+                << "waiting for Send() timed out"
+                << std::endl;
+
+            lock.unlock();
+
+            loopThread.join();
+
+            ::close(sockets[1]);
+
+            return 1;
+        }
+
+        if (testFailed)
+        {
+            std::cerr
+                << "TcpConnection was not connected"
+                << std::endl;
+
+            lock.unlock();
+
+            loopThread.join();
+
+            ::close(sockets[1]);
+
+            return 1;
+        }
     }
 
     // 现在开始读取对端数据，使发送缓冲区恢复可写
@@ -164,32 +290,63 @@ int main()
             buffer,
             sizeof(buffer));
 
-        assert(received > 0);
-
-        std::size_t remaining =
-            message.size() - receivedMessageBytes;
-
-        std::size_t usableBytes =
-            static_cast<std::size_t>(received);
-
-        // 前面填充的数据需要丢弃
-        if (fillerBytes > 0)
+        if (received > 0)
         {
-            const std::size_t discarded =
-                std::min(fillerBytes, usableBytes);
+            std::size_t remaining =
+                message.size() -
+                receivedMessageBytes;
 
-            fillerBytes -= discarded;
-            usableBytes -= discarded;
+            std::size_t usableBytes =
+                static_cast<std::size_t>(received);
+
+            // 前面填充的数据需要丢弃
+            if (fillerBytes > 0)
+            {
+                const std::size_t discarded =
+                    std::min(
+                        fillerBytes,
+                        usableBytes);
+
+                fillerBytes -= discarded;
+                usableBytes -= discarded;
+            }
+
+            if (usableBytes > 0)
+            {
+                receivedMessage.append(
+                    buffer + (received - usableBytes),
+                    usableBytes);
+
+                receivedMessageBytes +=
+                    usableBytes;
+            }
+
+            continue;
         }
 
-        if (usableBytes > 0)
+        if (received < 0 &&
+            errno == EINTR)
         {
-            receivedMessage.append(
-                buffer + (received - usableBytes),
-                usableBytes);
-
-            receivedMessageBytes += usableBytes;
+            continue;
         }
+
+        std::cerr
+            << "read from peer failed";
+
+        if (received < 0)
+        {
+            std::cerr
+                << ": "
+                << std::strerror(errno);
+        }
+
+        std::cerr << std::endl;
+
+        loopThread.join();
+
+        ::close(sockets[1]);
+
+        return 1;
     }
 
     {
@@ -198,16 +355,39 @@ int main()
         const bool completed = condition.wait_for(
             lock,
             std::chrono::seconds(2),
-            [&]() {
-                return writeCompleted;
+            [&]()
+            {
+                return writeCompleted ||
+                       testFailed ||
+                       loopFinished;
             });
 
-        assert(completed);
+        if (!completed || !writeCompleted)
+        {
+            std::cerr
+                << "write completion timeout"
+                << std::endl;
+
+            lock.unlock();
+
+            loopThread.join();
+
+            ::close(sockets[1]);
+
+            return 1;
+        }
     }
 
     loopThread.join();
 
-    assert(receivedMessage == message);
+    if (!Check(
+            receivedMessage == message,
+            "received message does not match sent message"))
+    {
+        ::close(sockets[1]);
+
+        return 1;
+    }
 
     ::close(sockets[1]);
 

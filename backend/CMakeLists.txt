@@ -6,6 +6,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(MYSQLCLIENT REQUIRED IMPORTED_TARGET mysqlclient)
 find_package(GTest CONFIG REQUIRED)
 find_package(hiredis CONFIG REQUIRED)
+find_package(yaml-cpp CONFIG REQUIRED)
 
 add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libbcrypt
@@ -13,6 +14,7 @@ add_subdirectory(
 )
 
 add_library(jobpilot_core STATIC
+    src/core/config.cpp
     src/core/core.cpp
     src/core/thread_pool.cpp
     src/network/channel.cpp
@@ -41,11 +43,23 @@ target_link_libraries(jobpilot_core
     PUBLIC
         PkgConfig::MYSQLCLIENT
         hiredis::hiredis
+    PRIVATE
+        yaml-cpp::yaml-cpp
 )
 
 # Tests use <cassert>. Keep their checks active in Release builds.
 add_compile_options(
     $<$<COMPILE_LANGUAGE:CXX>:-UNDEBUG>
+)
+
+add_executable(test_config
+    tests/test_config.cpp
+)
+
+target_link_libraries(test_config
+    PRIVATE
+        jobpilot_core
+        GTest::gtest_main
 )
 
 add_executable(test_event_loop
@@ -255,4 +269,5 @@ add_test(
 
 include(GoogleTest)
 
+gtest_discover_tests(test_config)
 gtest_discover_tests(test_sql_result)

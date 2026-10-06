@@ -39,8 +39,9 @@ __pycache__/
 # Logs, dumps, and temporary files
 logs/
 *.log
-core
-core.*
+/core
+core.[0-9]*
+core.[0-9]*.*
 *.tmp
 *.temp
 .DS_Store

@@ -1,4 +1,5 @@
 server:
+  host: 0.0.0.0
   port: 8080
 
 mysql:
@@ -11,6 +12,8 @@ mysql:
 redis:
   host: localhost
   port: 6379
+  max_conn: 4
+  timeout_ms: 1000
 
 log:
   level: info

@@ -1,5 +1,7 @@
 # ExecPlan 0002: Complete P0 Configuration, Logging, and Schema
 
+> Status: Completed on 2026-10-06.
+
 ## Background
 
 The executable currently hardcodes `0.0.0.0:8080`, does not load
@@ -115,12 +117,31 @@ Rollback:
 - config/log wiring can be reverted independently;
 - schema scripts are not destructive and do not replace the running volume.
 
-## Current Progress
+## Progress
 
-Not started.
+- [x] Phase 1: Configuration
+- [x] Phase 2: Logging
+- [x] Phase 3: Schema and Initialization
+- [x] Phase 4: Service Wiring
+
+## Verification Results
+
+- Clean `service/` configure and Release build: passed.
+- Clean root configure and Release build: passed.
+- `service/` CTest: 36/36 passed with live MySQL and Redis.
+- Root CTest: 36/36 passed with live MySQL and Redis.
+- ASan/UBSan targeted P0 and boundary tests: 18/18 passed.
+- Missing `MYSQL_PASSWORD`: service exits 1 with a critical log.
+- Valid configuration: service loads YAML, initializes logging, and starts HTTP
+  on the configured address and port.
+- Fresh isolated MySQL volume with a non-default database name: all six schema
+  scripts executed and created 11 expected tables.
+- Docker Compose configuration validates with `.env.example`.
 
 ## Known Issues and Follow-Up
 
-- `project-state.md` currently points to `f28a98c`; actual HEAD is `2be5212`.
-- Existing MySQL volumes should not be deleted during verification.
-- Schema path changes must be reflected in Compose and project-structure docs.
+- MySQL and Redis clients remain intentionally unconstructed in the service;
+  this is deferred to the P2 user vertical slice.
+- Schema tests require live MySQL.
+- The old `docker/mysql/init/` path is no longer mounted; no existing file was
+  moved or deleted.

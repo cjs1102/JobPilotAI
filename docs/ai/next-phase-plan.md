@@ -9,6 +9,9 @@
 >
 > The user-supplied `f28a98c` was the prior baseline. The documentation-only
 > commit `2be5212` is now the actual synchronized HEAD.
+>
+> Execution status: ExecPlan `0002` is completed. Config, logging, schema, and
+> service P0 wiring are committed locally; push remains a separate user action.
 
 ## A. Overall Goal
 
@@ -27,7 +30,7 @@ The next phase is not "implement all of P2". It is:
 
 ```text
 Baseline documentation correction
-    -> P0 completion: config, logging, schema
+    -> P0 completion: config, logging, schema [completed in 0002]
     -> Quality baseline: sanitizers
     -> P1 minimum correctness gate
     -> P2 user vertical slice
@@ -43,21 +46,20 @@ user/auth integration that depends on HTTP header and connection semantics.
 
 ### 1. Configuration loading and environment overrides
 
-Do now. `service/src/main.cpp` hardcodes `0.0.0.0:8080`; MySQL and Redis
-primitives cannot be constructed consistently without typed configuration and
-secret handling. `yaml-cpp` is already declared in Conan but unused.
+Completed in `0002`. The prior blocker was that `service/src/main.cpp`
+hardcoded `0.0.0.0:8080`; MySQL and Redis primitives could not be constructed
+consistently without typed configuration and secret handling.
 
 ### 2. Logging initialization
 
-Do immediately after configuration. Logging is required to diagnose database,
-Redis, startup, and shutdown failures. It depends on the configured log level
-and should be initialized before infrastructure clients.
+Completed in `0002`. Logging is initialized after configuration and before
+infrastructure clients so database, Redis, startup, and shutdown failures can
+be diagnosed consistently.
 
 ### 3. MySQL schema and initialization
 
-Do in P0 after the configuration/logging design, before P2 integration.
-`docs/03-database-design.md` already contains the locked DDL, while
-`docker/mysql/init/` is empty and the running database has no tables.
+Completed in `0002`. The locked `docs/03-database-design.md` DDL now exists as
+canonical scripts under `database/schema/` and is mounted by Compose.
 
 ### 4. P2 engine integration into service
 
@@ -122,16 +124,15 @@ P2 user slice
   -> Benchmark meaningful end-to-end behavior
 ```
 
-## E. Start First
+## E. Completed First
 
-Start with configuration, then logging and schema:
+The P0 foundation was completed in this order:
 
 1. config loader and environment override precedence;
 2. logging initialization and secret redaction;
 3. schema/init scripts and non-destructive database verification.
 
-The first code change should be the config loader because all later runtime
-work depends on it.
+The config loader came first because all later runtime work depends on it.
 
 ## F. Defer
 
@@ -184,9 +185,9 @@ themselves break P1 behavior.
 | Task | Level | ExecPlan |
 |---|---|---|
 | Fix `project-state.md` actual-HEAD drift | Level 1 | None |
-| Configuration loader and env overrides | Level 3 | `0002` |
-| Logging initialization | Level 2 | Included in `0002` |
-| MySQL schema and init scripts | Level 3 | `0002` |
+| Configuration loader and env overrides | Level 3 | `0002` completed |
+| Logging initialization | Level 2 | Included in completed `0002` |
+| MySQL schema and init scripts | Level 3 | `0002` completed |
 | Sanitizer build/test matrix | Level 3 | `0003` |
 | P1 HTTP/epoll correctness gate | Level 3 | `0004` |
 | P2 user vertical slice | Level 3 | `0005` |
@@ -198,7 +199,10 @@ would require an explicit architecture migration or frozen-contract break.
 
 ## Active ExecPlans
 
-- `docs/exec-plans/active/0002-p0-config-logging-schema.md`
 - `docs/exec-plans/active/0003-quality-and-performance-baseline.md`
 - `docs/exec-plans/active/0004-p1-correctness-gate.md`
 - `docs/exec-plans/active/0005-p2-user-vertical-slice.md`
+
+## Completed ExecPlans
+
+- `docs/exec-plans/completed/0002-p0-config-logging-schema.md`

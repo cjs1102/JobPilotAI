@@ -4,9 +4,10 @@
 >
 > Branch: `main`
 >
-> HEAD: `f28a98c chore(config): add safe local configuration template`
+> P0 implementation HEAD: `682e26d feat(database): add MySQL initialization schema`
 >
-> Remote: `origin/main` at the same commit; local and remote are fully synced
+> Remote: `origin/main` remains at `2be5212`; the P0 commits are local until a
+> separate push action is approved
 >
 > This document describes the actual files and Git state on disk. It is an AI
 > takeover map, not a substitute for the architecture, API, database, or
@@ -14,21 +15,28 @@
 
 ## 1. Executive Summary
 
-JobPilotAI is between a completed P1 network prototype and an incomplete P0/P2
-engineering foundation.
+JobPilotAI has a completed P1 network prototype and a completed P0 runtime
+foundation. P2 engine primitives exist but are not yet wired into the service
+business layer.
 
 - `service/` is the canonical build entry.
 - The root `CMakeLists.txt` is a working unified developer entry.
 - Clean Release builds from both entries succeed.
-- All 20 current tests pass with MySQL and Redis running and
+- All 36 current tests pass with MySQL and Redis running and
   `MYSQL_PASSWORD=root`; backend test targets explicitly retain assertions in
   Release builds.
 - P1 is complete for the current baseline and frozen. Its implementation has
   not changed since `6236ba1`.
 - P2 database and cache engine primitives and tests exist and are committed to
   Git, but they are not wired into the service business layer.
-- No database schema is installed yet.
-- Six baseline commits are pushed to `origin/main`.
+- Typed configuration loading, environment overrides, fail-fast secret
+  validation, application logging, and canonical MySQL schema scripts are
+  implemented and covered by tests.
+- The service startup flow is now
+  `Config -> Logging -> EventLoop/HttpServer`; it still does not construct
+  MySQL or Redis clients.
+- The schema is committed under `database/schema/` and is mounted by Compose
+  into the MySQL initialization directory.
 - The only untracked local WIP is
   `service/include/jobpilot/service/user/`.
 
@@ -38,25 +46,27 @@ engineering foundation.
 |---|---|
 | Branch | `main` |
 | Upstream | `origin/main` |
-| Local vs remote | Identical at `f28a98c` |
-| Recent history | Six baseline commits on top of `6236ba1` |
+| Local vs remote | Local has P0 commits; `origin/main` remains `2be5212` |
+| Recent history | P0 implementation commits on top of `2be5212` |
 | Remote | `https://github.com/cjs1102/JobPilotAI.git` |
 | Deleted tracked files | None |
 | Staged changes | None |
 | Tracked modifications | None |
 | Untracked content | `service/include/jobpilot/service/user/` WIP only |
-| Push state | `main == origin/main` at `f28a98c` |
+| Push state | P0 changes are committed locally and not pushed |
 
-The six baseline commits are:
+The current local P0 commits are:
 
 ```text
-f28a98c chore(config): add safe local configuration template
-71a3a9b build: support root and service CMake entry points
-ffd93d3 test: preserve assertions and stabilize timing tests
-4edf004 feat(engine): add database and cache primitives
-362f504 build(third_party): vendor libbcrypt with provenance
-9fae43a docs(ai): establish project takeover and AI infrastructure
+682e26d feat(database): add MySQL initialization schema
+2c2f344 feat(logging): initialize application logging
+1d3bcbd feat(config): add configuration loading and environment overrides
+4b82bd8 docs(plans): define next-phase execution plans
+2be5212 docs: update project state after baseline sync
 ```
+
+The P0 documentation/state commit follows the implementation commits; use
+`git rev-parse HEAD` for the exact current documentation commit.
 
 ## 3. What Exists on Disk
 
@@ -66,19 +76,19 @@ ffd93d3 test: preserve assertions and stabilize timing tests
 backend/
 ├── include/jobpilot/
 │   ├── cache/
-│   ├── core/
+│   ├── core/          # Config, Logger, ThreadPool interfaces
 │   ├── database/
 │   ├── http/
 │   ├── log/          # empty directory
 │   └── network/
 ├── src/
 │   ├── cache/
-│   ├── core/
+│   ├── core/          # Config, Logger, ThreadPool implementations
 │   ├── database/
 │   ├── http/
 │   ├── log/          # empty directory
 │   └── network/
-└── tests/
+└── tests/             # P1 network/HTTP plus Config, Logger, Schema tests
 ```
 
 ### Service
@@ -102,9 +112,10 @@ service/
 ### Other Project Areas
 
 - `third_party/libbcrypt/`: vendored bcrypt implementation.
-- `docker/mysql/init/`: empty directory.
+- `database/schema/`: canonical, idempotent MySQL initialization scripts.
+- `docker/mysql/init/`: legacy empty directory; no longer mounted.
 - `docs/`: architecture, API, database, execution, ADR, AI, and ExecPlan docs.
-- `database/`, `gateway/`, `ai_service/`, `crawler/`, and `scripts/`: absent.
+- `gateway/`, `ai_service/`, `crawler/`, and `scripts/`: absent.
 - `.agents/skills/jobpilot-reactor-review/`: project-specific AI workflow.
 
 ## 4. Current Architecture
@@ -113,14 +124,16 @@ service/
 
 `service/src/main.cpp` currently:
 
-1. Creates an `EventLoop`.
-2. Creates an `HttpServer` on `0.0.0.0:8080`.
-3. Registers routes from `service/src/router.cpp`.
-4. Starts the server.
-5. Blocks in `EventLoop::Loop()`.
+1. Parses the optional `--config=<path>` argument.
+2. Loads `Config` from YAML plus environment overrides.
+3. Initializes the application logger from `log.level`.
+4. Logs non-secret MySQL, Redis, and service configuration.
+5. Creates an `EventLoop` and `HttpServer` on the configured host and port.
+6. Registers routes from `service/src/router.cpp`.
+7. Starts the server and blocks in `EventLoop::Loop()`.
 
-The port is hardcoded. The service does not load `config/config.yaml`, initialize
-MySQL or Redis, configure logging, or install signal handlers.
+The service still does not construct MySQL or Redis clients and does not install
+signal handlers. Those remain explicit later-stage work.
 
 ### Network and HTTP Call Graph
 
@@ -255,14 +268,14 @@ They are not yet connected to the service business layer.
 
 ### Not Integrated
 
-- No config loader or environment override implementation.
-- No service logging initialization.
 - No user DAO implementation.
-- No database schema files.
 - No MySQL or Redis construction in `main`.
 - No HTTP user registration or login routes.
 - No transaction abstraction.
 - No DAO/service/controller business flow.
+
+Configuration, logging, and schema are P0 infrastructure and are now present;
+they are not P2 business integration.
 
 ## 7. Build and Test State
 
@@ -295,10 +308,17 @@ ctest --test-dir build --output-on-failure
 |---|---|
 | Clean `service/` configure and Release build | Passed |
 | Clean root configure and Release build | Passed |
-| `service/` CTest | 20/20 passed with `MYSQL_PASSWORD=root` |
-| Root CTest | 20/20 passed with `MYSQL_PASSWORD=root` |
+| `service/` CTest | 36/36 passed with `MYSQL_PASSWORD=root` |
+| Root CTest | 36/36 passed with `MYSQL_PASSWORD=root` |
+| ASan/UBSan targeted P0/boundary tests | 18/18 passed |
+| Missing `MYSQL_PASSWORD` startup | Failed fast with exit code 1 and a critical log |
+| Valid startup | Loaded YAML, initialized logging, and started HTTP on configured host/port |
+| Fresh isolated schema initialization | Passed on a non-default database name; 11 tables created |
 | Test compile flags | `-DNDEBUG` followed by `-UNDEBUG` |
 | C++ language mode | `-std=c++17` |
+
+The full CTest suites require live MySQL and Redis. `SchemaTest` also requires
+the canonical schema to be applied to the configured database.
 
 ### CMake Resolution
 
@@ -318,9 +338,10 @@ no longer required for baseline safety.
 - MySQL container: running and healthy.
 - Redis container: running and healthy.
 - MySQL database `jobpilot`: exists.
-- MySQL tables: none observed.
-- `docker/mysql/init/`: empty, so no schema or seed is installed at container
-  initialization.
+- MySQL tables: the 11 canonical tables are present.
+- `database/schema/`: mounted at `/docker-entrypoint-initdb.d:ro`; scripts run
+  only when the MySQL data volume is initialized for the first time.
+- `docker/mysql/init/`: legacy empty directory and no longer mounted.
 - No backend container or Dockerfile exists yet.
 - Compose reads MySQL credentials from required environment variables.
 - `.env.example` contains placeholder values only.
@@ -346,9 +367,14 @@ The following are no longer local-only changes:
 - The vendored bcrypt source and provenance note.
 - Project documentation and AI infrastructure.
 - Root/service CMake repairs and assertion-preserving test configuration.
+- Config loader and environment override implementation with tests.
+- spdlog initialization wrapper, startup logging, and logger tests.
+- Canonical `database/schema/` scripts, schema integration tests, and Compose
+  initialization mount.
 - Safe local configuration templates and the expanded `.gitignore`.
 
-They are included in the six baseline commits listed in Section 2.
+They are included in the local P0 commits listed in Section 2; the older
+six-commit baseline remains in history under `2be5212`.
 
 ### Ignored Local State
 
@@ -389,8 +415,6 @@ it directly. Keep the provenance note with the source.
 
 | Priority | Issue | Effect |
 |---|---|---|
-| High | P0 config and logging are not implemented | `main` hardcodes runtime settings |
-| High | No schema files or MySQL tables | P2 cannot persist business data |
 | High | HTTP/header limits and case-insensitive headers are absent | Parsing correctness and DoS risk |
 | High | `EPOLLERR`/`EPOLLHUP` returns before readable data | Peer-close data loss possible |
 | High | Raw `Channel *` in epoll active list | Lifetime risk under reentrant removal |
@@ -400,15 +424,19 @@ it directly. Keep the provenance note with the source.
 | Medium | No sanitizer or benchmark configuration | Memory, race, and performance risks unmeasured |
 | Medium | User DAO has declarations but no implementation | P2 skeleton only |
 | Medium | P2 engine primitives are not wired into service | No business flow yet |
+| Medium | MySQL and Redis clients are not constructed by the service | Runtime infrastructure is not connected yet |
 | Medium | Redis/MySQL tests require live services | Clean CTest is not self-contained |
+| Low | Schema scripts require a fresh volume to execute automatically | Existing volumes need explicit migration/application |
 | Low | Existing MySQL volumes retain old credentials | Credential changes need volume recreation |
 
 ## 13. Git State Classification
 
 ### Committed Baseline
 
-The baseline is committed and pushed in six logical commits listed in Section
-2. No tracked modifications or staged changes remain.
+The P0 implementation is committed locally in the logical commits listed in
+Section 2. `origin/main` has not been updated in this phase. No tracked
+modifications or staged changes should remain after the final state-document
+commit.
 
 ### Untracked WIP
 
@@ -427,15 +455,16 @@ implementation, and tests.
 
 ## 14. Next Development Entry
 
-The committed and pushed baseline is the next development starting point. P1
-remains frozen and the only untracked local content is the user DAO WIP.
+The local P0 baseline is the next development starting point. P1 remains frozen
+and the only untracked local content is the user DAO WIP.
 
 The next implementation sequence is:
 
-1. Implement configuration loading and logging without changing P1 behavior.
-2. Add database schema and initialization files.
-3. Wire MySQL, Redis, and Session only when P2 service integration begins.
-4. Address P1 hardening only through separately planned, test-backed changes.
-5. Add sanitizer presets and a benchmark baseline.
-6. Keep `service/include/jobpilot/service/user/` untracked until the user module
+1. Execute ExecPlan `0003` for sanitizer and performance-baseline
+   infrastructure.
+2. Execute ExecPlan `0004` for the minimum, separately approved P1 correctness
+   gate before changing frozen network behavior.
+3. Execute ExecPlan `0005` for the first P2 user vertical slice.
+4. Wire MySQL, Redis, and Session only during P2 integration.
+5. Keep `service/include/jobpilot/service/user/` untracked until the user module
    is implemented and committed as its own logical change.

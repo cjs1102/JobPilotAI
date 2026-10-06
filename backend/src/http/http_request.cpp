@@ -1,7 +1,33 @@
 #include "jobpilot/http/http_request.h"
 
+#include <algorithm>
+#include <cctype>
+
 namespace jobpilot::core
 {
+    namespace
+    {
+        bool EqualsCaseInsensitive(
+            const std::string &left,
+            const std::string &right)
+        {
+            if (left.size() != right.size())
+            {
+                return false;
+            }
+
+            return std::equal(
+                left.begin(),
+                left.end(),
+                right.begin(),
+                [](unsigned char lhs, unsigned char rhs)
+                {
+                    return std::tolower(lhs) ==
+                           std::tolower(rhs);
+                });
+        }
+
+    } // namespace
 
     HttpRequest::HttpRequest()
         : method_(HttpMethod::kInvalid),
@@ -62,20 +88,33 @@ namespace jobpilot::core
 
     bool HttpRequest::HasHeader(const std::string &name) const
     {
-        return headers_.find(name) != headers_.end();
+        for (const auto &entry : headers_)
+        {
+            if (EqualsCaseInsensitive(
+                    entry.first,
+                    name))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     std::string HttpRequest::GetHeader(
         const std::string &name) const
     {
-        const auto iterator = headers_.find(name);
-
-        if (iterator == headers_.end())
+        for (const auto &entry : headers_)
         {
-            return "";
+            if (EqualsCaseInsensitive(
+                    entry.first,
+                    name))
+            {
+                return entry.second;
+            }
         }
 
-        return iterator->second;
+        return "";
     }
 
     const HttpRequest::HeaderMap &HttpRequest::Headers() const

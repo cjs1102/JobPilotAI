@@ -292,10 +292,11 @@ namespace jobpilot::core
 
         if (outputBuffer_.ReadableBytes() == 0)
         {
-            n = ::write(
+            n = ::send(
                 socketFd_,
                 message.data(),
-                message.size());
+                message.size(),
+                MSG_NOSIGNAL);
 
             if (n < 0)
             {

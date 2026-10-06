@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <cstring>
+#include <sys/socket.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -160,10 +161,11 @@ namespace jobpilot::core
         int *savedErrno)
     {
         const ssize_t n =
-            ::write(
+            ::send(
                 fd,
                 Peek(),
-                ReadableBytes());
+                ReadableBytes(),
+                MSG_NOSIGNAL);
 
         if (n < 0)
         {

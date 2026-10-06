@@ -2,16 +2,18 @@
 
 > Date: 2026-10-06
 >
-> Verified Git baseline:
+> Planning baseline:
 >
 > - `HEAD = 2be52122c73acc6897dfdb8d235346e4c6dd7da9`
 > - `origin/main = 2be52122c73acc6897dfdb8d235346e4c6dd7da9`
 >
 > The user-supplied `f28a98c` was the prior baseline. The documentation-only
-> commit `2be5212` is now the actual synchronized HEAD.
+> commit `2be5212` was the baseline when this plan was written. `0c21200`
+> later synchronized the completed P0 work.
 >
-> Execution status: ExecPlan `0002` is completed. Config, logging, schema, and
-> service P0 wiring are committed locally; push remains a separate user action.
+> Execution status: ExecPlans `0002` and `0003` are completed. Config, logging,
+> schema, sanitizer presets, and benchmark infrastructure are committed
+> locally; push remains a separate user action.
 
 ## A. Overall Goal
 
@@ -31,7 +33,7 @@ The next phase is not "implement all of P2". It is:
 ```text
 Baseline documentation correction
     -> P0 completion: config, logging, schema [completed in 0002]
-    -> Quality baseline: sanitizers
+    -> Quality baseline: sanitizers and benchmark [completed in 0003]
     -> P1 minimum correctness gate
     -> P2 user vertical slice
     -> Benchmark and performance baseline
@@ -188,10 +190,10 @@ themselves break P1 behavior.
 | Configuration loader and env overrides | Level 3 | `0002` completed |
 | Logging initialization | Level 2 | Included in completed `0002` |
 | MySQL schema and init scripts | Level 3 | `0002` completed |
-| Sanitizer build/test matrix | Level 3 | `0003` |
+| Sanitizer build/test matrix | Level 3 | `0003` completed |
 | P1 HTTP/epoll correctness gate | Level 3 | `0004` |
 | P2 user vertical slice | Level 3 | `0005` |
-| Benchmark and performance baseline | Level 3 | `0003`, later phase |
+| Benchmark and performance baseline | Level 3 | `0003` completed |
 | Full P2, RPC, scheduler, or P1 redesign | Not approved now | None |
 
 No Level 4 task is justified by the current candidate list. A Level 4 plan
@@ -199,10 +201,10 @@ would require an explicit architecture migration or frozen-contract break.
 
 ## Active ExecPlans
 
-- `docs/exec-plans/active/0003-quality-and-performance-baseline.md`
 - `docs/exec-plans/active/0004-p1-correctness-gate.md`
 - `docs/exec-plans/active/0005-p2-user-vertical-slice.md`
 
 ## Completed ExecPlans
 
 - `docs/exec-plans/completed/0002-p0-config-logging-schema.md`
+- `docs/exec-plans/completed/0003-quality-and-performance-baseline.md`

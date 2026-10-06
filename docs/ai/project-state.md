@@ -4,9 +4,10 @@
 >
 > Branch: `main`
 >
-> P0 implementation HEAD: `682e26d feat(database): add MySQL initialization schema`
+> 0003 implementation HEAD:
+> `1901b21 test(thread-pool): synchronize condition variable notification`
 >
-> Remote: `origin/main` remains at `2be5212`; the P0 commits are local until a
+> Remote: `origin/main` is `0c21200`; the 0003 commits are local until a
 > separate push action is approved
 >
 > This document describes the actual files and Git state on disk. It is an AI
@@ -37,6 +38,12 @@ business layer.
   MySQL or Redis clients.
 - The schema is committed under `database/schema/` and is mounted by Compose
   into the MySQL initialization directory.
+- CMake presets, isolated ASan/UBSan/TSan builds, test labels, and a
+  dependency-free microbenchmark runner are implemented.
+- ASan and UBSan each pass all 36 tests. TSan passes the 7-test concurrency
+  gate and the 6-test external-service subset.
+- The first `wrk` HTTP baseline recorded a median of approximately 32,698
+  requests/sec for `/health` with two threads and 32 connections.
 - The only untracked local WIP is
   `service/include/jobpilot/service/user/`.
 
@@ -46,18 +53,21 @@ business layer.
 |---|---|
 | Branch | `main` |
 | Upstream | `origin/main` |
-| Local vs remote | Local has P0 commits; `origin/main` remains `2be5212` |
-| Recent history | P0 implementation commits on top of `2be5212` |
+| Local vs remote | Local has the 0003 commits; `origin/main` is `0c21200` |
+| Recent history | Quality baseline commits on top of `0c21200` |
 | Remote | `https://github.com/cjs1102/JobPilotAI.git` |
 | Deleted tracked files | None |
 | Staged changes | None |
 | Tracked modifications | None |
 | Untracked content | `service/include/jobpilot/service/user/` WIP only |
-| Push state | P0 changes are committed locally and not pushed |
+| Push state | 0003 changes are committed locally and not pushed |
 
 The current local P0 commits are:
 
 ```text
+1901b21 test(thread-pool): synchronize condition variable notification
+baefe55 build(quality): add sanitizer and benchmark infrastructure
+0c21200 docs(state): record completed P0 foundation
 682e26d feat(database): add MySQL initialization schema
 2c2f344 feat(logging): initialize application logging
 1d3bcbd feat(config): add configuration loading and environment overrides
@@ -113,6 +123,9 @@ service/
 
 - `third_party/libbcrypt/`: vendored bcrypt implementation.
 - `database/schema/`: canonical, idempotent MySQL initialization scripts.
+- `CMakePresets.json` and `service/CMakePresets.json`: quality build presets.
+- `backend/benchmarks/`: microbenchmark source and repeatable HTTP runner.
+- `docs/quality/` and `docs/benchmarks/`: sanitizer and performance evidence.
 - `docker/mysql/init/`: legacy empty directory; no longer mounted.
 - `docs/`: architecture, API, database, execution, ADR, AI, and ExecPlan docs.
 - `gateway/`, `ai_service/`, `crawler/`, and `scripts/`: absent.
@@ -302,6 +315,11 @@ cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 ```
 
+Root and `service/` also provide `debug`, `release`, `asan`, `ubsan`, `tsan`,
+and `benchmark` CMake presets. Sanitizer presets link the available Release
+Conan packages and compile project sources with `-O1 -g` because Debug package
+variants are not available in the local cache or reachable remote.
+
 ### Verified Results
 
 | Check | Result |
@@ -310,7 +328,13 @@ ctest --test-dir build --output-on-failure
 | Clean root configure and Release build | Passed |
 | `service/` CTest | 36/36 passed with `MYSQL_PASSWORD=root` |
 | Root CTest | 36/36 passed with `MYSQL_PASSWORD=root` |
-| ASan/UBSan targeted P0/boundary tests | 18/18 passed |
+| ASan full CTest with leak detection | 36/36 passed |
+| UBSan full CTest with halt-on-error | 36/36 passed |
+| TSan concurrency subset | 7/7 passed |
+| TSan external-service subset | 6/6 passed |
+| Service top-level ASan/TSan builds | Passed |
+| Microbenchmark | Buffer, parser, router, and event-loop dispatch measured |
+| HTTP `wrk` baseline | Median approximately 32,698 requests/sec |
 | Missing `MYSQL_PASSWORD` startup | Failed fast with exit code 1 and a critical log |
 | Valid startup | Loaded YAML, initialized logging, and started HTTP on configured host/port |
 | Fresh isolated schema initialization | Passed on a non-default database name; 11 tables created |
@@ -332,6 +356,13 @@ Backend test targets receive `-UNDEBUG` after the Release `-DNDEBUG` flag, so
 their existing C assertions execute during normal CTest runs. The repository
 can still migrate individual tests to GoogleTest assertions later, but that is
 no longer required for baseline safety.
+
+TSan exposed a synchronization bug in `test_thread_pool.cpp`; the test now
+updates completion state and signals under the same mutex. No P1 production
+code changed.
+
+Detailed commands and results are in `docs/quality/README.md` and
+`docs/benchmarks/README.md`.
 
 ## 8. Docker and Infrastructure State
 
@@ -372,6 +403,10 @@ The following are no longer local-only changes:
 - Canonical `database/schema/` scripts, schema integration tests, and Compose
   initialization mount.
 - Safe local configuration templates and the expanded `.gitignore`.
+- Root and service CMake quality presets with ASan, UBSan, TSan, and benchmark
+  options.
+- Microbenchmark source, HTTP `wrk` runner, and recorded quality baseline.
+- The TSan-driven ThreadPool test synchronization fix.
 
 They are included in the local P0 commits listed in Section 2; the older
 six-commit baseline remains in history under `2be5212`.
@@ -421,11 +456,12 @@ it directly. Keep the provenance note with the source.
 | Medium | `write` may trigger `SIGPIPE` | Process termination risk |
 | Medium | HTTP contexts use a discarded temporary allocation | Small bug and unnecessary allocation |
 | Medium | No graceful signal handling | Service cannot shut down cleanly |
-| Medium | No sanitizer or benchmark configuration | Memory, race, and performance risks unmeasured |
+| Medium | Google Benchmark is not yet integrated | Baseline uses the dependency-free runner plus `wrk` |
 | Medium | User DAO has declarations but no implementation | P2 skeleton only |
 | Medium | P2 engine primitives are not wired into service | No business flow yet |
 | Medium | MySQL and Redis clients are not constructed by the service | Runtime infrastructure is not connected yet |
 | Medium | Redis/MySQL tests require live services | Clean CTest is not self-contained |
+| Low | Sanitizer presets use Release dependency packages | Local cache lacks Debug variants |
 | Low | Schema scripts require a fresh volume to execute automatically | Existing volumes need explicit migration/application |
 | Low | Existing MySQL volumes retain old credentials | Credential changes need volume recreation |
 
@@ -433,10 +469,10 @@ it directly. Keep the provenance note with the source.
 
 ### Committed Baseline
 
-The P0 implementation is committed locally in the logical commits listed in
-Section 2. `origin/main` has not been updated in this phase. No tracked
-modifications or staged changes should remain after the final state-document
-commit.
+The P0 and 0003 implementation commits are local. `origin/main` was at
+`0c21200` before this phase and has not yet received the 0003 commits. No
+tracked modifications or staged changes should remain after the final
+state-document commit.
 
 ### Untracked WIP
 
@@ -455,16 +491,14 @@ implementation, and tests.
 
 ## 14. Next Development Entry
 
-The local P0 baseline is the next development starting point. P1 remains frozen
-and the only untracked local content is the user DAO WIP.
+The local P0 plus quality baseline is the next development starting point. P1
+remains frozen and the only untracked local content is the user DAO WIP.
 
 The next implementation sequence is:
 
-1. Execute ExecPlan `0003` for sanitizer and performance-baseline
-   infrastructure.
-2. Execute ExecPlan `0004` for the minimum, separately approved P1 correctness
+1. Execute ExecPlan `0004` for the minimum, separately approved P1 correctness
    gate before changing frozen network behavior.
-3. Execute ExecPlan `0005` for the first P2 user vertical slice.
-4. Wire MySQL, Redis, and Session only during P2 integration.
-5. Keep `service/include/jobpilot/service/user/` untracked until the user module
+2. Execute ExecPlan `0005` for the first P2 user vertical slice.
+3. Wire MySQL, Redis, and Session only during P2 integration.
+4. Keep `service/include/jobpilot/service/user/` untracked until the user module
    is implemented and committed as its own logical change.

@@ -1,16 +1,16 @@
 # JobPilotAI Current Project State
 
-> Snapshot date: 2026-10-04
+> Snapshot date: 2026-10-06
 >
 > Branch: `main`
 >
-> HEAD: `6236ba1 feat: complete P1 HTTP server and thread pool`
+> HEAD: `f28a98c chore(config): add safe local configuration template`
 >
-> Remote: `origin/main` at the same commit
+> Remote: `origin/main` at the same commit; local and remote are fully synced
 >
-> This document describes the actual files on disk, including files that are
-> not tracked by Git yet. It is an AI takeover map, not a substitute for the
-> architecture, API, database, or execution documents.
+> This document describes the actual files and Git state on disk. It is an AI
+> takeover map, not a substitute for the architecture, API, database, or
+> execution documents.
 
 ## 1. Executive Summary
 
@@ -23,12 +23,14 @@ engineering foundation.
 - All 20 current tests pass with MySQL and Redis running and
   `MYSQL_PASSWORD=root`; backend test targets explicitly retain assertions in
   Release builds.
-- P1 has a working epoll/Reactor/HTTP subset, but timers, sanitizer evidence,
-  graceful shutdown, performance evidence, and several network edge cases are
-  still missing.
-- P2 has MySQL, Redis, session, SQL-result, and bcrypt primitives, but they are
-  not wired into the service and no database schema is installed.
-- Most current work exists only on disk and is not committed to GitHub.
+- P1 is complete for the current baseline and frozen. Its implementation has
+  not changed since `6236ba1`.
+- P2 database and cache engine primitives and tests exist and are committed to
+  Git, but they are not wired into the service business layer.
+- No database schema is installed yet.
+- Six baseline commits are pushed to `origin/main`.
+- The only untracked local WIP is
+  `service/include/jobpilot/service/user/`.
 
 ## 2. Git and GitHub State
 
@@ -36,15 +38,25 @@ engineering foundation.
 |---|---|
 | Branch | `main` |
 | Upstream | `origin/main` |
-| Local vs remote | Same commit before current uncommitted work |
-| Recent history | 5 commits, latest `6236ba1` |
+| Local vs remote | Identical at `f28a98c` |
+| Recent history | Six baseline commits on top of `6236ba1` |
 | Remote | `https://github.com/cjs1102/JobPilotAI.git` |
 | Deleted tracked files | None |
-| Staged changes | None observed |
-| Local modifications | P1/P2/build/config changes plus baseline hardening changes from this audit |
-| Untracked content | P2 engine code, tests, docs, AI infrastructure, vendored bcrypt |
+| Staged changes | None |
+| Tracked modifications | None |
+| Untracked content | `service/include/jobpilot/service/user/` WIP only |
+| Push state | `main == origin/main` at `f28a98c` |
 
-No commit or push was performed during this audit.
+The six baseline commits are:
+
+```text
+f28a98c chore(config): add safe local configuration template
+71a3a9b build: support root and service CMake entry points
+ffd93d3 test: preserve assertions and stabilize timing tests
+4edf004 feat(engine): add database and cache primitives
+362f504 build(third_party): vendor libbcrypt with provenance
+9fae43a docs(ai): establish project takeover and AI infrastructure
+```
 
 ## 3. What Exists on Disk
 
@@ -78,7 +90,7 @@ service/
 ├── config/config.yaml
 ├── include/jobpilot/
 │   ├── error.h
-│   └── service/user/     # interfaces and DAO declaration only
+│   └── service/user/     # local untracked WIP: interfaces and DAO declaration
 ├── src/
 │   ├── main.cpp
 │   ├── router.cpp
@@ -187,6 +199,10 @@ area.
 
 ## 5. P1 Assessment
 
+Status: P1 is complete for the current baseline and frozen. Its network and HTTP
+implementation has not changed since `6236ba1`. The items below remain known
+follow-up hardening work, not pending P1 implementation.
+
 ### Implemented
 
 - `EventLoop` with eventfd wakeup and cross-thread `RunInLoop`.
@@ -220,6 +236,9 @@ area.
 - Backpressure, high-water marks, or idle connection timeout policy.
 
 ## 6. P2 Assessment
+
+Status: the engine primitives are implemented, tested, and committed to Git.
+They are not yet connected to the service business layer.
 
 ### Implemented as Engine Primitives
 
@@ -309,49 +328,34 @@ no longer required for baseline safety.
 - Reusing an existing MySQL volume after changing credentials requires the
   relevant volume to be recreated or the password to be rotated in the server.
 
-## 9. Local Changes Not Yet in Git
+## 9. Current Local WIP and Ignored State
 
-### Formal P2 Engine Code
+### Untracked WIP
 
-- `backend/include/jobpilot/database/`
-- `backend/src/database/`
-- `backend/include/jobpilot/cache/`
-- `backend/src/cache/`
+- `service/include/jobpilot/service/user/user_dao.h`
+- `service/include/jobpilot/service/user/user_dao_interface.h`
 
-### P2 Tests
+These files define P2 user DAO interfaces and declarations only. They have no
+implementation or tests and remain intentionally untracked.
 
-- `backend/tests/test_mysql_pool.cpp`
-- `backend/tests/test_sql_result.cpp`
-- `backend/tests/test_redis_client.cpp`
-- `backend/tests/test_bcrypt.cpp`
+### Committed Baseline
 
-### Project Configuration and Build Changes
+The following are no longer local-only changes:
 
-- `backend/CMakeLists.txt`
-- `CMakeLists.txt`
-- `service/CMakeLists.txt`
-- `service/config/config.yaml`
-- `backend/tests/test_tcp_connection_write_buffer.cpp`
-- `backend/tests/test_redis_client.cpp`
-- `docker-compose.yml`
-- `.env.example`
+- P2 database and cache headers, sources, and tests.
+- The vendored bcrypt source and provenance note.
+- Project documentation and AI infrastructure.
+- Root/service CMake repairs and assertion-preserving test configuration.
+- Safe local configuration templates and the expanded `.gitignore`.
 
-### Third-Party Code
+They are included in the six baseline commits listed in Section 2.
 
-- `third_party/libbcrypt/`
-- `third_party/libbcrypt/PROVENANCE.md`
+### Ignored Local State
 
-### AI Infrastructure
-
-- `AGENTS.md`
-- `.agents/skills/jobpilot-reactor-review/`
-- `docs/ai/`
-- `docs/exec-plans/`
-
-### Documentation
-
-- All files under `docs/` are currently untracked.
-- `docs/ai/github_resources.md` must be preserved.
+- `service/build/`
+- `service/CMakeUserPresets.json`
+- Local `.env`, local config variants, logs, caches, binaries, coverage,
+  profiler output, core dumps, and IDE state.
 
 ## 10. Sensitive Information Review
 
@@ -399,49 +403,39 @@ it directly. Keep the provenance note with the source.
 | Medium | Redis/MySQL tests require live services | Clean CTest is not self-contained |
 | Low | Existing MySQL volumes retain old credentials | Credential changes need volume recreation |
 
-## 13. Git Classification
+## 13. Git State Classification
 
-### Should Commit
+### Committed Baseline
 
-- All project documentation under `docs/`.
-- `AGENTS.md` and `.agents/skills/jobpilot-reactor-review/`.
-- Database and cache engine headers/sources.
-- Their tests.
-- `third_party/libbcrypt/`.
-- `third_party/libbcrypt/PROVENANCE.md`.
-- The `.gitignore` update.
-- The repaired root/service CMake configuration.
-- The assertion-preserving test configuration.
-- Docker Compose environment substitution and `.env.example`.
+The baseline is committed and pushed in six logical commits listed in Section
+2. No tracked modifications or staged changes remain.
 
-### Should Be Ignored
+### Untracked WIP
+
+- `service/include/jobpilot/service/user/user_dao.h`
+- `service/include/jobpilot/service/user/user_dao_interface.h`
+
+Keep these files untracked until the P2 user module has an implementation plan,
+implementation, and tests.
+
+### Ignored
 
 - `service/build/`.
 - `service/CMakeUserPresets.json`.
-- Future `.env` and local config variants.
-- Compiled libraries, object files, dependency files, logs, core dumps,
-  coverage, profiler output, and IDE state.
-
-### Keep Local, Do Not Commit
-
-- Machine-specific Conan/CMake generated files.
-- Local `.env` or `config.local.yaml`.
-- Local build directories.
-
-### Needs Human Confirmation
-
-- Whether to commit `service/include/jobpilot/service/user/` now as a P2
-  skeleton or wait until a `UserDao` implementation exists.
-- Whether the vendored bcrypt dependency should be committed as one dedicated
-  commit before the P2 engine changes.
+- `.env`, local config variants, caches, logs, binaries, coverage, profiler
+  output, core dumps, and IDE state.
 
 ## 14. Next Development Entry
 
-The build and test baseline is ready for review. The next implementation
-sequence is:
+The committed and pushed baseline is the next development starting point. P1
+remains frozen and the only untracked local content is the user DAO WIP.
 
-1. Add configuration loading and logging.
-2. Add database schema and connect MySQL/Redis only when P2 starts.
-3. Harden P1 HTTP parsing and event-close handling.
-4. Add sanitizer presets and one benchmark baseline.
-5. Keep P1 network behavior frozen unless a verified defect requires a change.
+The next implementation sequence is:
+
+1. Implement configuration loading and logging without changing P1 behavior.
+2. Add database schema and initialization files.
+3. Wire MySQL, Redis, and Session only when P2 service integration begins.
+4. Address P1 hardening only through separately planned, test-backed changes.
+5. Add sanitizer presets and a benchmark baseline.
+6. Keep `service/include/jobpilot/service/user/` untracked until the user module
+   is implemented and committed as its own logical change.

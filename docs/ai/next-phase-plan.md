@@ -11,9 +11,10 @@
 > commit `2be5212` was the baseline when this plan was written. `0c21200`
 > later synchronized the completed P0 work.
 >
-> Execution status: ExecPlans `0002` and `0003` are completed. Config, logging,
-> schema, sanitizer presets, and benchmark infrastructure are committed
-> locally; push remains a separate user action.
+> Execution status: ExecPlans `0002`, `0003`, and `0004` are completed. Config,
+> logging, schema, sanitizer presets, benchmark infrastructure, and the
+> minimum P1 correctness gate are committed locally; push remains a separate
+> user action.
 
 ## A. Overall Goal
 
@@ -79,15 +80,15 @@ Do before P2 integration, but as a separately approved freeze exception.
 These are correctness defects, not opportunities to add timers, Acceptor,
 EventLoopThreadPool, HTTPS, or chunked encoding.
 
-Priority defects:
+Priority defects and outcomes:
 
-- HTTP header lookup is case-sensitive, although HTTP field names are not.
-- The parser must reject conflicting or invalid `Content-Length`.
-- `Channel::HandleEvent` returns on `EPOLLERR/HUP` before draining readable
-  data, which can lose final bytes.
-- `TcpConnection::SendInLoop` uses `write`, so peer closure can raise SIGPIPE.
-- epoll's active list stores raw `Channel *`; reentrant removal can create a
-  stale-pointer risk.
+- Completed in `0004`: HTTP header lookup is now case-insensitive.
+- Completed in `0004`: duplicate/conflicting `Content-Length` is rejected.
+- Completed in `0004`: `Channel::HandleEvent` drains readable data before HUP
+  close handling.
+- Completed in `0004`: socket writes use `send(MSG_NOSIGNAL)`.
+- Retained as technical debt: epoll's active list stores raw `Channel *`;
+  callers must preserve channel lifetime through event dispatch.
 
 ### 6. Sanitizers
 
@@ -191,7 +192,7 @@ themselves break P1 behavior.
 | Logging initialization | Level 2 | Included in completed `0002` |
 | MySQL schema and init scripts | Level 3 | `0002` completed |
 | Sanitizer build/test matrix | Level 3 | `0003` completed |
-| P1 HTTP/epoll correctness gate | Level 3 | `0004` |
+| P1 HTTP/epoll correctness gate | Level 3 | `0004` completed |
 | P2 user vertical slice | Level 3 | `0005` |
 | Benchmark and performance baseline | Level 3 | `0003` completed |
 | Full P2, RPC, scheduler, or P1 redesign | Not approved now | None |
@@ -201,10 +202,10 @@ would require an explicit architecture migration or frozen-contract break.
 
 ## Active ExecPlans
 
-- `docs/exec-plans/active/0004-p1-correctness-gate.md`
 - `docs/exec-plans/active/0005-p2-user-vertical-slice.md`
 
 ## Completed ExecPlans
 
 - `docs/exec-plans/completed/0002-p0-config-logging-schema.md`
 - `docs/exec-plans/completed/0003-quality-and-performance-baseline.md`
+- `docs/exec-plans/completed/0004-p1-correctness-gate.md`

@@ -1,5 +1,9 @@
 # ExecPlan 0004: P1 Minimum Correctness Gate
 
+> Status: Completed on 2026-10-06.
+>
+> Archived after regression and sanitizer verification.
+
 ## Background
 
 P1 is complete and frozen. The freeze preserves behavior; it does not make
@@ -101,10 +105,62 @@ Rollback:
 
 ## Current Progress
 
-Not started.
+- [x] Research
+- [x] Phase 1: Header and Body Framing Correctness
+- [x] Phase 2: Close and Write Correctness
+- [x] Phase 3: Channel Lifetime Assessment
+
+### Additional Research Decisions
+
+- Header lookup will scan stored names case-insensitively rather than changing
+  the stored map representation.
+- Duplicate `Content-Length` will be rejected unconditionally. Rejecting all
+  duplicates is the smallest safe behavior for the current HTTP subset; it
+  avoids accepting conflicting framing metadata.
+- HUP/ERR dispatch will attempt a final read before close handling. Writes are
+  not attempted for an error/hangup event.
+- Socket writes in `Buffer::WriteFd` and `TcpConnection::SendInLoop` will use
+  `send(..., MSG_NOSIGNAL)` rather than changing the process-wide SIGPIPE
+  policy.
+- The raw `Channel *` active list will remain unchanged unless a deterministic
+  test proves a defect. The current server path holds a connection `shared_ptr`
+  and defers map removal through `QueueInLoop`.
+
+## Verification Results
+
+- Header case-insensitivity failed 4 focused tests before the fix and passed
+  after it.
+- Buffer and TcpConnection peer-close writes terminated with SIGPIPE before the
+  fix and passed after it.
+- The HUP test lost the final readable payload before the fix and passed after
+  it.
+- Clean `service/` and root builds: passed.
+- Normal `service/` and root CTest: 43/43 passed.
+- ASan with leak detection: 43/43 passed.
+- UBSan with halt-on-error: 43/43 passed.
+- TSan concurrency subset: 9/9 passed.
+- TSan external-service subset: 6/6 passed.
+- TSan exposed a shutdown race in `test_http_server.cpp`; the test now queues
+  `Quit()` onto the loop thread before joining. No EventLoop production code
+  changed.
+
+## Channel Lifetime Assessment
+
+No reproducible use-after-free was found in the server-managed path:
+
+- `TcpServer` owns connections in `connections_`.
+- `TcpConnection::HandleClose` invokes the close callback before map removal.
+- `TcpServer` captures a `shared_ptr` in the queued `RemoveConnection` task.
+- Therefore a `Channel *` already present in the active event list remains
+  backed by a live `TcpConnection` through event dispatch.
+
+The raw pointer remains a fragile API constraint: callers must not destroy a
+registered `Channel` while an active event list or callback can still reference
+it. This is recorded as technical debt, not changed in 0004.
 
 ## Known Issues and Follow-Up
 
 - Query-string routing, request-size limits, and backpressure are not part of
   this gate.
 - P1 implementation changes require explicit user approval before execution.
+- Raw channel pointers still require strict external lifetime discipline.

@@ -27,7 +27,7 @@ MYSQL_PASSWORD=root \
   ctest --preset asan
 ```
 
-Scope: all 36 current tests, including live MySQL, Redis, and schema checks.
+Scope: all 43 current tests, including live MySQL, Redis, and schema checks.
 
 ## UBSan
 
@@ -39,7 +39,7 @@ MYSQL_PASSWORD=root \
   ctest --preset ubsan
 ```
 
-Scope: all 36 current tests and `-fno-sanitize-recover=undefined`.
+Scope: all 43 current tests and `-fno-sanitize-recover=undefined`.
 
 ## TSan
 
@@ -76,9 +76,9 @@ Date: 2026-10-06
 
 | Check | Result |
 |---|---|
-| ASan full CTest | 36/36 passed |
-| UBSan full CTest | 36/36 passed |
-| TSan concurrency tests | 7/7 passed |
+| ASan full CTest | 43/43 passed |
+| UBSan full CTest | 43/43 passed |
+| TSan concurrency tests | 9/9 passed |
 | TSan external-service tests | 6/6 passed |
 
 TSan initially found a race in `test_thread_pool.cpp`: the completion counter

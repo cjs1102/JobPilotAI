@@ -9,6 +9,7 @@ the architecture, API, database, or execution documents.
 |---|---|
 | `github_resources.md` | GitHub resource research and classification. Reference only; do not copy third-party code. |
 | `project-state.md` | Current disk, Git, build, test, architecture, and technical-debt snapshot for AI takeover. |
+| `next-phase-plan.md` | Dependency-based plan for P0 completion, P1 correctness, P2 integration, and quality work. |
 | `README.md` | Navigation and boundaries for AI-facing documentation. |
 | `../../.agents/skills/jobpilot-reactor-review/SKILL.md` | Project workflow for reviewing Reactor, epoll, fd, callback, threading, shutdown, and network-test changes. |
 

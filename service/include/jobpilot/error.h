@@ -2,16 +2,49 @@
 
 namespace jobpilot {
 
-enum class ErrorCode {
-    OK = 0,
-
-    CONFIG_ERROR = 1000,
-
-    MYSQL_ERROR = 2000,
-
-    REDIS_ERROR = 3000,
-
-    INTERNAL_ERROR = 5000
+enum class ErrorCode : int {
+    kSuccess = 0,
+    kInvalidParam = 10001,
+    kMalformedRequest = 10002,
+    kUnauthorized = 20001,
+    kTokenExpired = 20002,
+    kForbidden = 20003,
+    kEmailExists = 30001,
+    kUserNotFound = 30002,
+    kInvalidPassword = 30003,
+    kInternalError = 60001,
+    kDatabaseError = 60002
 };
+
+inline const char *ErrorMessage(ErrorCode code)
+{
+    switch (code)
+    {
+    case ErrorCode::kSuccess:
+        return "success";
+    case ErrorCode::kInvalidParam:
+        return "invalid parameter";
+    case ErrorCode::kMalformedRequest:
+        return "malformed request body";
+    case ErrorCode::kUnauthorized:
+        return "unauthorized";
+    case ErrorCode::kTokenExpired:
+        return "token expired";
+    case ErrorCode::kForbidden:
+        return "forbidden";
+    case ErrorCode::kEmailExists:
+        return "email already exists";
+    case ErrorCode::kUserNotFound:
+        return "user not found";
+    case ErrorCode::kInvalidPassword:
+        return "invalid password";
+    case ErrorCode::kInternalError:
+        return "internal error";
+    case ErrorCode::kDatabaseError:
+        return "database error";
+    }
+
+    return "internal error";
+}
 
 }

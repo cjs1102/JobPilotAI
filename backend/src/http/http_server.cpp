@@ -77,9 +77,6 @@ namespace jobpilot::core
             return;
         }
 
-        auto context =
-            std::make_unique<ConnectionContext>();
-
         contexts_[connection->Name()] =
             std::make_shared<ConnectionContext>();
     }

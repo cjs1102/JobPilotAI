@@ -299,9 +299,8 @@ JobPilotAI/
 ├── third_party/
 │   └── libbcrypt/             # V1.1 修正：vendored bcrypt（bcrypt.c + bcrypt.h + LICENSE），CC0 许可
 ├── database/
-│   └── schema/                # 建表 SQL（P0 先建目录+占位说明，P2 补全，见 5.3 ⑥）
+│   └── schema/                # canonical DDL；P0 已落地，后续迁移按版本扩展
 ├── docker/
-│   ├── mysql/init/README.md   # 初始化脚本目录（P2 放 01_schema.sql / 02_seed.sql）
 │   └── backend/  ai/  gateway/   # Dockerfile（P4/P5 阶段填充）
 └── docs/                      # 已有，不动
 ```
@@ -459,12 +458,12 @@ redis:
 
 > **本地 vs Docker 的唯一差异 = 主机名**（127.0.0.1 vs 服务名）。代码只读环境变量与 yaml，不感知运行环境。
 
-### ⑥ MySQL 初始化最终方案（V1.1 修正：明确"只在数据卷为空时执行"与幂等要求）
+### ⑥ MySQL 初始化最终方案（明确"只在数据卷为空时执行"与幂等要求）
 
-- 初始化脚本目录：`docker/mysql/init/`，挂载到容器 `/docker-entrypoint-initdb.d`。
+- 初始化脚本目录：`database/schema/`，挂载到容器 `/docker-entrypoint-initdb.d`。
 - **执行时机**：MySQL 镜像**只在数据卷为空（首次启动）时执行 init 脚本**；之后 `docker compose down` 不会重跑，需要重置就 `docker compose down -v`。
-- 文件名按字母序执行：P2 落地 `01_schema.sql`（全量 DDL，全部 `CREATE TABLE IF NOT EXISTS`）+ `02_seed.sql`（示例数据，全部 `INSERT IGNORE`）。
-- P0 阶段 init 目录只放 `README.md` 说明（库由 compose 的 `MYSQL_DATABASE: jobpilot` 自动创建）。
+- 文件名按字母序执行：`01_user.sql`、`02_resume.sql`、`03_job.sql`、`04_application.sql`、`05_ai.sql`、`06_notification.sql`，全部使用 `CREATE TABLE IF NOT EXISTS`。
+- 库由 compose 的 `MYSQL_DATABASE` 自动创建；脚本作用于该数据库，不硬编码实例库名。
 
 ### ⑦ docker-compose.yml（仓库根，P0 版只有 mysql + redis）（V1.1 修正：移到根目录，context 与 dockerfile 路径自洽；P4/P5 追加服务的完整版见 §9.3 / §10.3）
 
@@ -478,7 +477,7 @@ services:
     ports: ["3306:3306"]
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+      - ./database/schema:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -771,7 +770,7 @@ service/src/resume/resume_controller.cc + resume_service.cc + resume_dao.cc + ..
 service/src/job/job_controller.cc + job_service.cc + job_dao.cc + ...
 service/src/application/application_controller.cc + application_service.cc + application_dao.cc + ...
 service/src/router.cc    # 挂载全部路由
-database/schema/*.sql    # 03 文档 DDL 全量落地（01_schema.sql + 02_seed.sql）
+database/schema/*.sql    # 03 文档 DDL 已按域拆分落地；种子数据后续单独纳入
 service/tests/test_*.cc  # Service/DAO 单测（mock 或内存实现）
 ```
 
@@ -851,10 +850,10 @@ Transaction：BEGIN → 多次 Execute → COMMIT/ROLLBACK（同一连接的连�
 - **实现要点**：`(user_id,job_id)` 唯一防重复投递；状态迁移校验表（`canTransition(from,to)` 纯函数）；统计按状态/时间分组。
 - **验收**：重复创建投递返回 40004；`6 Offer` 后再转 `4 一面` 被拒（40005）；统计数字正确。
 
-### ⑦ schema SQL 落地（database/schema/ + docker/mysql/init/）
+### ⑦ schema SQL 落地（database/schema/）
 
-- `docker/mysql/init/01_schema.sql`：按 03 文档 DDL 全量建表（users/profiles/skills/resumes/resume_versions/jobs/job_requirements/applications/ai_tasks/interview_records/notifications），**全部 `CREATE TABLE IF NOT EXISTS`**。
-- `docker/mysql/init/02_seed.sql`：示例用户 + 示例岗位，**全部 `INSERT IGNORE`**。
+- `database/schema/01_user.sql` 至 `database/schema/06_notification.sql`：按 03 文档 DDL 分域建表（users/profiles/skills/resumes/resume_versions/jobs/job_requirements/applications/ai_tasks/interview_records/notifications），**全部 `CREATE TABLE IF NOT EXISTS`**。
+- 示例用户 + 示例岗位种子数据尚未纳入当前 P0；后续加入时必须使用 `INSERT IGNORE`。
 - 幂等可重复执行；**重置数据**：`docker compose down -v && docker compose up -d mysql`（V1.1 修正：明确重置命令）。
 
 ## 7.4 验收标准（C2）
@@ -896,7 +895,7 @@ Transaction：BEGIN → 多次 Execute → COMMIT/ROLLBACK（同一连接的连�
 ## 8.2 写什么文件
 
 ```
-database/schema/05_ai.sql          # ai_tasks 表（并入 01_schema.sql，见 7.3 ⑦）
+database/schema/05_ai.sql          # ai_tasks + interview_records（canonical schema fragment，见 7.3 ⑦）
 service/src/ai/ai_task_service.cc  # C++ 侧：建任务/查状态/轮询接口
 service/src/ai/ai_task_dao.cc
 service/src/ai/ai_task_controller.cc
@@ -1312,7 +1311,7 @@ services:
     ports: ["3306:3306"]
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+      - ./database/schema:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s

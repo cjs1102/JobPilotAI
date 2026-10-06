@@ -221,5 +221,6 @@ CREATE TABLE notifications (
 
 ## 6. 数据初始化
 
-- `docker/mysql/init/` 挂载到容器 `docker-entrypoint-initdb.d`，首次启动自动建表 + 种子数据（示例岗位、示例用户）
+- `database/schema/` 挂载到容器 `docker-entrypoint-initdb.d`，首次启动自动建表
+- 种子数据尚未纳入当前 P0 schema；后续引入时必须保持幂等
 - 所有脚本幂等可重复执行

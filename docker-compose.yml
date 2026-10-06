@@ -2,18 +2,21 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: jobpilot-mysql
+    container_name: ${JOBPILOT_MYSQL_CONTAINER_NAME:-jobpilot-mysql}
     restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-jobpilot}
       MYSQL_USER: ${MYSQL_USER:-jobpilot}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
     ports:
-      - "3306:3306"
+      - "${JOBPILOT_MYSQL_HOST_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+      - ./database/schema:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -23,10 +26,10 @@ services:
 
   redis:
     image: redis:7
-    container_name: jobpilot-redis
+    container_name: ${JOBPILOT_REDIS_CONTAINER_NAME:-jobpilot-redis}
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${JOBPILOT_REDIS_HOST_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

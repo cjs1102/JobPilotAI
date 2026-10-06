@@ -75,6 +75,16 @@ target_link_libraries(test_logger
         GTest::gtest_main
 )
 
+add_executable(test_schema
+    tests/test_schema.cpp
+)
+
+target_link_libraries(test_schema
+    PRIVATE
+        jobpilot_core
+        GTest::gtest_main
+)
+
 add_executable(test_event_loop
     tests/test_event_loop.cpp
 
@@ -284,4 +294,5 @@ include(GoogleTest)
 
 gtest_discover_tests(test_config)
 gtest_discover_tests(test_logger)
+gtest_discover_tests(test_schema)
 gtest_discover_tests(test_sql_result)

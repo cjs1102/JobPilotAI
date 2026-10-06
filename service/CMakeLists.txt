@@ -12,19 +12,35 @@ if(PROJECT_IS_TOP_LEVEL)
     add_subdirectory(../backend backend)
 endif()
 
-add_executable(jobpilot_service
-    src/main.cpp
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(GTest CONFIG REQUIRED)
+
+add_library(jobpilot_service_core STATIC
     src/router.cpp
+    src/user/user_controller.cpp
+    src/user/user_dao.cpp
+    src/user/user_service.cpp
 )
 
-target_include_directories(jobpilot_service
-    PRIVATE
+target_include_directories(jobpilot_service_core
+    PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(jobpilot_service_core
+    PUBLIC
+        jobpilot_core
+        jobpilot_bcrypt
+        nlohmann_json::nlohmann_json
+)
+
+add_executable(jobpilot_service
+    src/main.cpp
 )
 
 target_link_libraries(jobpilot_service
     PRIVATE
-        jobpilot_core
+        jobpilot_service_core
 )
 
 add_executable(jobpilot_test
@@ -33,7 +49,7 @@ add_executable(jobpilot_test
 
 target_link_libraries(jobpilot_test
     PRIVATE
-        jobpilot_core
+        jobpilot_service_core
 )
 
 add_test(

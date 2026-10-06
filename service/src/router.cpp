@@ -1,14 +1,62 @@
 #include "jobpilot/service/router.h"
 
+#include <stdexcept>
+
 #include "jobpilot/http/http_request.h"
 #include "jobpilot/http/http_response.h"
+#include "jobpilot/service/user/user_controller.h"
 
 namespace jobpilot::service
 {
 
-    void RegisterRoutes(jobpilot::core::HttpServer *server)
+    void RegisterRoutes(
+        jobpilot::core::HttpServer *server,
+        UserController *userController)
     {
+        if (server == nullptr ||
+            userController == nullptr)
+        {
+            throw std::invalid_argument(
+                "RegisterRoutes requires server and user controller");
+        }
+
         auto &router = server->Router();
+
+        router.RegisterRoute(
+            jobpilot::core::HttpMethod::kPost,
+            "/api/v1/users/register",
+            [userController](
+                const jobpilot::core::HttpRequest &request,
+                jobpilot::core::HttpResponse &response)
+            {
+                userController->Register(
+                    request,
+                    response);
+            });
+
+        router.RegisterRoute(
+            jobpilot::core::HttpMethod::kPost,
+            "/api/v1/users/login",
+            [userController](
+                const jobpilot::core::HttpRequest &request,
+                jobpilot::core::HttpResponse &response)
+            {
+                userController->Login(
+                    request,
+                    response);
+            });
+
+        router.RegisterRoute(
+            jobpilot::core::HttpMethod::kGet,
+            "/api/v1/users/me",
+            [userController](
+                const jobpilot::core::HttpRequest &request,
+                jobpilot::core::HttpResponse &response)
+            {
+                userController->Me(
+                    request,
+                    response);
+            });
 
         router.RegisterRoute(
             jobpilot::core::HttpMethod::kGet,

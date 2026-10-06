@@ -1,8 +1,14 @@
 #include "jobpilot/core/config.h"
 #include "jobpilot/core/logger.h"
+#include "jobpilot/cache/redis_client.h"
+#include "jobpilot/cache/session_manager.h"
+#include "jobpilot/database/mysql_pool.h"
 #include "jobpilot/http/http_server.h"
 #include "jobpilot/network/event_loop.h"
 #include "jobpilot/service/router.h"
+#include "jobpilot/service/user/user_controller.h"
+#include "jobpilot/service/user/user_dao.h"
+#include "jobpilot/service/user/user_service.h"
 
 #include <exception>
 #include <stdexcept>
@@ -79,6 +85,33 @@ int main(int argc, char *argv[])
             config.redis.maxConn,
             config.redis.timeoutMs);
 
+        jobpilot::core::ConnectionPool mysqlPool(
+            config.mysql.host,
+            config.mysql.port,
+            config.mysql.user,
+            config.mysql.password,
+            config.mysql.database,
+            config.mysql.maxConn);
+
+        jobpilot::core::RedisClient redisClient(
+            config.redis.host,
+            config.redis.port,
+            config.redis.maxConn,
+            config.redis.timeoutMs);
+
+        jobpilot::core::SessionManager sessions(
+            redisClient);
+
+        jobpilot::service::UserDao userDao(
+            mysqlPool);
+
+        jobpilot::service::UserService userService(
+            userDao,
+            sessions);
+
+        jobpilot::service::UserController userController(
+            userService);
+
         jobpilot::core::EventLoop loop;
 
         jobpilot::core::HttpServer server(
@@ -86,7 +119,9 @@ int main(int argc, char *argv[])
             config.server.host,
             config.server.port);
 
-        jobpilot::service::RegisterRoutes(&server);
+        jobpilot::service::RegisterRoutes(
+            &server,
+            &userController);
 
         server.Start();
 

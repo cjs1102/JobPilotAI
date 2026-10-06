@@ -239,6 +239,91 @@ namespace
             firstError.empty(),
             "concurrent query failed: " + firstError);
     }
+
+    void TestExecuteMetadata(
+        jobpilot::core::ConnectionPool &pool)
+    {
+        const std::string table =
+            "jobpilot_execute_metadata_test";
+
+        const auto cleanup =
+            [&pool, &table]()
+            {
+                pool.Execute(
+                    "DROP TABLE IF EXISTS " + table,
+                    {});
+            };
+
+        cleanup();
+
+        try
+        {
+            pool.Execute(
+                "CREATE TABLE " + table +
+                    " ("
+                    "id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,"
+                    "value VARCHAR(32) NOT NULL"
+                    ") ENGINE=InnoDB",
+                {});
+
+            const jobpilot::core::ExecutionResult first =
+                pool.Execute(
+                    "INSERT INTO " + table +
+                        " (value) VALUES (?)",
+                    {std::string("first")});
+
+            Check(
+                first.affectedRows == 1,
+                "first INSERT affected row count mismatch");
+
+            Check(
+                first.lastInsertId > 0,
+                "first INSERT did not return an id");
+
+            const jobpilot::core::ExecutionResult second =
+                pool.Execute(
+                    "INSERT INTO " + table +
+                        " (value) VALUES (?)",
+                    {std::string("second")});
+
+            Check(
+                second.affectedRows == 1,
+                "second INSERT affected row count mismatch");
+
+            Check(
+                second.lastInsertId > first.lastInsertId,
+                "second INSERT id did not increase");
+
+            const jobpilot::core::Result result =
+                pool.Query(
+                    "SELECT value FROM " + table +
+                        " WHERE id = ?",
+                    {second.lastInsertId});
+
+            Check(
+                result.rowCount() == 1,
+                "inserted row was not found");
+
+            Check(
+                result.value(0, 0).has_value() &&
+                    *result.value(0, 0) == "second",
+                "inserted row value mismatch");
+        }
+        catch (...)
+        {
+            try
+            {
+                cleanup();
+            }
+            catch (...)
+            {
+            }
+
+            throw;
+        }
+
+        cleanup();
+    }
 }
 
 int main()
@@ -306,6 +391,12 @@ int main()
 
         std::cout
             << "8-thread concurrent query test passed"
+            << std::endl;
+
+        TestExecuteMetadata(pool);
+
+        std::cout
+            << "execute metadata test passed"
             << std::endl;
 
         std::cout

@@ -176,6 +176,104 @@ namespace
 
 namespace jobpilot::core
 {
+    ExecutionResult ConnectionPool::Execute(
+        const std::string &sql,
+        const std::vector<SqlParam> &params)
+    {
+        MYSQL *connection = Get();
+
+        struct ConnectionGuard
+        {
+            ConnectionPool *pool;
+            MYSQL *connection;
+
+            ~ConnectionGuard()
+            {
+                if (pool != nullptr &&
+                    connection != nullptr)
+                {
+                    pool->Return(connection);
+                }
+            }
+        };
+
+        ConnectionGuard connectionGuard{
+            this,
+            connection};
+
+        MYSQL_STMT *rawStmt =
+            mysql_stmt_init(connection);
+
+        if (rawStmt == nullptr)
+        {
+            throw std::runtime_error(
+                "mysql_stmt_init failed");
+        }
+
+        std::unique_ptr<
+            MYSQL_STMT,
+            decltype(&mysql_stmt_close)>
+            stmt(
+                rawStmt,
+                &mysql_stmt_close);
+
+        if (mysql_stmt_prepare(
+                stmt.get(),
+                sql.data(),
+                static_cast<unsigned long>(
+                    sql.size())) != 0)
+        {
+            throw std::runtime_error(
+                std::string(
+                    "mysql_stmt_prepare failed: ") +
+                mysql_stmt_error(stmt.get()));
+        }
+
+        const unsigned long paramCount =
+            mysql_stmt_param_count(
+                stmt.get());
+
+        if (paramCount != params.size())
+        {
+            throw std::invalid_argument(
+                "SQL parameter count mismatch");
+        }
+
+        ParamBindContext paramContext(params);
+
+        if (!params.empty() &&
+            mysql_stmt_bind_param(
+                stmt.get(),
+                paramContext.data()) != 0)
+        {
+            throw std::runtime_error(
+                std::string(
+                    "mysql_stmt_bind_param failed: ") +
+                mysql_stmt_error(stmt.get()));
+        }
+
+        if (mysql_stmt_execute(stmt.get()) != 0)
+        {
+            throw std::runtime_error(
+                std::string(
+                    "mysql_stmt_execute failed: ") +
+                mysql_stmt_error(stmt.get()));
+        }
+
+        if (mysql_stmt_field_count(
+                stmt.get()) != 0)
+        {
+            throw std::invalid_argument(
+                "Execute must not be used for row-returning SQL");
+        }
+
+        return ExecutionResult{
+            static_cast<std::uint64_t>(
+                mysql_stmt_affected_rows(stmt.get())),
+            static_cast<std::uint64_t>(
+                mysql_stmt_insert_id(stmt.get()))};
+    }
+
     Result ConnectionPool::Query(
         const std::string &sql,
         const std::vector<SqlParam> &params)

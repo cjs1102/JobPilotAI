@@ -31,6 +31,12 @@ namespace jobpilot::core
         std::string,
         std::nullptr_t>;
 
+    struct ExecutionResult
+    {
+        std::uint64_t affectedRows = 0;
+        std::uint64_t lastInsertId = 0;
+    };
+
     class ConnectionPool
     {
     public:
@@ -52,6 +58,10 @@ namespace jobpilot::core
         void Return(MYSQL *connection);
 
         Result Query(
+            const std::string &sql,
+            const std::vector<SqlParam> &params);
+
+        ExecutionResult Execute(
             const std::string &sql,
             const std::vector<SqlParam> &params);
 

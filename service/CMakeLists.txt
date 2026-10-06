@@ -56,3 +56,72 @@ add_test(
     NAME basic_test
     COMMAND jobpilot_test
 )
+
+add_executable(test_user_dao
+    tests/test_user_dao.cpp
+)
+
+target_link_libraries(test_user_dao
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(test_user_service
+    tests/test_user_service.cpp
+)
+
+target_link_libraries(test_user_service
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(test_user_http
+    tests/test_user_http.cpp
+)
+
+target_link_libraries(test_user_http
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(_jp_service_tsan_launcher
+        setarch
+        ${CMAKE_SYSTEM_PROCESSOR}
+        -R
+    )
+
+    set_target_properties(
+        test_user_dao
+        test_user_service
+        test_user_http
+        PROPERTIES
+            CROSSCOMPILING_EMULATOR
+                "${_jp_service_tsan_launcher}"
+    )
+
+    unset(_jp_service_tsan_launcher)
+endif()
+
+include(GoogleTest)
+
+gtest_discover_tests(
+    test_user_dao
+    PROPERTIES
+        LABELS "user;external;integration"
+)
+
+gtest_discover_tests(
+    test_user_service
+    PROPERTIES
+        LABELS "user;integration;tsan"
+)
+
+gtest_discover_tests(
+    test_user_http
+    PROPERTIES
+        LABELS "user;integration;tsan"
+)

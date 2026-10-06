@@ -66,6 +66,8 @@ void TestSubmitTasks()
         pool.Submit(
             [&completedTasks, &mutex, &condition]()
             {
+                std::lock_guard<std::mutex> lock(mutex);
+
                 const int completed =
                     completedTasks.fetch_add(
                         1,
@@ -119,9 +121,12 @@ void TestWorkerExecutesTasks()
         pool.Submit(
             [&workerTasks,
              &completedTasks,
+             &mutex,
              &condition,
              mainThreadId]()
             {
+                std::lock_guard<std::mutex> lock(mutex);
+
                 if (std::this_thread::get_id() !=
                     mainThreadId)
                 {
@@ -181,8 +186,12 @@ void TestWorkerSurvivesTaskException()
         });
 
     pool.Submit(
-        [&secondTaskCompleted, &condition]()
+        [&secondTaskCompleted,
+         &mutex,
+         &condition]()
         {
+            std::lock_guard<std::mutex> lock(mutex);
+
             secondTaskCompleted.store(
                 true,
                 std::memory_order_relaxed);

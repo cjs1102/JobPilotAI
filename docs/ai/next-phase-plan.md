@@ -11,10 +11,10 @@
 > commit `2be5212` was the baseline when this plan was written. `0c21200`
 > later synchronized the completed P0 work.
 >
-> Execution status: ExecPlans `0002`, `0003`, and `0004` are completed. Config,
-> logging, schema, sanitizer presets, benchmark infrastructure, and the
-> minimum P1 correctness gate are committed locally; push remains a separate
-> user action.
+> Execution status: ExecPlans `0002`, `0003`, `0004`, and `0005` are completed.
+> Config, logging, schema, sanitizer presets, benchmark infrastructure, the
+> minimum P1 correctness gate, and the first user vertical slice are committed
+> locally; push remains a separate user action.
 
 ## A. Overall Goal
 
@@ -193,7 +193,7 @@ themselves break P1 behavior.
 | MySQL schema and init scripts | Level 3 | `0002` completed |
 | Sanitizer build/test matrix | Level 3 | `0003` completed |
 | P1 HTTP/epoll correctness gate | Level 3 | `0004` completed |
-| P2 user vertical slice | Level 3 | `0005` |
+| P2 user vertical slice | Level 3 | `0005` completed |
 | Benchmark and performance baseline | Level 3 | `0003` completed |
 | Full P2, RPC, scheduler, or P1 redesign | Not approved now | None |
 
@@ -202,10 +202,11 @@ would require an explicit architecture migration or frozen-contract break.
 
 ## Active ExecPlans
 
-- `docs/exec-plans/active/0005-p2-user-vertical-slice.md`
+None.
 
 ## Completed ExecPlans
 
 - `docs/exec-plans/completed/0002-p0-config-logging-schema.md`
 - `docs/exec-plans/completed/0003-quality-and-performance-baseline.md`
 - `docs/exec-plans/completed/0004-p1-correctness-gate.md`
+- `docs/exec-plans/completed/0005-p2-user-vertical-slice.md`

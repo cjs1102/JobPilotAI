@@ -4,11 +4,11 @@
 >
 > Branch: `main`
 >
-> 0004 implementation HEAD:
-> `2f54cb6 test(p1): add correctness regression coverage`
+> 0005 implementation HEAD:
+> `889e1e7 test(user): add user vertical slice coverage`
 >
-> Remote: `origin/main` is `0c21200`; the 0003 and 0004 commits are local until
-> a separate push action is approved
+> Remote: `origin/main` is `2655e05`; the 0005 commits are local until a
+> separate push action is approved
 >
 > This document describes the actual files and Git state on disk. It is an AI
 > takeover map, not a substitute for the architecture, API, database, or
@@ -16,21 +16,23 @@
 
 ## 1. Executive Summary
 
-JobPilotAI has a completed P1 network prototype and a completed P0 runtime
-foundation. P2 engine primitives exist but are not yet wired into the service
-business layer.
+JobPilotAI has a completed P1 network prototype, a completed P0 runtime
+foundation, and a first working P2 user/auth vertical slice.
 
 - `service/` is the canonical build entry.
 - The root `CMakeLists.txt` is a working unified developer entry.
 - Clean Release builds from both entries succeed.
-- All 43 current tests pass with MySQL and Redis running and
+- All 54 current tests pass with MySQL and Redis running and
   `MYSQL_PASSWORD=root`; backend test targets explicitly retain assertions in
   Release builds.
 - P1 remains behaviorally frozen after the minimum correctness gate. The 0004
   fixes are limited to proven protocol, HUP, SIGPIPE, and dead-allocation
   defects.
-- P2 database and cache engine primitives and tests exist and are committed to
-  Git, but they are not wired into the service business layer.
+- P2 database and cache engine primitives, UserDao, UserService,
+  UserController, and the user auth routes are wired end to end.
+- Registration performs bcrypt hashing and a parameterized INSERT; login
+  verifies bcrypt and stores a 24-hour Redis session; `/me` resolves Bearer
+  token -> Redis -> UserDao -> MySQL.
 - Typed configuration loading, environment overrides, fail-fast secret
   validation, application logging, and canonical MySQL schema scripts are
   implemented and covered by tests.
@@ -41,12 +43,12 @@ business layer.
   into the MySQL initialization directory.
 - CMake presets, isolated ASan/UBSan/TSan builds, test labels, and a
   dependency-free microbenchmark runner are implemented.
-- ASan and UBSan each pass all 43 tests. TSan passes the 9-test concurrency
-  gate and the 6-test external-service subset.
+- ASan and UBSan each pass all 54 tests. TSan passes the 17-test
+  concurrency/User gate and the 6-test external-service subset.
 - The first `wrk` HTTP baseline recorded a median of approximately 32,698
   requests/sec for `/health` with two threads and 32 connections.
-- The only untracked local WIP is
-  `service/include/jobpilot/service/user/`.
+- The former `service/include/jobpilot/service/user/` WIP is committed and the
+  local worktree has no untracked source WIP.
 
 ## 2. Git and GitHub State
 
@@ -54,18 +56,24 @@ business layer.
 |---|---|
 | Branch | `main` |
 | Upstream | `origin/main` |
-| Local vs remote | Local has the 0003 and 0004 commits; `origin/main` is `0c21200` |
-| Recent history | Quality baseline and P1 correctness gate commits |
+| Local vs remote | Local has the 0005 commits; `origin/main` is `2655e05` |
+| Recent history | User vertical-slice commits on top of the pushed 0004 baseline |
 | Remote | `https://github.com/cjs1102/JobPilotAI.git` |
 | Deleted tracked files | None |
 | Staged changes | None |
 | Tracked modifications | None |
-| Untracked content | `service/include/jobpilot/service/user/` WIP only |
-| Push state | 0003/0004 changes are committed locally and not pushed |
+| Untracked content | None |
+| Push state | 0005 changes are committed locally and not pushed |
 
 The current local commits since the synchronized P0 baseline are:
 
 ```text
+889e1e7 test(user): add user vertical slice coverage
+70051c7 feat(http): expose user auth endpoints
+6ed94cb feat(auth): implement user authentication service
+8e501ce feat(user): implement user dao
+d9a08d3 feat(engine): expose execute metadata
+2655e05 docs(state): record completed P1 correctness gate
 2f54cb6 test(p1): add correctness regression coverage
 3e391a2 chore(http): remove unused connection allocation
 d0a8287 fix(net): prevent SIGPIPE termination on socket writes
@@ -117,11 +125,11 @@ service/
 ├── config/config.yaml
 ├── include/jobpilot/
 │   ├── error.h
-│   └── service/user/     # local untracked WIP: interfaces and DAO declaration
+│   └── service/user/     # User DAO, Service, Controller interfaces
 ├── src/
 │   ├── main.cpp
 │   ├── router.cpp
-│   └── user/             # empty directory
+│   └── user/             # User DAO, Service, Controller implementations
 ├── tests/test_basic.cpp
 └── build/                # generated, ignored
 ```
@@ -148,12 +156,14 @@ service/
 2. Loads `Config` from YAML plus environment overrides.
 3. Initializes the application logger from `log.level`.
 4. Logs non-secret MySQL, Redis, and service configuration.
-5. Creates an `EventLoop` and `HttpServer` on the configured host and port.
-6. Registers routes from `service/src/router.cpp`.
-7. Starts the server and blocks in `EventLoop::Loop()`.
+5. Constructs `ConnectionPool`, `RedisClient`, `SessionManager`, `UserDao`,
+   `UserService`, and `UserController`.
+6. Creates an `EventLoop` and `HttpServer` on the configured host and port.
+7. Registers routes from `service/src/router.cpp`.
+8. Starts the server and blocks in `EventLoop::Loop()`.
 
-The service still does not construct MySQL or Redis clients and does not install
-signal handlers. Those remain explicit later-stage work.
+The service does not install signal handlers. That remains explicit later-stage
+work.
 
 ### Network and HTTP Call Graph
 
@@ -178,6 +188,10 @@ epoll event
   -> HttpServer::HandleMessage
   -> ThreadPool worker
   -> HttpRouter
+       -> UserController
+            -> UserService
+                 -> UserDao -> ConnectionPool -> MySQL
+                 -> SessionManager -> RedisClient -> Redis
   -> EventLoop::RunInLoop
   -> TcpConnection::Send
 ```
@@ -202,6 +216,9 @@ epoll event
 | `Result` | Column names, rows, nullable values, and bounds-checked access |
 | `RedisClient` | Redis connection pool and GET/SET/SETEX/DEL/INCRBY operations |
 | `SessionManager` | `session:{token}` mapping to user id with TTL |
+| `UserDao` | Parameterized user INSERT and lookup by email/id |
+| `UserService` | Registration/login rules, bcrypt, token generation, session lookup |
+| `UserController` | JSON/Bearer parsing and `{code,message,data}` HTTP responses |
 
 ### Thread Model
 
@@ -273,8 +290,8 @@ The remaining items are follow-up hardening, not pending P1 implementation.
 
 ## 6. P2 Assessment
 
-Status: the engine primitives are implemented, tested, and committed to Git.
-They are not yet connected to the service business layer.
+Status: the first P2 user vertical slice is implemented end to end. Additional
+P2 domains remain.
 
 ### Implemented as Engine Primitives
 
@@ -288,14 +305,25 @@ They are not yet connected to the service business layer.
 - bcrypt hashing and verification.
 - Integration tests for MySQL, Redis, session expiration, concurrency, and
   bcrypt.
+- Execution metadata with affected rows and last insert id.
+
+### Integrated User Slice
+
+- `POST /api/v1/users/register` validates input, hashes with bcrypt, inserts a
+  user, and returns `user_id`.
+- `POST /api/v1/users/login` verifies bcrypt, creates a secure 64-character
+  hex token, and stores `session:{token} -> user_id` in Redis for 86400
+  seconds.
+- `GET /api/v1/users/me` parses `Authorization: Bearer <token>`, resolves the
+  Redis session, loads the user through `UserDao`, and returns the API shape.
+- `UserController -> UserService -> UserDao -> ConnectionPool` is wired in the
+  service.
 
 ### Not Integrated
 
-- No user DAO implementation.
-- No MySQL or Redis construction in `main`.
-- No HTTP user registration or login routes.
-- No transaction abstraction.
-- No DAO/service/controller business flow.
+- Profile and skill endpoints.
+- Transaction abstraction; the current registration is one INSERT.
+- Distinguishing expired tokens from never-issued tokens in Redis.
 
 Configuration, logging, and schema are P0 infrastructure and are now present;
 they are not P2 business integration.
@@ -336,12 +364,14 @@ variants are not available in the local cache or reachable remote.
 |---|---|
 | Clean `service/` configure and Release build | Passed |
 | Clean root configure and Release build | Passed |
-| `service/` CTest | 43/43 passed with `MYSQL_PASSWORD=root` |
-| Root CTest | 43/43 passed with `MYSQL_PASSWORD=root` |
-| ASan full CTest with leak detection | 43/43 passed |
-| UBSan full CTest with halt-on-error | 43/43 passed |
-| TSan concurrency subset | 9/9 passed |
+| `service/` CTest | 54/54 passed with `MYSQL_PASSWORD=root` |
+| Root CTest | 54/54 passed with `MYSQL_PASSWORD=root` |
+| ASan full CTest with leak detection | 54/54 passed |
+| UBSan full CTest with halt-on-error | 54/54 passed |
+| TSan concurrency/User subset | 17/17 passed |
 | TSan external-service subset | 6/6 passed |
+| User DAO/Service/HTTP tests | 3 + 6 + 2 passed |
+| Real service auth flow | register -> login -> `/me` passed |
 | Service top-level ASan/TSan builds | Passed |
 | Microbenchmark | Buffer, parser, router, and event-loop dispatch measured |
 | HTTP `wrk` baseline | Median approximately 32,698 requests/sec |
@@ -400,11 +430,7 @@ Detailed commands and results are in `docs/quality/README.md` and
 
 ### Untracked WIP
 
-- `service/include/jobpilot/service/user/user_dao.h`
-- `service/include/jobpilot/service/user/user_dao_interface.h`
-
-These files define P2 user DAO interfaces and declarations only. They have no
-implementation or tests and remain intentionally untracked.
+None. The former User DAO WIP has been implemented, tested, and committed.
 
 ### Committed Baseline
 
@@ -427,9 +453,12 @@ The following are no longer local-only changes:
   rejection.
 - HUP data draining and SIGPIPE-safe socket writes.
 - P1 correctness regression tests for HTTP framing, HUP, and peer-close writes.
+- Engine execution metadata and User DAO.
+- User authentication Service/Controller, secure token generation, and Redis
+  session integration.
+- User register/login/me routes and their DAO/Service/HTTP integration tests.
 
-They are included in the local commits listed in Section 2; the older
-six-commit baseline remains in history under `2be5212`.
+They are included in the local commits listed in Section 2.
 
 ### Ignored Local State
 
@@ -474,9 +503,9 @@ it directly. Keep the provenance note with the source.
 | High | Raw `Channel *` in epoll active list | Requires strict caller lifetime discipline |
 | Medium | No graceful signal handling | Service cannot shut down cleanly |
 | Medium | Google Benchmark is not yet integrated | Baseline uses the dependency-free runner plus `wrk` |
-| Medium | User DAO has declarations but no implementation | P2 skeleton only |
-| Medium | P2 engine primitives are not wired into service | No business flow yet |
-| Medium | MySQL and Redis clients are not constructed by the service | Runtime infrastructure is not connected yet |
+| Medium | Profile and skill endpoints are not implemented | User slice is auth-only |
+| Medium | Redis cannot distinguish expired from invalid tokens | Both currently return `20001`; `20002` is reserved |
+| Medium | Registration has no transaction abstraction | Safe because it performs one INSERT |
 | Medium | Redis/MySQL tests require live services | Clean CTest is not self-contained |
 | Low | ConanCenter requires bypassing the current proxy environment | Dependency installs can appear unreachable |
 | Low | Sanitizer presets use Release dependency packages | Local cache lacks Debug variants |
@@ -487,18 +516,13 @@ it directly. Keep the provenance note with the source.
 
 ### Committed Baseline
 
-The P0, 0003, and 0004 implementation commits are local. `origin/main` was at
-`0c21200` before these phases and has not yet received the quality or
-correctness commits. No tracked modifications or staged changes should remain
-after the final state-document commit.
+The 0005 user vertical-slice commits are local. `origin/main` is at `2655e05`
+and has not yet received this phase. No tracked modifications or staged
+changes should remain after the final state-document commit.
 
 ### Untracked WIP
 
-- `service/include/jobpilot/service/user/user_dao.h`
-- `service/include/jobpilot/service/user/user_dao_interface.h`
-
-Keep these files untracked until the P2 user module has an implementation plan,
-implementation, and tests.
+None.
 
 ### Ignored
 
@@ -509,13 +533,12 @@ implementation, and tests.
 
 ## 14. Next Development Entry
 
-The local P0 baseline, quality tooling, and minimum P1 correctness gate are the
-next development starting point. P1 is frozen again and the only untracked
-local content is the user DAO WIP.
+The user vertical slice is complete. P0 infrastructure, quality tooling, the
+P1 correctness gate, and the first P2 business path are now the development
+baseline. P1 remains frozen and there is no untracked source WIP.
 
 The next implementation sequence is:
 
-1. Execute ExecPlan `0005` for the first P2 user vertical slice.
-2. Wire MySQL, Redis, and Session only during P2 integration.
-3. Keep `service/include/jobpilot/service/user/` untracked until the user module
-   is implemented and committed as its own logical change.
+1. Plan the profile and skill portion of the user domain.
+2. Continue P2 with resume, job, and application modules.
+3. Keep all new business work separate from the frozen P1 network layer.

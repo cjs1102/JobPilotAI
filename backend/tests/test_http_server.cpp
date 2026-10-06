@@ -394,7 +394,11 @@ void StopServer(
 
     assert(loop != nullptr);
 
-    loop->Quit();
+    loop->QueueInLoop(
+        [loop]()
+        {
+            loop->Quit();
+        });
 
     if (serverThread->joinable())
     {

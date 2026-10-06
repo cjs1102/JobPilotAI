@@ -162,6 +162,16 @@ target_link_libraries(test_logger
         GTest::gtest_main
 )
 
+add_executable(test_http_correctness
+    tests/test_http_correctness.cpp
+)
+
+target_link_libraries(test_http_correctness
+    PRIVATE
+        jobpilot_core
+        GTest::gtest_main
+)
+
 add_executable(test_schema
     tests/test_schema.cpp
 )
@@ -199,6 +209,21 @@ add_test(
     NAME buffer_test
     COMMAND test_buffer
 )
+
+add_executable(test_buffer_sigpipe
+    tests/test_buffer_sigpipe.cpp
+)
+
+target_link_libraries(test_buffer_sigpipe
+    PRIVATE
+        jobpilot_core
+)
+
+add_test(
+    NAME buffer_sigpipe_test
+    COMMAND test_buffer_sigpipe
+)
+
     add_executable(test_tcp_connection
     tests/test_tcp_connection.cpp
 )
@@ -213,6 +238,21 @@ add_test(
     COMMAND test_tcp_connection
 )
 
+add_executable(
+    test_tcp_connection_hangup
+    tests/test_tcp_connection_hangup.cpp
+)
+
+target_link_libraries(
+    test_tcp_connection_hangup
+    PRIVATE jobpilot_core
+)
+
+add_test(
+    NAME tcp_connection_hangup_test
+    COMMAND test_tcp_connection_hangup
+)
+
 add_executable(test_tcp_connection_send
     tests/test_tcp_connection_send.cpp
 )
@@ -225,6 +265,21 @@ target_link_libraries(test_tcp_connection_send
 add_test(
     NAME tcp_connection_send_test
     COMMAND test_tcp_connection_send
+)
+
+add_executable(
+    test_tcp_connection_peer_close
+    tests/test_tcp_connection_peer_close.cpp
+)
+
+target_link_libraries(
+    test_tcp_connection_peer_close
+    PRIVATE jobpilot_core
+)
+
+add_test(
+    NAME tcp_connection_peer_close_test
+    COMMAND test_tcp_connection_peer_close
 )
 
 add_executable(
@@ -382,7 +437,9 @@ set_tests_properties(
     event_loop_test
     thread_pool_test
     tcp_connection_test
+    tcp_connection_hangup_test
     tcp_connection_send_test
+    tcp_connection_peer_close_test
     tcp_connection_write_buffer_test
     tcp_server_test
     http_server_test
@@ -427,11 +484,15 @@ if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set_target_properties(
         test_config
         test_logger
+        test_http_correctness
         test_schema
         test_event_loop
         test_buffer
+        test_buffer_sigpipe
         test_tcp_connection
+        test_tcp_connection_hangup
         test_tcp_connection_send
+        test_tcp_connection_peer_close
         test_tcp_connection_write_buffer
         test_tcp_server
         test_http_request
@@ -456,6 +517,7 @@ include(GoogleTest)
 gtest_discover_tests(test_config)
 gtest_discover_tests(test_logger)
 gtest_discover_tests(test_sql_result)
+gtest_discover_tests(test_http_correctness)
 
 gtest_discover_tests(
     test_schema

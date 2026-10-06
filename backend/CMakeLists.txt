@@ -2,6 +2,86 @@ cmake_minimum_required(VERSION 3.22)
 
 project(jobpilot_core C CXX)
 
+option(
+    JP_ENABLE_ASAN
+    "Build JobPilotAI targets with AddressSanitizer"
+    OFF
+)
+
+option(
+    JP_ENABLE_UBSAN
+    "Build JobPilotAI targets with UndefinedBehaviorSanitizer"
+    OFF
+)
+
+option(
+    JP_ENABLE_TSAN
+    "Build JobPilotAI targets with ThreadSanitizer"
+    OFF
+)
+
+option(
+    JP_BUILD_BENCHMARKS
+    "Build the isolated JobPilotAI microbenchmark runner"
+    OFF
+)
+
+if(JP_ENABLE_TSAN AND (JP_ENABLE_ASAN OR JP_ENABLE_UBSAN))
+    message(
+        FATAL_ERROR
+        "TSan cannot be combined with ASan or UBSan in the same build"
+    )
+endif()
+
+add_library(jobpilot_sanitizers INTERFACE)
+
+if(JP_ENABLE_ASAN)
+    target_compile_options(
+        jobpilot_sanitizers
+        INTERFACE
+            $<$<COMPILE_LANGUAGE:C,CXX>:-fsanitize=address>
+            $<$<COMPILE_LANGUAGE:C,CXX>:-fno-omit-frame-pointer>
+            $<$<COMPILE_LANGUAGE:C,CXX>:-fno-common>
+    )
+
+    target_link_options(
+        jobpilot_sanitizers
+        INTERFACE
+            -fsanitize=address
+    )
+endif()
+
+if(JP_ENABLE_UBSAN)
+    target_compile_options(
+        jobpilot_sanitizers
+        INTERFACE
+            $<$<COMPILE_LANGUAGE:C,CXX>:-fsanitize=undefined>
+            $<$<COMPILE_LANGUAGE:C,CXX>:-fno-sanitize-recover=undefined>
+            $<$<COMPILE_LANGUAGE:C,CXX>:-fno-omit-frame-pointer>
+    )
+
+    target_link_options(
+        jobpilot_sanitizers
+        INTERFACE
+            -fsanitize=undefined
+    )
+endif()
+
+if(JP_ENABLE_TSAN)
+    target_compile_options(
+        jobpilot_sanitizers
+        INTERFACE
+            $<$<COMPILE_LANGUAGE:C,CXX>:-fsanitize=thread>
+            $<$<COMPILE_LANGUAGE:C,CXX>:-fno-omit-frame-pointer>
+    )
+
+    target_link_options(
+        jobpilot_sanitizers
+        INTERFACE
+            -fsanitize=thread
+    )
+endif()
+
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MYSQLCLIENT REQUIRED IMPORTED_TARGET mysqlclient)
 find_package(GTest CONFIG REQUIRED)
@@ -12,6 +92,12 @@ find_package(yaml-cpp CONFIG REQUIRED)
 add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libbcrypt
     libbcrypt
+)
+
+target_link_libraries(
+    jobpilot_bcrypt
+    PRIVATE
+        jobpilot_sanitizers
 )
 
 add_library(jobpilot_core STATIC
@@ -46,6 +132,7 @@ target_link_libraries(jobpilot_core
         PkgConfig::MYSQLCLIENT
         hiredis::hiredis
         spdlog::spdlog
+        jobpilot_sanitizers
     PRIVATE
         yaml-cpp::yaml-cpp
 )
@@ -283,6 +370,7 @@ add_executable(test_bcrypt
 target_link_libraries(test_bcrypt
     PRIVATE
         jobpilot_bcrypt
+        jobpilot_sanitizers
 )
 
 add_test(
@@ -290,9 +378,87 @@ add_test(
     COMMAND test_bcrypt
 )
 
+set_tests_properties(
+    event_loop_test
+    thread_pool_test
+    tcp_connection_test
+    tcp_connection_send_test
+    tcp_connection_write_buffer_test
+    tcp_server_test
+    http_server_test
+    PROPERTIES
+        LABELS "concurrency;tsan"
+)
+
+set_tests_properties(
+    mysql_pool_test
+    redis_client_test
+    PROPERTIES
+        LABELS "external;integration"
+)
+
+if(JP_BUILD_BENCHMARKS)
+    add_executable(
+        jobpilot_microbench
+        benchmarks/microbenchmarks.cpp
+    )
+
+    target_link_libraries(
+        jobpilot_microbench
+        PRIVATE
+            jobpilot_core
+    )
+
+    add_custom_target(
+        run_microbench
+        COMMAND jobpilot_microbench
+        DEPENDS jobpilot_microbench
+        USES_TERMINAL
+    )
+endif()
+
+if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(_jp_tsan_launcher
+        setarch
+        ${CMAKE_SYSTEM_PROCESSOR}
+        -R
+    )
+
+    set_target_properties(
+        test_config
+        test_logger
+        test_schema
+        test_event_loop
+        test_buffer
+        test_tcp_connection
+        test_tcp_connection_send
+        test_tcp_connection_write_buffer
+        test_tcp_server
+        test_http_request
+        test_http_response
+        test_http_router
+        test_http_server
+        test_thread_pool
+        test_mysql_pool
+        test_sql_result
+        test_redis_client
+        test_bcrypt
+        PROPERTIES
+            CROSSCOMPILING_EMULATOR
+                "${_jp_tsan_launcher}"
+    )
+
+    unset(_jp_tsan_launcher)
+endif()
+
 include(GoogleTest)
 
 gtest_discover_tests(test_config)
 gtest_discover_tests(test_logger)
-gtest_discover_tests(test_schema)
 gtest_discover_tests(test_sql_result)
+
+gtest_discover_tests(
+    test_schema
+    PROPERTIES
+        LABELS "external;integration"
+)

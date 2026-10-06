@@ -1,0 +1,147 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/presets/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/service/build/conan_toolchain.cmake"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS_RELEASE": "-O0 -g -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O0 -g -DNDEBUG"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "asan",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS_RELEASE": "-O1 -g -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O1 -g -DNDEBUG",
+        "JP_ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "ubsan",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS_RELEASE": "-O1 -g -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O1 -g -DNDEBUG",
+        "JP_ENABLE_UBSAN": "ON"
+      }
+    },
+    {
+      "name": "tsan",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS_RELEASE": "-O1 -g -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O1 -g -DNDEBUG",
+        "JP_ENABLE_TSAN": "ON"
+      }
+    },
+    {
+      "name": "benchmark",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "JP_BUILD_BENCHMARKS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "ubsan",
+      "configurePreset": "ubsan"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    },
+    {
+      "name": "benchmark",
+      "configurePreset": "benchmark"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-base",
+      "hidden": true,
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 120
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "test-base",
+      "configurePreset": "release"
+    },
+    {
+      "name": "asan",
+      "inherits": "test-base",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "ubsan",
+      "inherits": "test-base",
+      "configurePreset": "ubsan"
+    },
+    {
+      "name": "tsan",
+      "inherits": "test-base",
+      "configurePreset": "tsan",
+      "filter": {
+        "include": {
+          "label": "^tsan$"
+        }
+      }
+    },
+    {
+      "name": "tsan-external",
+      "inherits": "test-base",
+      "configurePreset": "tsan",
+      "filter": {
+        "include": {
+          "label": "^external$"
+        }
+      }
+    }
+  ]
+}

@@ -55,23 +55,28 @@ namespace jobpilot::core
 
     void Channel::HandleEvent()
     {
-        // 出现错误或者对端挂断
-        if ((revents_ & (EPOLLERR | EPOLLHUP)) != 0)
-        {
-            if (closeCallback_)
-            {
-                closeCallback_();
-            }
-            return;
-        }
+        const bool hasErrorOrHangup =
+            (revents_ & (EPOLLERR | EPOLLHUP)) != 0;
 
-        // 可读
-        if ((revents_ & EPOLLIN) != 0)
+        // 先尝试读出已经到达的数据，即使同一个事件同时带
+        // EPOLLERR/EPOLLHUP，也不能在读取前关闭连接。
+        if (hasErrorOrHangup ||
+            (revents_ & EPOLLIN) != 0)
         {
             if (readCallback_)
             {
                 readCallback_();
             }
+        }
+
+        if (hasErrorOrHangup)
+        {
+            if (closeCallback_)
+            {
+                closeCallback_();
+            }
+
+            return;
         }
 
         // 可写

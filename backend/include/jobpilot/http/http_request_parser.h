@@ -45,6 +45,7 @@ namespace jobpilot::core
         ParseState state_;
         HttpRequest request_;
         std::size_t contentLength_;
+        bool hasContentLength_;
     };
 
 } // namespace jobpilot::core

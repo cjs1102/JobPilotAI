@@ -102,7 +102,8 @@ namespace jobpilot::core
     HttpRequestParser::HttpRequestParser()
         : state_(ParseState::kParseRequestLine),
           request_(),
-          contentLength_(0)
+          contentLength_(0),
+          hasContentLength_(false)
     {
     }
 
@@ -325,16 +326,25 @@ namespace jobpilot::core
                 return ParseResult::kError;
             }
 
+            const std::string lowerName =
+                ToLower(name);
+
+            if (lowerName == "content-length")
+            {
+                if (hasContentLength_)
+                {
+                    return ParseResult::kError;
+                }
+
+                hasContentLength_ = true;
+            }
+
             request_.SetHeader(name, value);
 
             buffer->Retrieve(position + 2);
 
-            const std::string lowerName =
-                ToLower(name);
-
             // Content-Length / Connection 在真正结束 Header
             // 时统一解释，因此这里只保存 Header。
-            (void)lowerName;
         }
     }
 
@@ -380,6 +390,7 @@ namespace jobpilot::core
         state_ = ParseState::kParseRequestLine;
         request_ = HttpRequest();
         contentLength_ = 0;
+        hasContentLength_ = false;
     }
 
 } // namespace jobpilot::core

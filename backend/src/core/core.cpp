@@ -1,11 +1,11 @@
-#include <iostream>
+#include "jobpilot/core/logger.h"
 
 namespace jobpilot
 {
 
     void core_init()
     {
-        std::cout << "JobPilot Core initialized\n";
+        core::Logger::Get()->info("JobPilot Core initialized");
     }
 
 }

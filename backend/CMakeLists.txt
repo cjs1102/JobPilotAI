@@ -6,6 +6,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(MYSQLCLIENT REQUIRED IMPORTED_TARGET mysqlclient)
 find_package(GTest CONFIG REQUIRED)
 find_package(hiredis CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 
 add_subdirectory(
@@ -16,6 +17,7 @@ add_subdirectory(
 add_library(jobpilot_core STATIC
     src/core/config.cpp
     src/core/core.cpp
+    src/core/logger.cpp
     src/core/thread_pool.cpp
     src/network/channel.cpp
     src/network/epoll_poller.cpp
@@ -43,6 +45,7 @@ target_link_libraries(jobpilot_core
     PUBLIC
         PkgConfig::MYSQLCLIENT
         hiredis::hiredis
+        spdlog::spdlog
     PRIVATE
         yaml-cpp::yaml-cpp
 )
@@ -57,6 +60,16 @@ add_executable(test_config
 )
 
 target_link_libraries(test_config
+    PRIVATE
+        jobpilot_core
+        GTest::gtest_main
+)
+
+add_executable(test_logger
+    tests/test_logger.cpp
+)
+
+target_link_libraries(test_logger
     PRIVATE
         jobpilot_core
         GTest::gtest_main
@@ -270,4 +283,5 @@ add_test(
 include(GoogleTest)
 
 gtest_discover_tests(test_config)
+gtest_discover_tests(test_logger)
 gtest_discover_tests(test_sql_result)

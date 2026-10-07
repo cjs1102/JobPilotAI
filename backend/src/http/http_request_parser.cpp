@@ -99,12 +99,19 @@ namespace jobpilot::core
 
     } // namespace
 
-    HttpRequestParser::HttpRequestParser()
+    HttpRequestParser::HttpRequestParser(
+        std::size_t maxRequestBodyBytes)
         : state_(ParseState::kParseRequestLine),
           request_(),
           contentLength_(0),
-          hasContentLength_(false)
+          hasContentLength_(false),
+          maxRequestBodyBytes_(maxRequestBodyBytes)
     {
+        if (maxRequestBodyBytes_ == 0)
+        {
+            throw std::invalid_argument(
+                "max request body size must be greater than zero");
+        }
     }
 
     ParseResult HttpRequestParser::Parse(Buffer *buffer)
@@ -264,6 +271,12 @@ namespace jobpilot::core
                     if (!ParseContentLength(
                             contentLength,
                             &contentLength_))
+                    {
+                        return ParseResult::kError;
+                    }
+
+                    if (contentLength_ >
+                        maxRequestBodyBytes_)
                     {
                         return ParseResult::kError;
                     }

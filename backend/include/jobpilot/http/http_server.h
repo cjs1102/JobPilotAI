@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -23,7 +24,10 @@ namespace jobpilot::core
         HttpServer(
             EventLoop *loop,
             const std::string &ip,
-            uint16_t port);
+            uint16_t port,
+            std::size_t maxRequestBodyBytes =
+                HttpRequestParser::
+                    kDefaultMaxRequestBodyBytes);
 
         ~HttpServer();
 
@@ -44,6 +48,12 @@ namespace jobpilot::core
 
         struct ConnectionContext
         {
+            explicit ConnectionContext(
+                std::size_t maxRequestBodyBytes)
+                : parser(maxRequestBodyBytes)
+            {
+            }
+
             HttpRequestParser parser;
 
             std::size_t nextRequestSequence{0};
@@ -83,6 +93,7 @@ namespace jobpilot::core
 
         TcpServer tcpServer_;
         HttpRouter router_;
+        std::size_t maxRequestBodyBytes_;
 
         std::unordered_map<std::string,
                            std::shared_ptr<ConnectionContext>>

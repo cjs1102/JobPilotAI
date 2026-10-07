@@ -1,19 +1,29 @@
 #include "jobpilot/http/http_server.h"
 #include "jobpilot/network/event_loop.h"
 
+#include <stdexcept>
+
 namespace jobpilot::core
 {
 
     HttpServer::HttpServer(
         EventLoop *loop,
         const std::string &ip,
-        uint16_t port)
+        uint16_t port,
+        std::size_t maxRequestBodyBytes)
         : loop_(loop),
           tcpServer_(loop, ip, port),
           router_(),
+          maxRequestBodyBytes_(maxRequestBodyBytes),
           contexts_(),
           threadPool_(4)
     {
+        if (maxRequestBodyBytes_ == 0)
+        {
+            throw std::invalid_argument(
+                "max request body size must be greater than zero");
+        }
+
         tcpServer_.SetConnectionCallback(
             [this](const TcpConnection::Ptr &connection)
             {
@@ -78,7 +88,8 @@ namespace jobpilot::core
         }
 
         contexts_[connection->Name()] =
-            std::make_shared<ConnectionContext>();
+            std::make_shared<ConnectionContext>(
+                maxRequestBodyBytes_);
     }
 
     void HttpServer::HandleMessage(

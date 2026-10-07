@@ -27,7 +27,13 @@ namespace jobpilot::core
     class HttpRequestParser
     {
     public:
-        HttpRequestParser();
+        static constexpr std::size_t
+            kDefaultMaxRequestBodyBytes =
+                12U * 1024U * 1024U;
+
+        explicit HttpRequestParser(
+            std::size_t maxRequestBodyBytes =
+                kDefaultMaxRequestBodyBytes);
 
         ParseResult Parse(Buffer *buffer);
 
@@ -46,6 +52,7 @@ namespace jobpilot::core
         HttpRequest request_;
         std::size_t contentLength_;
         bool hasContentLength_;
+        std::size_t maxRequestBodyBytes_;
     };
 
 } // namespace jobpilot::core

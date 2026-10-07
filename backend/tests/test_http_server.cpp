@@ -552,6 +552,42 @@ void TestInvalidRequest()
     close(socketFd);
 }
 
+void TestOversizedBodyIsRejected()
+{
+    const int socketFd =
+        CreateClientSocket();
+
+    assert(socketFd >= 0);
+    assert(ConnectToServer(socketFd));
+
+    const std::string request =
+        "POST /hello HTTP/1.1\r\n"
+        "Host: 127.0.0.1\r\n"
+        "Content-Length: 12582913\r\n"
+        "\r\n";
+
+    assert(
+        SendAll(
+            socketFd,
+            request));
+
+    std::string receiveBuffer;
+    std::string response;
+
+    assert(
+        ReceiveHttpResponse(
+            socketFd,
+            &receiveBuffer,
+            &response));
+
+    assert(
+        response.find(
+            "HTTP/1.1 400 Bad Request") !=
+        std::string::npos);
+
+    close(socketFd);
+}
+
 void TestKeepAlive()
 {
     const int socketFd =
@@ -777,6 +813,7 @@ int main()
     TestPostHello();
     TestNotFound();
     TestInvalidRequest();
+    TestOversizedBodyIsRejected();
     TestKeepAlive();
     TestPipelinedRequests();
     TestHalfPacket();

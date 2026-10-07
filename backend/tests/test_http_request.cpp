@@ -217,7 +217,49 @@ int main()
     }
 
     // ------------------------------------------------------------
-    // 7. 非法请求
+    // 7. Request body limit boundary
+    // ------------------------------------------------------------
+    {
+        Buffer buffer;
+
+        buffer.Append(
+            "POST /upload HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Length: 4\r\n"
+            "\r\n"
+            "test");
+
+        HttpRequestParser parser(4U);
+
+        const ParseResult result = parser.Parse(&buffer);
+
+        assert(result == ParseResult::kComplete);
+        assert(parser.Request().Body() == "test");
+    }
+
+    // ------------------------------------------------------------
+    // 8. Request body limit exceeded before body buffering
+    // ------------------------------------------------------------
+    {
+        Buffer buffer;
+
+        buffer.Append(
+            "POST /upload HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n");
+
+        HttpRequestParser parser(4U);
+
+        const ParseResult result = parser.Parse(&buffer);
+
+        assert(result == ParseResult::kError);
+        assert(parser.State() == ParseState::kParseHeaders);
+        assert(buffer.ReadableBytes() == 0);
+    }
+
+    // ------------------------------------------------------------
+    // 9. 非法请求
     // ------------------------------------------------------------
     {
         Buffer buffer;

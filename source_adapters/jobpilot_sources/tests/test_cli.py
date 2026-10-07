@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 from jobpilot_sources import cli
-from jobpilot_sources.client import HttpClient
+from jobpilot_sources.client import HttpClient, HttpError
 from jobpilot_sources.config import JobPilotConfig, SourceConfig
 
 from .support import (
@@ -169,6 +169,43 @@ class RunSyncTest(unittest.TestCase):
 
         self.assertEqual(code, 1)
         self.assertIn("publish failed", lines[0])
+
+    def test_rate_limit_is_reported_as_fetch_failure(self) -> None:
+        transport = RecordingTransport(default=(429, b"{}"))
+        lines: list[str] = []
+
+        code = cli.run_sync(
+            make_config(),
+            token=TOKEN,
+            provider="lever",
+            dry_run=True,
+            client=HttpClient(transport=transport),
+            clock=lambda: "2026-10-08 12:00:00",
+            log=lines.append,
+        )
+
+        self.assertEqual(code, 1)
+        self.assertIn("HTTP 429", lines[0])
+
+    def test_transport_timeout_is_reported_as_fetch_failure(self) -> None:
+        class TimingOutTransport:
+            def __call__(self, method, url, body, headers, timeout):
+                raise HttpError("request failed: timed out")
+
+        lines: list[str] = []
+
+        code = cli.run_sync(
+            make_config(),
+            token=TOKEN,
+            provider="lever",
+            dry_run=True,
+            client=HttpClient(transport=TimingOutTransport()),
+            clock=lambda: "2026-10-08 12:00:00",
+            log=lines.append,
+        )
+
+        self.assertEqual(code, 1)
+        self.assertIn("timed out", lines[0])
 
     def test_unproven_empty_board_is_skipped(self) -> None:
         transport = RecordingTransport(

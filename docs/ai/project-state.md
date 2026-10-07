@@ -2,11 +2,14 @@
 
 > Snapshot: 2026-10-08
 >
-> Baseline HEAD: `214dc9e feat(job): add search and ranking`
+> Baseline HEAD: `e3a640a test(job): add end-to-end source sync and freshness
+> coverage`
 >
-> `origin/main` matches this baseline. The 0010 Job Ingestion, Architecture
-> Re-Research, and 0011 Job Search / Ranking work is committed and pushed.
-> The active plan is 0012 Job Source Adapter + Freshness.
+> `origin/main` matches this baseline. 0010 Job Ingestion, the Architecture
+> Re-Research, 0011 Job Search / Ranking, and 0012 Steps 1-8 (freshness schema,
+> source observation domain, Source Sync DAO/Service/API, freshness search,
+> Python ATS adapters, end-to-end integration) are committed and pushed. The
+> active plan is still 0012 Job Source Adapter + Freshness.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active ExecPlan should be enough for a new Agent to continue
@@ -50,6 +53,11 @@ are preserved in
   pushed: salary/skill hard filters, authenticated `rule_v1`
   recommendations, deterministic score breakdown, stable pagination, and a
   bounded ranking candidate set.
+- The 0012 Source Adapter + Freshness slice is implemented through Step 8 and
+  pushed: additive freshness columns, Python Greenhouse/Lever/Ashby adapters,
+  internal `POST /internal/jobs/source-sync` observations with completeness
+  semantics, disappearance grace and reopen, and freshness-aware public search.
+  Step 9 (documentation) and Step 10 (L4 verification) remain.
 - AI Task remains outside completed slices.
 
 The revised architecture direction is:
@@ -91,7 +99,8 @@ Current step:
 
 ```text
 Research / Capability Check / Design / Plan complete
-Implementation not started
+Steps 1-8 implemented, committed, and pushed
+Step 9 (documentation) and Step 10 (L4 verification) remain
 ```
 
 0012 scope:
@@ -143,6 +152,11 @@ HTTP request
 - TSan external-service subset: 6/6.
 - Focused Release regression after the `PUT`/`DELETE` method extension: 9/9.
 - Both `service/` and root Release builds completed successfully.
+- 0012 Steps 1-8 focused evidence: `SchemaTest` 8/8, source observation domain
+  26/26, Source Sync DAO 12/12, Source Sync Service 6/6, source-sync HTTP 5/5,
+  source sync E2E 1/1, `ctest -L job` 84/84, Python adapter suite 81/81.
+- Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
+  all published with `complete=false` only where the 200-job limit required it.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test
   data was cleaned afterward.
 
@@ -163,7 +177,9 @@ Performance baseline:
 | Medium | P1 HTTP methods remain a minimal subset | Further methods require a new reviewed change |
 | Medium | Live MySQL/Redis required by integration tests | CTest is not self-contained |
 | Medium | Internal import token is application-layer only | Gateway network isolation is still pending |
-| Medium | No source adapter runner yet | ATS discovery is designed but not implemented |
+| Medium | Source adapters publish no salary | Lever/Ashby units do not map to the monthly-thousands column contract |
+| Medium | Adapters need a running C++ service | The CLI publishes over HTTP; there is no queue or scheduler yet |
+| Medium | Lever/Ashby company comes from configuration | Those APIs return no company name, so `company` falls back to config or the board token |
 | Medium | AI provider abstraction is not implemented yet | Core must remain functional without AI |
 | Medium | Ranking candidate set is capped at 2000 | Results expose `truncated=true` |
 | Low | No minimal end-user UI yet | Open-source demo remains API/CLI-first |

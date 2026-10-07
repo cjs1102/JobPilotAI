@@ -1,9 +1,10 @@
 # ExecPlan 0012: Job Source Adapter + Freshness
 
-> Status: Research, Design, and Planning complete. Steps 1-8 (Schema migration,
+> Status: Research, Design, and Planning complete. Steps 1-9 (Schema migration,
 > Source observation domain, Source Sync DAO, Source Sync Service, Internal
 > Source Sync API, Search freshness integration, Python source adapters,
-> End-to-end integration) implemented; Step 9 onward not started.
+> End-to-end integration, Documentation) implemented; Step 10 (L4 verification)
+> remains.
 >
 > Task level: L4.
 
@@ -582,7 +583,7 @@ Stop and return to design if:
 - [x] Search freshness integration
 - [x] Python source adapters
 - [x] End-to-end integration
-- [ ] Documentation
+- [x] Documentation
 - [ ] L4 verification
 
 Implementation decisions (keep later steps consistent):

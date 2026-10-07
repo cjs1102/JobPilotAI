@@ -66,6 +66,29 @@ preserve the first causal error and the relevant failing output.
 - A release/demo gate should eventually cover:
   `clone -> configure -> start -> import/discover -> search -> match -> track`.
 
+## Source Adapter Tests
+
+The Python adapters use recorded fixtures and never contact a live ATS API in
+the suite:
+
+```bash
+cd source_adapters
+python3 -m unittest discover -s jobpilot_sources/tests -t .
+```
+
+Coverage: provider fixture parsing (Greenhouse/Lever/Ashby), completeness
+classification (Greenhouse total mismatch; a board above the 200-job limit
+becomes incomplete), partial pagination, HTTP timeout, rate limit and source
+failure, duplicate source URLs, config validation, "token is never logged", and
+a guard that the package imports no database driver and contains no SQL.
+
+An opt-in live smoke (not part of CI) replaces fixtures with real public APIs:
+
+```bash
+INTERNAL_API_TOKEN=dummy python3 -m jobpilot_sources sync \
+  --config /path/to/live-config.yaml --dry-run
+```
+
 ## ASan
 
 ```bash

@@ -372,6 +372,9 @@ GET /api/v1/jobs/{id}
 }
 ```
 
+- 详情响应与 5.1 一致地包含 0012 freshness 字段（`posted_at`、`first_seen_at`、
+  `last_seen_at`、`last_verified_at`、`freshness`、`source_status`）。
+
 ### 5.3 个性化岗位推荐
 
 ```
@@ -539,6 +542,10 @@ X-Internal-Token: <environment secret>
 - `source_url` 仍是唯一幂等键，本接口不改变 `uk_source_url`。
 - `INTERNAL_API_TOKEN` 仅从环境变量读取；当前无 Gateway，该 token 只是应用层保护。
 - 错误响应继续使用统一 `{code,message,data}` 格式。
+
+实现说明：适配器代码位于 `source_adapters/`（Greenhouse / Lever / Ashby，
+fixture 驱动，可选 live smoke）；配置、运行方式与归一化规则见
+[`source_adapters/README.md`](../source_adapters/README.md)。
 
 ---
 

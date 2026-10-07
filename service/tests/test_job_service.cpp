@@ -18,8 +18,7 @@ namespace jobpilot::service
         {
         public:
             std::vector<JobSummary> SearchJobs(
-                const std::optional<std::string> &keyword,
-                const std::optional<std::string> &location,
+                const JobSearchFilter &filter,
                 std::size_t limit,
                 std::size_t offset) override
             {
@@ -29,16 +28,18 @@ namespace jobpilot::service
                         "forced search failure");
                 }
 
-                capturedKeyword = keyword;
-                capturedLocation = location;
+                capturedKeyword = filter.keyword;
+                capturedLocation = filter.location;
+                capturedSalaryMin = filter.salaryMin;
+                capturedSalaryMax = filter.salaryMax;
+                capturedSkill = filter.skill;
                 capturedLimit = limit;
                 capturedOffset = offset;
                 return searchResults;
             }
 
             std::size_t CountJobs(
-                const std::optional<std::string> &keyword,
-                const std::optional<std::string> &location) override
+                const JobSearchFilter &filter) override
             {
                 if (throwOnCount)
                 {
@@ -46,8 +47,8 @@ namespace jobpilot::service
                         "forced count failure");
                 }
 
-                capturedCountKeyword = keyword;
-                capturedCountLocation = location;
+                capturedCountKeyword = filter.keyword;
+                capturedCountLocation = filter.location;
                 return total;
             }
 
@@ -91,6 +92,9 @@ namespace jobpilot::service
             std::optional<std::string> capturedLocation;
             std::optional<std::string> capturedCountKeyword;
             std::optional<std::string> capturedCountLocation;
+            std::optional<std::uint32_t> capturedSalaryMin;
+            std::optional<std::uint32_t> capturedSalaryMax;
+            std::optional<std::string> capturedSkill;
             std::size_t capturedLimit = 0;
             std::size_t capturedOffset = 0;
             std::uint64_t capturedJobId = 0;
@@ -112,8 +116,12 @@ namespace jobpilot::service
         JobService service(dao);
         const ServiceResult<JobPage> result =
             service.SearchJobs(
-                "  C++  ",
-                "  Shenzhen ",
+                JobSearchFilter{
+                    "  C++  ",
+                    "  Shenzhen ",
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt},
                 2,
                 20);
 
@@ -135,8 +143,12 @@ namespace jobpilot::service
 
         const ServiceResult<JobPage> result =
             service.SearchJobs(
-                "   ",
-                "",
+                JobSearchFilter{
+                    "   ",
+                    "",
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt},
                 1,
                 20);
 
@@ -147,27 +159,64 @@ namespace jobpilot::service
             dao.capturedLocation.has_value());
     }
 
+    TEST(JobServiceTest, NormalizesExtendedFilters)
+    {
+        FakeJobDao dao;
+        JobService service(dao);
+
+        const ServiceResult<JobPage> result =
+            service.SearchJobs(
+                JobSearchFilter{
+                    std::nullopt,
+                    std::nullopt,
+                    std::uint32_t(20),
+                    std::uint32_t(35),
+                    std::string("  C++  ")},
+                1,
+                20);
+
+        ASSERT_EQ(result.code, ErrorCode::kSuccess);
+        ASSERT_TRUE(dao.capturedSalaryMin.has_value());
+        ASSERT_TRUE(dao.capturedSalaryMax.has_value());
+        ASSERT_TRUE(dao.capturedSkill.has_value());
+        EXPECT_EQ(dao.capturedSalaryMin.value(), 20U);
+        EXPECT_EQ(dao.capturedSalaryMax.value(), 35U);
+        EXPECT_EQ(dao.capturedSkill.value(), "C++");
+
+        EXPECT_EQ(
+            service.SearchJobs(
+                       JobSearchFilter{
+                           std::nullopt,
+                           std::nullopt,
+                           std::uint32_t(40),
+                           std::uint32_t(20),
+                           std::nullopt},
+                       1,
+                       20)
+                .code,
+            ErrorCode::kInvalidParam);
+    }
+
     TEST(JobServiceTest, RejectsInvalidPagination)
     {
         FakeJobDao dao;
         JobService service(dao);
 
         EXPECT_EQ(
-            service.SearchJobs("", "", 0, 20).code,
+            service.SearchJobs({}, 0, 20).code,
             ErrorCode::kInvalidParam);
         EXPECT_EQ(
-            service.SearchJobs("", "", 1, 0).code,
+            service.SearchJobs({}, 1, 0).code,
             ErrorCode::kInvalidParam);
         EXPECT_EQ(
-            service.SearchJobs("", "", 1, 101).code,
+            service.SearchJobs({}, 1, 101).code,
             ErrorCode::kInvalidParam);
 
         const std::size_t max =
             std::numeric_limits<std::size_t>::max();
         EXPECT_EQ(
             service.SearchJobs(
-                       "",
-                       "",
+                       {},
                        max,
                        2)
                 .code,
@@ -216,7 +265,7 @@ namespace jobpilot::service
         JobService service(dao);
 
         EXPECT_EQ(
-            service.SearchJobs("", "", 1, 20).code,
+            service.SearchJobs({}, 1, 20).code,
             ErrorCode::kDatabaseError);
 
         dao.throwOnCount = false;

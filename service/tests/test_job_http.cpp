@@ -22,8 +22,10 @@
 #include "jobpilot/cache/session_manager.h"
 #include "jobpilot/http/http_server.h"
 #include "jobpilot/network/event_loop.h"
+#include "jobpilot/service/auth/session_authenticator.h"
 #include "jobpilot/service/job/job_controller.h"
 #include "jobpilot/service/job/job_dao.h"
+#include "jobpilot/service/job/job_ranking_service.h"
 #include "jobpilot/service/job/job_service.h"
 #include "jobpilot/service/router.h"
 #include "jobpilot/service/user/user_controller.h"
@@ -126,7 +128,8 @@ namespace jobpilot::service
         }
 
         std::optional<HttpResponseData> SendRequest(
-            const std::string &path)
+            const std::string &path,
+            const std::string &authorization = "")
         {
             const int socketFd =
                 CreateClientSocket();
@@ -142,12 +145,20 @@ namespace jobpilot::service
                 return std::nullopt;
             }
 
-            const std::string request =
+            std::string request =
                 "GET " + path +
                 " HTTP/1.1\r\n"
                 "Host: 127.0.0.1\r\n"
-                "Connection: close\r\n"
-                "\r\n";
+                "Connection: close\r\n";
+
+            if (!authorization.empty())
+            {
+                request +=
+                    "Authorization: " +
+                    authorization + "\r\n";
+            }
+
+            request += "\r\n";
 
             if (!SendAll(socketFd, request))
             {
@@ -232,13 +243,22 @@ namespace jobpilot::service
             userController =
                 std::make_unique<UserController>(
                     *userService);
+            authenticator =
+                std::make_unique<SessionAuthenticator>(
+                    *sessions);
             jobDao =
                 std::make_unique<JobDao>(*pool);
             jobService =
                 std::make_unique<JobService>(*jobDao);
+            rankingService =
+                std::make_unique<JobRankingService>(
+                    *jobDao,
+                    *userDao,
+                    *authenticator);
             jobController =
                 std::make_unique<JobController>(
-                    *jobService);
+                    *jobService,
+                    rankingService.get());
 
             searchToken =
                 jobpilot::test::UniqueJobToken(
@@ -281,6 +301,19 @@ namespace jobpilot::service
                     0,
                     "2026-10-03 10:00:00");
 
+            pool->Execute(
+                "UPDATE jobs SET salary_min = ?, salary_max = ? "
+                "WHERE id = ?",
+                {std::uint64_t(50),
+                 std::uint64_t(70),
+                 olderId});
+            pool->Execute(
+                "UPDATE jobs SET salary_min = ?, salary_max = ? "
+                "WHERE id = ?",
+                {std::uint64_t(20),
+                 std::uint64_t(35),
+                 newerId});
+
             jobpilot::test::InsertJobRequirement(
                 pool.get(),
                 newerId,
@@ -291,6 +324,42 @@ namespace jobpilot::service
                 newerId,
                 "C++",
                 3);
+
+            email =
+                jobpilot::test::UniqueEmail(
+                    "job-http-user");
+            const std::optional<std::uint64_t> createdUser =
+                userDao->CreateUser(
+                    "job-http-user",
+                    email,
+                    "hash");
+            ASSERT_TRUE(createdUser.has_value());
+            userId = createdUser.value();
+            token =
+                jobpilot::test::UniqueJobToken(
+                    "job-http-token");
+            sessions->Set(token, userId);
+
+            UserProfile profile;
+            profile.userId = userId;
+            profile.targetPosition = "C++";
+            profile.location = location;
+            profile.salaryMin = 20;
+            profile.salaryMax = 35;
+            ASSERT_TRUE(
+                userDao->UpsertProfile(profile));
+            ASSERT_TRUE(
+                userDao->UpsertSkill(
+                    userId,
+                    "C++",
+                    3)
+                    .has_value());
+            ASSERT_TRUE(
+                userDao->UpsertSkill(
+                    userId,
+                    "Redis",
+                    2)
+                    .has_value());
 
             serverThread = std::thread(
                 [this]()
@@ -386,6 +455,10 @@ namespace jobpilot::service
             jobpilot::test::CleanupJob(
                 pool.get(),
                 inactiveId);
+            sessions->Remove(token);
+            jobpilot::test::CleanupUser(
+                pool.get(),
+                email);
         }
 
         ServerState state;
@@ -399,8 +472,12 @@ namespace jobpilot::service
         std::unique_ptr<UserDao> userDao;
         std::unique_ptr<UserService> userService;
         std::unique_ptr<UserController> userController;
+        std::unique_ptr<SessionAuthenticator>
+            authenticator;
         std::unique_ptr<JobDao> jobDao;
         std::unique_ptr<JobService> jobService;
+        std::unique_ptr<JobRankingService>
+            rankingService;
         std::unique_ptr<JobController>
             jobController;
         std::string searchToken;
@@ -408,6 +485,9 @@ namespace jobpilot::service
         std::uint64_t olderId = 0;
         std::uint64_t newerId = 0;
         std::uint64_t inactiveId = 0;
+        std::string email;
+        std::string token;
+        std::uint64_t userId = 0;
     };
 
     TEST_F(JobHttpTest, SearchesWithPaginationAndPercentDecoding)
@@ -582,6 +662,82 @@ namespace jobpilot::service
         EXPECT_EQ(
             invalidId->jsonBody["code"],
             10001);
+    }
+
+    TEST_F(JobHttpTest, FiltersBySalaryAndSkill)
+    {
+        const std::optional<HttpResponseData> response =
+            SendRequest(
+                "/api/v1/jobs?keyword=" +
+                searchToken +
+                "&skill=C%2B%2B&salary_min=25&salary_max=30");
+
+        ASSERT_TRUE(response.has_value());
+        ASSERT_TRUE(response->hasJson);
+        EXPECT_EQ(response->statusCode, 200);
+        ASSERT_EQ(
+            response->jsonBody["data"]["list"].size(),
+            1U);
+        EXPECT_EQ(
+            response->jsonBody["data"]["list"][0]["id"],
+            newerId);
+    }
+
+    TEST_F(JobHttpTest, ReturnsDeterministicRecommendations)
+    {
+        const std::optional<HttpResponseData> unauthenticated =
+            SendRequest(
+                "/api/v1/jobs/recommended?keyword=" +
+                searchToken);
+
+        ASSERT_TRUE(unauthenticated.has_value());
+        ASSERT_TRUE(unauthenticated->hasJson);
+        EXPECT_EQ(unauthenticated->statusCode, 401);
+        EXPECT_EQ(
+            unauthenticated->jsonBody["code"],
+            20001);
+
+        const std::optional<HttpResponseData> invalidToken =
+            SendRequest(
+                "/api/v1/jobs/recommended?keyword=" +
+                    searchToken,
+                "Bearer invalid-token");
+
+        ASSERT_TRUE(invalidToken.has_value());
+        ASSERT_TRUE(invalidToken->hasJson);
+        EXPECT_EQ(invalidToken->statusCode, 401);
+        EXPECT_EQ(
+            invalidToken->jsonBody["code"],
+            20001);
+
+        const std::optional<HttpResponseData> response =
+            SendRequest(
+                "/api/v1/jobs/recommended?keyword=" +
+                    searchToken +
+                    "&page=1&page_size=10",
+                "Bearer " + token);
+
+        ASSERT_TRUE(response.has_value());
+        ASSERT_TRUE(response->hasJson);
+        EXPECT_EQ(response->statusCode, 200);
+        ASSERT_EQ(
+            response->jsonBody["data"]["list"].size(),
+            2U);
+        EXPECT_EQ(
+            response->jsonBody["data"]["list"][0]["id"],
+            newerId);
+        EXPECT_EQ(
+            response->jsonBody["data"]["list"][0]
+                             ["score_version"],
+            "rule_v1");
+        EXPECT_TRUE(
+            response->jsonBody["data"]["list"][0]
+                             ["score"]
+                .is_number());
+        EXPECT_TRUE(
+            response->jsonBody["data"]["list"][0]
+                             ["score_breakdown"]
+                .is_object());
     }
 
 } // namespace jobpilot::service

@@ -11,6 +11,8 @@
 #include <nlohmann/json.hpp>
 
 #include "jobpilot/error.h"
+#include "jobpilot/service/auth/session_authenticator.h"
+#include "jobpilot/service/job/job_ranking_service.h"
 
 namespace jobpilot::service
 {
@@ -23,8 +25,7 @@ namespace jobpilot::service
 
         struct JobSearchQuery
         {
-            std::string keyword;
-            std::string location;
+            JobSearchFilter filter;
             std::size_t page = kDefaultPage;
             std::size_t pageSize = kDefaultPageSize;
         };
@@ -206,6 +207,41 @@ namespace jobpilot::service
             }
         }
 
+        bool ParseUnsigned32(
+            const std::string &value,
+            std::uint32_t *result)
+        {
+            if (value.empty())
+            {
+                return false;
+            }
+
+            std::size_t parsed = 0;
+
+            try
+            {
+                const unsigned long long number =
+                    std::stoull(value, &parsed);
+
+                if (parsed != value.size() ||
+                    number >
+                        std::numeric_limits<
+                            std::uint32_t>::max())
+                {
+                    return false;
+                }
+
+                *result =
+                    static_cast<std::uint32_t>(
+                        number);
+                return true;
+            }
+            catch (const std::exception &)
+            {
+                return false;
+            }
+        }
+
         bool ParseSearchQuery(
             const std::string &path,
             JobSearchQuery *query)
@@ -220,6 +256,9 @@ namespace jobpilot::service
 
             bool hasKeyword = false;
             bool hasLocation = false;
+            bool hasSalaryMin = false;
+            bool hasSalaryMax = false;
+            bool hasSkill = false;
             bool hasPage = false;
             bool hasPageSize = false;
 
@@ -267,7 +306,7 @@ namespace jobpilot::service
                         }
 
                         hasKeyword = true;
-                        query->keyword = value;
+                        query->filter.keyword = value;
                     }
                     else if (key == "location")
                     {
@@ -277,7 +316,47 @@ namespace jobpilot::service
                         }
 
                         hasLocation = true;
-                        query->location = value;
+                        query->filter.location = value;
+                    }
+                    else if (key == "salary_min")
+                    {
+                        std::uint32_t salary = 0;
+
+                        if (hasSalaryMin ||
+                            !ParseUnsigned32(
+                                value,
+                                &salary))
+                        {
+                            return false;
+                        }
+
+                        hasSalaryMin = true;
+                        query->filter.salaryMin = salary;
+                    }
+                    else if (key == "salary_max")
+                    {
+                        std::uint32_t salary = 0;
+
+                        if (hasSalaryMax ||
+                            !ParseUnsigned32(
+                                value,
+                                &salary))
+                        {
+                            return false;
+                        }
+
+                        hasSalaryMax = true;
+                        query->filter.salaryMax = salary;
+                    }
+                    else if (key == "skill")
+                    {
+                        if (hasSkill)
+                        {
+                            return false;
+                        }
+
+                        hasSkill = true;
+                        query->filter.skill = value;
                     }
                     else if (key == "page")
                     {
@@ -385,6 +464,14 @@ namespace jobpilot::service
                        : Json(nullptr);
         }
 
+        Json NullableDouble(
+            const std::optional<double> &value)
+        {
+            return value.has_value()
+                       ? Json(value.value())
+                       : Json(nullptr);
+        }
+
         Json SummaryToJson(
             const JobSummary &summary)
         {
@@ -404,11 +491,48 @@ namespace jobpilot::service
                 {"created_at", summary.createTime},
                 {"updated_at", summary.updateTime}};
         }
+
+        std::optional<std::uint64_t> AuthenticateRequest(
+            const jobpilot::core::HttpRequest &request,
+            jobpilot::core::HttpResponse *response,
+            JobRankingService *service)
+        {
+            const std::optional<std::string> token =
+                ParseBearerToken(
+                    request.GetHeader("Authorization"));
+
+            if (!token.has_value())
+            {
+                WriteResponse(
+                    response,
+                    request.KeepAlive(),
+                    ErrorCode::kUnauthorized,
+                    nullptr);
+                return std::nullopt;
+            }
+
+            const ServiceResult<std::uint64_t> result =
+                service->Authenticate(token.value());
+
+            if (result.code != ErrorCode::kSuccess)
+            {
+                WriteResponse(
+                    response,
+                    request.KeepAlive(),
+                    result.code,
+                    nullptr);
+                return std::nullopt;
+            }
+
+            return result.value;
+        }
     } // namespace
 
     JobController::JobController(
-        JobService &service)
-        : service_(service)
+        JobService &service,
+        JobRankingService *rankingService)
+        : service_(service),
+          rankingService_(rankingService)
     {
     }
 
@@ -432,8 +556,7 @@ namespace jobpilot::service
 
         const ServiceResult<JobPage> result =
             service_.SearchJobs(
-                query.keyword,
-                query.location,
+                query.filter,
                 query.page,
                 query.pageSize);
 
@@ -527,6 +650,111 @@ namespace jobpilot::service
             request.KeepAlive(),
             ErrorCode::kSuccess,
             data);
+    }
+
+    void JobController::Recommended(
+        const jobpilot::core::HttpRequest &request,
+        jobpilot::core::HttpResponse &response)
+    {
+        if (rankingService_ == nullptr)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInternalError,
+                nullptr);
+            return;
+        }
+
+        const std::optional<std::uint64_t> userId =
+            AuthenticateRequest(
+                request,
+                &response,
+                rankingService_);
+
+        if (!userId.has_value())
+        {
+            return;
+        }
+
+        JobSearchQuery query;
+
+        if (!ParseSearchQuery(
+                request.Path(),
+                &query))
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInvalidParam,
+                nullptr);
+            return;
+        }
+
+        const ServiceResult<RankedJobPage> result =
+            rankingService_->RankJobs(
+                userId.value(),
+                query.filter,
+                query.page,
+                query.pageSize);
+
+        if (result.code != ErrorCode::kSuccess)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                result.code,
+                nullptr);
+            return;
+        }
+
+        Json list = Json::array();
+
+        for (const RankedJob &job :
+             result.value.list)
+        {
+            Json item =
+                SummaryToJson(job.job);
+            item["score"] = job.score;
+            item["score_version"] =
+                job.scoreVersion;
+            item["score_breakdown"] = Json{
+                {"skill",
+                 NullableDouble(
+                     job.breakdown.skill)},
+                {"title",
+                 NullableDouble(
+                     job.breakdown.title)},
+                {"salary",
+                 NullableDouble(
+                     job.breakdown.salary)},
+                {"location",
+                 NullableDouble(
+                     job.breakdown.location)},
+                {"first_seen",
+                 NullableDouble(
+                     job.breakdown.firstSeen)}};
+            item["matched_skills"] =
+                job.matchedSkills;
+            item["missing_skills"] =
+                job.missingSkills;
+            list.push_back(
+                std::move(item));
+        }
+
+        WriteResponse(
+            &response,
+            request.KeepAlive(),
+            ErrorCode::kSuccess,
+            Json{
+                {"list", std::move(list)},
+                {"total", result.value.total},
+                {"ranked_total",
+                 result.value.rankedTotal},
+                {"truncated",
+                 result.value.truncated},
+                {"page", result.value.page},
+                {"page_size", result.value.pageSize}});
     }
 
 } // namespace jobpilot::service

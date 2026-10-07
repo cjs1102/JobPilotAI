@@ -6,10 +6,14 @@
 
 namespace jobpilot::service
 {
+    class JobRankingService;
+
     class JobController
     {
     public:
-        explicit JobController(JobService &service);
+        JobController(
+            JobService &service,
+            JobRankingService *rankingService = nullptr);
 
         void Search(
             const jobpilot::core::HttpRequest &request,
@@ -19,8 +23,13 @@ namespace jobpilot::service
             const jobpilot::core::HttpRequest &request,
             jobpilot::core::HttpResponse &response);
 
+        void Recommended(
+            const jobpilot::core::HttpRequest &request,
+            jobpilot::core::HttpResponse &response);
+
     private:
         JobService &service_;
+        JobRankingService *rankingService_;
     };
 
 } // namespace jobpilot::service

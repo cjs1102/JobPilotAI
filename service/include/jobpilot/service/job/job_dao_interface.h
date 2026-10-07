@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "jobpilot/database/mysql_pool.h"
+#include "jobpilot/service/job/job_search_filter.h"
 
 namespace jobpilot::service
 {
@@ -45,14 +46,12 @@ namespace jobpilot::service
         virtual ~IJobDao() = default;
 
         virtual std::vector<JobSummary> SearchJobs(
-            const std::optional<std::string> &keyword,
-            const std::optional<std::string> &location,
+            const JobSearchFilter &filter,
             std::size_t limit,
             std::size_t offset) = 0;
 
         virtual std::size_t CountJobs(
-            const std::optional<std::string> &keyword,
-            const std::optional<std::string> &location) = 0;
+            const JobSearchFilter &filter) = 0;
 
         virtual std::optional<JobDetail> FindActiveJobById(
             std::uint64_t jobId) = 0;

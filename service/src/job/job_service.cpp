@@ -1,9 +1,7 @@
 #include "jobpilot/service/job/job_service.h"
 
-#include <cctype>
 #include <exception>
 #include <limits>
-#include <optional>
 #include <utility>
 
 #include "jobpilot/core/logger.h"
@@ -12,20 +10,7 @@ namespace jobpilot::service
 {
     namespace
     {
-        constexpr std::size_t kMaxKeywordBytes = 128;
-        constexpr std::size_t kMaxLocationBytes = 64;
         constexpr std::size_t kMaxPageSize = 100;
-
-        std::optional<std::string> NormalizeOptional(
-            const std::string &value)
-        {
-            if (value.empty())
-            {
-                return std::nullopt;
-            }
-
-            return value;
-        }
     } // namespace
 
     JobService::JobService(
@@ -34,36 +19,8 @@ namespace jobpilot::service
     {
     }
 
-    std::string JobService::Trim(
-        const std::string &value)
-    {
-        std::size_t begin = 0;
-        std::size_t end = value.size();
-
-        while (begin < end &&
-               std::isspace(
-                   static_cast<unsigned char>(
-                       value[begin])))
-        {
-            ++begin;
-        }
-
-        while (end > begin &&
-               std::isspace(
-                   static_cast<unsigned char>(
-                       value[end - 1])))
-        {
-            --end;
-        }
-
-        return value.substr(
-            begin,
-            end - begin);
-    }
-
     ServiceResult<JobPage> JobService::SearchJobs(
-        const std::string &keyword,
-        const std::string &location,
+        const JobSearchFilter &filter,
         std::size_t page,
         std::size_t pageSize)
     {
@@ -76,13 +33,11 @@ namespace jobpilot::service
                 {}};
         }
 
-        const std::string normalizedKeyword =
-            Trim(keyword);
-        const std::string normalizedLocation =
-            Trim(location);
+        JobSearchFilter normalized;
 
-        if (normalizedKeyword.size() > kMaxKeywordBytes ||
-            normalizedLocation.size() > kMaxLocationBytes)
+        if (!NormalizeJobSearchFilter(
+                filter,
+                &normalized))
         {
             return ServiceResult<JobPage>{
                 ErrorCode::kInvalidParam,
@@ -103,24 +58,16 @@ namespace jobpilot::service
         const std::size_t offset =
             pageIndex * pageSize;
 
-        const std::optional<std::string> keywordFilter =
-            NormalizeOptional(normalizedKeyword);
-        const std::optional<std::string> locationFilter =
-            NormalizeOptional(normalizedLocation);
-
         try
         {
             JobPage result;
             result.page = page;
             result.pageSize = pageSize;
             result.total =
-                jobDao_.CountJobs(
-                    keywordFilter,
-                    locationFilter);
+                jobDao_.CountJobs(normalized);
             result.list =
                 jobDao_.SearchJobs(
-                    keywordFilter,
-                    locationFilter,
+                    normalized,
                     pageSize,
                     offset);
 

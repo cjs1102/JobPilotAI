@@ -14,6 +14,7 @@
 #include "jobpilot/service/job/job_dao.h"
 #include "jobpilot/service/job/job_ingestion_dao.h"
 #include "jobpilot/service/job/job_ingestion_service.h"
+#include "jobpilot/service/job/job_ranking_service.h"
 #include "jobpilot/service/job/job_service.h"
 #include "jobpilot/service/job/internal_job_import_controller.h"
 #include "jobpilot/service/resume/resume_controller.h"
@@ -153,6 +154,15 @@ int main(int argc, char *argv[])
         jobpilot::service::JobService jobService(
             jobDao);
 
+        jobpilot::service::JobRankingService jobRankingService(
+            jobDao,
+            userDao,
+            authenticator);
+
+        jobpilot::service::JobController jobController(
+            jobService,
+            &jobRankingService);
+
         jobpilot::service::JobIngestionDao jobIngestionDao;
 
         jobpilot::service::JobIngestionService jobIngestionService(
@@ -163,9 +173,6 @@ int main(int argc, char *argv[])
             internalJobImportController(
                 jobIngestionService,
                 config.internalApi.token);
-
-        jobpilot::service::JobController jobController(
-            jobService);
 
         jobpilot::service::ApplicationDao applicationDao(
             mysqlPool);

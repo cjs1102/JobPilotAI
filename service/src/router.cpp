@@ -213,6 +213,18 @@ namespace jobpilot::service
 
             router.RegisterRoute(
                 jobpilot::core::HttpMethod::kGet,
+                "/api/v1/jobs/recommended",
+                [jobController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    jobController->Recommended(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
                 "/api/v1/jobs/{id}",
                 [jobController](
                     const jobpilot::core::HttpRequest &request,

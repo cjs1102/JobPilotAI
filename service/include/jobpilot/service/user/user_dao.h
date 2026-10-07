@@ -10,7 +10,9 @@ class ConnectionPool;
 namespace jobpilot::service
 {
 
-class UserDao final : public IUserDao
+class UserDao final
+    : public IUserDao,
+      public IUserProfileReader
 {
 public:
     explicit UserDao(

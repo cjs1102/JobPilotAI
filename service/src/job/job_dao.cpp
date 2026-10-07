@@ -1,8 +1,10 @@
 #include "jobpilot/service/job/job_dao.h"
 
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -125,39 +127,69 @@ namespace jobpilot::service
         }
 
         JobFilter BuildJobFilter(
-            const std::optional<std::string> &keyword,
-            const std::optional<std::string> &location)
+            const JobSearchFilter &filter)
         {
-            JobFilter filter;
-            filter.sql = " WHERE status = 1";
+            JobFilter result;
+            result.sql = " WHERE j.status = 1";
 
-            if (location.has_value())
+            if (filter.location.has_value())
             {
-                filter.sql += " AND location = ?";
-                filter.params.emplace_back(
-                    location.value());
+                result.sql += " AND j.location = ?";
+                result.params.emplace_back(
+                    filter.location.value());
             }
 
-            if (keyword.has_value())
+            if (filter.keyword.has_value())
             {
                 const std::string pattern =
                     "%" + EscapeLikeLiteral(
-                              keyword.value()) +
+                              filter.keyword.value()) +
                     "%";
 
-                filter.sql +=
+                result.sql +=
                     " AND ("
-                    "title LIKE ? ESCAPE '!' "
-                    "OR company LIKE ? ESCAPE '!' "
-                    "OR COALESCE(description, '') "
+                    "j.title LIKE ? ESCAPE '!' "
+                    "OR j.company LIKE ? ESCAPE '!' "
+                    "OR COALESCE(j.description, '') "
                     "LIKE ? ESCAPE '!'"
                     ")";
-                filter.params.emplace_back(pattern);
-                filter.params.emplace_back(pattern);
-                filter.params.emplace_back(pattern);
+                result.params.emplace_back(pattern);
+                result.params.emplace_back(pattern);
+                result.params.emplace_back(pattern);
             }
 
-            return filter;
+            if (filter.skill.has_value())
+            {
+                result.sql +=
+                    " AND EXISTS ("
+                    "SELECT 1 FROM job_requirements jr "
+                    "WHERE jr.job_id = j.id "
+                    "AND jr.skill = ?)";
+                result.params.emplace_back(
+                    filter.skill.value());
+            }
+
+            if (filter.salaryMin.has_value())
+            {
+                result.sql +=
+                    " AND j.salary_max IS NOT NULL "
+                    "AND j.salary_max >= ?";
+                result.params.emplace_back(
+                    static_cast<std::uint64_t>(
+                        filter.salaryMin.value()));
+            }
+
+            if (filter.salaryMax.has_value())
+            {
+                result.sql +=
+                    " AND j.salary_min IS NOT NULL "
+                    "AND j.salary_min <= ?";
+                result.params.emplace_back(
+                    static_cast<std::uint64_t>(
+                        filter.salaryMax.value()));
+            }
+
+            return result;
         }
 
         JobSummary MakeJobSummary(
@@ -220,16 +252,15 @@ namespace jobpilot::service
     }
 
     std::vector<JobSummary> JobDao::SearchJobs(
-        const std::optional<std::string> &keyword,
-        const std::optional<std::string> &location,
+        const JobSearchFilter &filter,
         std::size_t limit,
         std::size_t offset)
     {
-        const JobFilter filter =
-            BuildJobFilter(keyword, location);
+        const JobFilter sqlFilter =
+            BuildJobFilter(filter);
 
         std::vector<jobpilot::core::SqlParam> params =
-            filter.params;
+            sqlFilter.params;
         params.emplace_back(
             static_cast<std::uint64_t>(limit));
         params.emplace_back(
@@ -237,12 +268,12 @@ namespace jobpilot::service
 
         const jobpilot::core::Result result =
             pool_.Query(
-                "SELECT id, company, title, location, "
-                "salary_min, salary_max, salary_currency, "
-                "source, create_time, update_time "
-                "FROM jobs" +
-                    filter.sql +
-                    " ORDER BY update_time DESC, id DESC "
+                "SELECT j.id, j.company, j.title, j.location, "
+                "j.salary_min, j.salary_max, j.salary_currency, "
+                "j.source, j.create_time, j.update_time "
+                "FROM jobs j" +
+                    sqlFilter.sql +
+                    " ORDER BY j.create_time DESC, j.id DESC "
                     "LIMIT ? OFFSET ?",
                 params);
 
@@ -261,17 +292,16 @@ namespace jobpilot::service
     }
 
     std::size_t JobDao::CountJobs(
-        const std::optional<std::string> &keyword,
-        const std::optional<std::string> &location)
+        const JobSearchFilter &filter)
     {
-        const JobFilter filter =
-            BuildJobFilter(keyword, location);
+        const JobFilter sqlFilter =
+            BuildJobFilter(filter);
 
         const jobpilot::core::Result result =
             pool_.Query(
-                "SELECT COUNT(*) FROM jobs" +
-                    filter.sql,
-                filter.params);
+                "SELECT COUNT(*) FROM jobs j" +
+                    sqlFilter.sql,
+                sqlFilter.params);
 
         if (result.rowCount() != 1)
         {
@@ -283,6 +313,152 @@ namespace jobpilot::service
             ParseUint64(
                 result.value(0, 0),
                 "jobs.count"));
+    }
+
+    std::vector<JobSummary> JobDao::SearchRankingCandidates(
+        const JobSearchFilter &filter,
+        std::size_t limit)
+    {
+        const JobFilter sqlFilter =
+            BuildJobFilter(filter);
+
+        std::vector<jobpilot::core::SqlParam> params =
+            sqlFilter.params;
+        params.emplace_back(
+            static_cast<std::uint64_t>(limit));
+
+        const jobpilot::core::Result result =
+            pool_.Query(
+                "SELECT j.id, j.company, j.title, j.location, "
+                "j.salary_min, j.salary_max, j.salary_currency, "
+                "j.source, j.create_time, j.update_time "
+                "FROM jobs j" +
+                    sqlFilter.sql +
+                    " ORDER BY j.create_time DESC, j.id DESC "
+                    "LIMIT ?",
+                params);
+
+        std::vector<JobSummary> jobs;
+        jobs.reserve(result.rowCount());
+
+        for (std::size_t row = 0;
+             row < result.rowCount();
+             ++row)
+        {
+            jobs.push_back(
+                MakeJobSummary(result.row(row)));
+        }
+
+        return jobs;
+    }
+
+    std::size_t JobDao::CountRankingCandidates(
+        const JobSearchFilter &filter)
+    {
+        return CountJobs(filter);
+    }
+
+    std::vector<JobRequirementsRecord>
+    JobDao::ListRequirementsForJobs(
+        const std::vector<std::uint64_t> &jobIds)
+    {
+        std::vector<JobRequirementsRecord> records;
+
+        if (jobIds.empty())
+        {
+            return records;
+        }
+
+        constexpr std::size_t kChunkSize = 500;
+        std::unordered_map<
+            std::uint64_t,
+            std::size_t> recordIndex;
+
+        for (std::size_t begin = 0;
+             begin < jobIds.size();
+             begin += kChunkSize)
+        {
+            const std::size_t end =
+                std::min(
+                    jobIds.size(),
+                    begin + kChunkSize);
+            std::string placeholders;
+            std::vector<jobpilot::core::SqlParam> params;
+            params.reserve(end - begin);
+
+            for (std::size_t index = begin;
+                 index < end;
+                 ++index)
+            {
+                if (!placeholders.empty())
+                {
+                    placeholders += ", ";
+                }
+
+                placeholders += "?";
+                params.emplace_back(jobIds[index]);
+            }
+
+            const jobpilot::core::Result result =
+                pool_.Query(
+                    "SELECT job_id, skill, level "
+                    "FROM job_requirements "
+                    "WHERE job_id IN (" +
+                        placeholders +
+                        ") "
+                        "ORDER BY job_id ASC, skill ASC",
+                    params);
+
+            for (std::size_t row = 0;
+                 row < result.rowCount();
+                 ++row)
+            {
+                const auto &values = result.row(row);
+
+                if (values.size() != 3)
+                {
+                    throw std::runtime_error(
+                        "job requirements query returned an "
+                        "unexpected column count");
+                }
+
+                const std::uint64_t jobId =
+                    ParseUint64(
+                        values[0],
+                        "job_requirements.job_id");
+                const auto found =
+                    recordIndex.find(jobId);
+                std::size_t recordPosition = 0;
+
+                if (found == recordIndex.end())
+                {
+                    recordPosition = records.size();
+                    recordIndex.emplace(
+                        jobId,
+                        recordPosition);
+                    JobRequirementsRecord record;
+                    record.jobId = jobId;
+                    records.push_back(
+                        std::move(record));
+                }
+                else
+                {
+                    recordPosition = found->second;
+                }
+
+                records[recordPosition]
+                    .requirements.push_back(
+                        JobRequirement{
+                            RequireValue(
+                                values[1],
+                                "job_requirements.skill"),
+                            ParseInt32(
+                                values[2],
+                                "job_requirements.level")});
+            }
+        }
+
+        return records;
     }
 
     std::optional<JobDetail> JobDao::FindActiveJobById(

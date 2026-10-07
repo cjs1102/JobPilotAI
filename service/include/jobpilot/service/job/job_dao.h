@@ -1,6 +1,7 @@
 #pragma once
 
 #include "jobpilot/service/job/job_dao_interface.h"
+#include "jobpilot/service/job/job_ranking_dao_interface.h"
 
 namespace jobpilot::core
 {
@@ -9,21 +10,31 @@ namespace jobpilot::core
 
 namespace jobpilot::service
 {
-    class JobDao final : public IJobDao
+    class JobDao final
+        : public IJobDao,
+          public IJobRankingDao
     {
     public:
         explicit JobDao(
             jobpilot::core::ConnectionPool &pool);
 
         std::vector<JobSummary> SearchJobs(
-            const std::optional<std::string> &keyword,
-            const std::optional<std::string> &location,
+            const JobSearchFilter &filter,
             std::size_t limit,
             std::size_t offset) override;
 
         std::size_t CountJobs(
-            const std::optional<std::string> &keyword,
-            const std::optional<std::string> &location) override;
+            const JobSearchFilter &filter) override;
+
+        std::vector<JobSummary> SearchRankingCandidates(
+            const JobSearchFilter &filter,
+            std::size_t limit) override;
+
+        std::size_t CountRankingCandidates(
+            const JobSearchFilter &filter) override;
+
+        std::vector<JobRequirementsRecord> ListRequirementsForJobs(
+            const std::vector<std::uint64_t> &jobIds) override;
 
         std::optional<JobDetail> FindActiveJobById(
             std::uint64_t jobId) override;

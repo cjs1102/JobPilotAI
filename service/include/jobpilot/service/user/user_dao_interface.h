@@ -42,6 +42,18 @@ namespace jobpilot::service
         std::string createTime;
     };
 
+    class IUserProfileReader
+    {
+    public:
+        virtual ~IUserProfileReader() = default;
+
+        virtual std::optional<UserProfile> FindProfile(
+            std::uint64_t userId) = 0;
+
+        virtual std::vector<UserSkill> ListSkills(
+            std::uint64_t userId) = 0;
+    };
+
     class IUserDao
     {
     public:

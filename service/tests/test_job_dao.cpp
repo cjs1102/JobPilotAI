@@ -97,8 +97,12 @@ namespace jobpilot::service
 
         const std::vector<JobSummary> all =
             dao->SearchJobs(
-                token,
-                std::nullopt,
+                JobSearchFilter{
+                    token,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt},
                 20,
                 0);
 
@@ -106,13 +110,23 @@ namespace jobpilot::service
         EXPECT_EQ(all[0].id, newer);
         EXPECT_EQ(all[1].id, older);
         EXPECT_EQ(
-            dao->CountJobs(token, std::nullopt),
+            dao->CountJobs(
+                JobSearchFilter{
+                    token,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt}),
             2U);
 
         const std::vector<JobSummary> byLocation =
             dao->SearchJobs(
-                token,
-                std::string("Shenzhen"),
+                JobSearchFilter{
+                    token,
+                    std::string("Shenzhen"),
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt},
                 20,
                 0);
 
@@ -152,23 +166,39 @@ namespace jobpilot::service
 
         EXPECT_EQ(
             dao->CountJobs(
-                prefix + "%",
-                std::nullopt),
+                JobSearchFilter{
+                    prefix + "%",
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt}),
             1U);
         EXPECT_EQ(
             dao->CountJobs(
-                prefix + "_",
-                std::nullopt),
+                JobSearchFilter{
+                    prefix + "_",
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt}),
             1U);
         EXPECT_EQ(
             dao->CountJobs(
-                prefix + "!",
-                std::nullopt),
+                JobSearchFilter{
+                    prefix + "!",
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt}),
             1U);
         EXPECT_EQ(
             dao->CountJobs(
-                "' OR 1=1 --",
-                std::nullopt),
+                JobSearchFilter{
+                    "' OR 1=1 --",
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt}),
             0U);
     }
 
@@ -225,5 +255,78 @@ namespace jobpilot::service
         EXPECT_FALSE(
             dao->FindActiveJobById(999999999ULL)
                 .has_value());
+    }
+
+    TEST_F(JobDaoTest, FiltersSalaryAndSkillAndLoadsBulkRequirements)
+    {
+        const std::string token =
+            jobpilot::test::UniqueJobToken(
+                "salary-skill");
+        const std::uint64_t matching =
+            AddJob(
+                "Match",
+                token + " C++",
+                "Shenzhen",
+                "description",
+                1,
+                "2026-10-01 10:00:00");
+        const std::uint64_t other =
+            AddJob(
+                "Other",
+                token + " Go",
+                "Shenzhen",
+                "description",
+                1,
+                "2026-10-02 10:00:00");
+
+        pool->Execute(
+            "UPDATE jobs SET salary_min = ?, salary_max = ? "
+            "WHERE id = ?",
+            {std::uint64_t(20),
+             std::uint64_t(35),
+             matching});
+        pool->Execute(
+            "UPDATE jobs SET salary_min = ?, salary_max = ? "
+            "WHERE id = ?",
+            {std::uint64_t(50),
+             std::uint64_t(70),
+             other});
+
+        jobpilot::test::InsertJobRequirement(
+            pool.get(),
+            matching,
+            "C++",
+            3);
+        jobpilot::test::InsertJobRequirement(
+            pool.get(),
+            other,
+            "Go",
+            2);
+
+        const JobSearchFilter filter{
+            token,
+            std::nullopt,
+            std::uint32_t(25),
+            std::uint32_t(40),
+            std::string("C++")};
+
+        const std::vector<JobSummary> jobs =
+            dao->SearchJobs(filter, 20, 0);
+
+        ASSERT_EQ(jobs.size(), 1U);
+        EXPECT_EQ(jobs.front().id, matching);
+        EXPECT_EQ(dao->CountJobs(filter), 1U);
+
+        const std::vector<JobRequirementsRecord> records =
+            dao->ListRequirementsForJobs(
+                {matching, other});
+
+        ASSERT_EQ(records.size(), 2U);
+        EXPECT_EQ(records[0].jobId, matching);
+        ASSERT_EQ(records[0].requirements.size(), 1U);
+        EXPECT_EQ(records[0].requirements[0].skill, "C++");
+        EXPECT_EQ(records[1].jobId, other);
+        ASSERT_EQ(records[1].requirements.size(), 1U);
+        EXPECT_EQ(records[1].requirements[0].skill, "Go");
     }
 } // namespace jobpilot::service

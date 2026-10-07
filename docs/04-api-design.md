@@ -278,7 +278,14 @@ GET /api/v1/resumes/{id}/versions
 ### 5.1 岗位搜索
 
 ```
-GET /api/v1/jobs?keyword=C%2B%2B&location=深圳&page=1&page_size=20
+GET /api/v1/jobs
+  ?keyword=C%2B%2B
+  &location=深圳
+  &salary_min=20
+  &salary_max=35
+  &skill=Redis
+  &page=1
+  &page_size=20
 ```
 
 ```json
@@ -303,6 +310,11 @@ GET /api/v1/jobs?keyword=C%2B%2B&location=深圳&page=1&page_size=20
   }
 }
 ```
+
+- `salary_min/salary_max` 表示用户可接受薪资区间，岗位薪资区间与之有交集才返回。
+- 使用薪资过滤时，未提供薪资区间的岗位不返回。
+- `skill` 为精确技能过滤，匹配 `job_requirements.skill`。
+- 公共搜索结果按 `create_time DESC, id DESC` 稳定排序。
 
 ### 5.2 岗位详情
 
@@ -334,7 +346,57 @@ GET /api/v1/jobs/{id}
 }
 ```
 
-### 5.3 岗位内部导入
+### 5.3 个性化岗位推荐
+
+```
+GET /api/v1/jobs/recommended
+Authorization: Bearer <token>
+```
+
+支持与 `GET /api/v1/jobs` 相同的 Hard Filter 参数。
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "list": [
+      {
+        "id": 20001,
+        "title": "C++服务器开发",
+        "company": "某公司",
+        "score": 82.5,
+        "score_version": "rule_v1",
+        "score_breakdown": {
+          "skill": 0.91,
+          "title": 0.75,
+          "salary": 1.0,
+          "location": 1.0,
+          "first_seen": 0.8
+        },
+        "matched_skills": ["C++", "Redis"],
+        "missing_skills": ["Kubernetes"]
+      }
+    ],
+    "total": 120,
+    "ranked_total": 120,
+    "truncated": false,
+    "page": 1,
+    "page_size": 20
+  }
+}
+```
+
+规则：
+
+- Hard Filter 决定岗位是否进入结果集。
+- Soft Ranking 只对已通过 Hard Filter 的岗位计分。
+- 已被 Hard Filter 使用的属性会从评分中移除并重新归一化权重，避免重复惩罚。
+- `rule_v1` 权重：skill 55%、title 15%、salary 15%、location 10%、first_seen 5%。
+- 最多加载 2000 个候选岗位；超出时返回 `truncated=true`。
+- 不调用 LLM 或 Embedding。
+
+### 5.4 岗位内部导入
 
 该接口不属于公共 `/api/v1/*` API，仅供可信导入器或后续 Crawler 使用：
 
@@ -575,6 +637,7 @@ GET /health
 | POST | /api/v1/resumes/{id}/versions | 是 | 新版本 |
 | GET | /api/v1/resumes/{id}/versions | 是 | 版本列表 |
 | GET | /api/v1/jobs | 否 | 岗位搜索 |
+| GET | /api/v1/jobs/recommended | 是 | 个性化岗位推荐 |
 | GET | /api/v1/jobs/{id} | 否 | 岗位详情 |
 | POST | /api/v1/applications | 是 | 创建投递 |
 | GET | /api/v1/applications | 是 | 投递列表 |

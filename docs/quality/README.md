@@ -47,6 +47,25 @@ Record the command, scope, result count, failures, and environment. On success,
 report a concise summary instead of replaying the complete log. On failure,
 preserve the first causal error and the relevant failing output.
 
+## Open-source MVP Quality Gates
+
+- Core tests must pass without an LLM or external AI provider.
+- Source-adapter tests use fixtures and recorded/synthetic payloads; live
+  provider checks are opt-in.
+- AI provider tests mock network boundaries and verify timeout, degradation,
+  invalid output, and retry behavior.
+- Provider keys are never required for normal CI and never printed.
+- The documented local flow must remain runnable with MySQL and Redis only;
+  AI is optional.
+- 0011 ranking tests must verify deterministic ordering, score versioning,
+  hard-filter/ranking separation, and no double penalty.
+- 0012 adapter tests must cover complete observation, partial pagination,
+  timeout, rate limit, source failure, disappearance grace, and reopen.
+- 0013 worker tests must verify atomic claim, lease timeout, retry, stale
+  recovery, provider failure, and rule-only fallback.
+- A release/demo gate should eventually cover:
+  `clone -> configure -> start -> import/discover -> search -> match -> track`.
+
 ## ASan
 
 ```bash
@@ -57,8 +76,8 @@ MYSQL_PASSWORD=root \
   ctest --preset asan
 ```
 
-Scope: all 97 current tests, including live MySQL, Redis, schema, User,
-Resume, Job, and Application checks.
+Scope: all 115 current tests, including live MySQL, Redis, schema, User,
+Resume, Job, Job Ingestion, Job Ranking, and Application checks.
 
 ## UBSan
 
@@ -70,7 +89,7 @@ MYSQL_PASSWORD=root \
   ctest --preset ubsan
 ```
 
-Scope: all 97 current tests and `-fno-sanitize-recover=undefined`.
+Scope: all 115 current tests and `-fno-sanitize-recover=undefined`.
 
 ## TSan
 
@@ -90,6 +109,7 @@ The default TSan gate covers:
 - TcpConnection read, write, callback, and socket lifecycle behavior;
 - TcpServer request/connection integration;
 - HttpServer request concurrency and response ordering;
+- Job ingestion transaction rollback and HTTP idempotency;
 - Application service duplicate-create concurrency and transaction behavior.
 
 GCC TSan on this Ubuntu VM can fail during process startup with
@@ -108,11 +128,15 @@ Date: 2026-10-07
 
 | Check | Result |
 |---|---|
-| ASan full CTest | 97/97 passed |
-| UBSan full CTest | 97/97 passed |
-| TSan default gate | 36/36 passed |
+| ASan full CTest | 115/115 passed |
+| UBSan full CTest | 115/115 passed |
+| TSan default gate | 42/42 passed |
 | TSan external-service tests | 6/6 passed |
 | Service and root Release builds | passed |
+
+TSan was not rerun for 0011 because the slice introduced no new concurrency,
+thread, event-loop, connection-lifetime, or background-worker behavior. The
+42/42 TSan baseline remains recorded for the last concurrency-relevant stage.
 
 TSan initially found a race in `test_thread_pool.cpp`: the completion counter
 was updated before `condition.notify_one()` while the test could leave scope

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "jobpilot/service/job/job_dao_interface.h"
+#include "jobpilot/service/job/job_search_filter.h"
 #include "jobpilot/service/result.h"
 
 namespace jobpilot::service
@@ -25,8 +26,7 @@ namespace jobpilot::service
         explicit JobService(IJobDao &jobDao);
 
         ServiceResult<JobPage> SearchJobs(
-            const std::string &keyword,
-            const std::string &location,
+            const JobSearchFilter &filter,
             std::size_t page,
             std::size_t pageSize);
 
@@ -34,9 +34,6 @@ namespace jobpilot::service
             std::uint64_t jobId);
 
     private:
-        static std::string Trim(
-            const std::string &value);
-
         IJobDao &jobDao_;
     };
 

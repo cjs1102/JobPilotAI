@@ -31,7 +31,8 @@ namespace jobpilot::service
         IUserDao &userDao,
         jobpilot::core::SessionManager &sessions)
         : userDao_(userDao),
-          sessions_(sessions)
+          sessions_(sessions),
+          authenticator_(sessions)
     {
     }
 
@@ -414,39 +415,7 @@ namespace jobpilot::service
     ServiceResult<std::uint64_t> UserService::Authenticate(
         const std::string &token)
     {
-        if (token.empty())
-        {
-            return ServiceResult<std::uint64_t>{
-                ErrorCode::kUnauthorized,
-                0};
-        }
-
-        try
-        {
-            const std::optional<std::uint64_t> userId =
-                sessions_.GetUserId(token);
-
-            if (!userId.has_value())
-            {
-                return ServiceResult<std::uint64_t>{
-                    ErrorCode::kUnauthorized,
-                    0};
-            }
-
-            return ServiceResult<std::uint64_t>{
-                ErrorCode::kSuccess,
-                userId.value()};
-        }
-        catch (const std::exception &error)
-        {
-            jobpilot::core::Logger::Get()->error(
-                "session authentication failed: {}",
-                error.what());
-
-            return ServiceResult<std::uint64_t>{
-                ErrorCode::kInternalError,
-                0};
-        }
+        return authenticator_.Authenticate(token);
     }
 
     ServiceResult<UserProfile> UserService::GetProfile(

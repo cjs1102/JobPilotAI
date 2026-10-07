@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "jobpilot/service/auth/session_authenticator.h"
 #include "jobpilot/service/result.h"
 #include "jobpilot/service/user/user_dao_interface.h"
 
@@ -97,6 +98,7 @@ namespace jobpilot::service
     private:
         IUserDao &userDao_;
         jobpilot::core::SessionManager &sessions_;
+        SessionAuthenticator authenticator_;
     };
 
 } // namespace jobpilot::service

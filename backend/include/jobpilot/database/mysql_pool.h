@@ -40,6 +40,48 @@ namespace jobpilot::core
     class ConnectionPool
     {
     public:
+        // Move-only lease of one pooled connection. A Transaction must not
+        // outlive its ConnectionPool.
+        class Transaction
+        {
+        public:
+            ~Transaction();
+
+            Transaction(const Transaction &) = delete;
+            Transaction &operator=(
+                const Transaction &) = delete;
+
+            Transaction(Transaction &&other) noexcept;
+
+            Transaction &operator=(
+                Transaction &&other) noexcept;
+
+            Result Query(
+                const std::string &sql,
+                const std::vector<SqlParam> &params);
+
+            ExecutionResult Execute(
+                const std::string &sql,
+                const std::vector<SqlParam> &params);
+
+            void Commit();
+            void Rollback();
+
+        private:
+            friend class ConnectionPool;
+
+            Transaction(
+                ConnectionPool *pool,
+                MYSQL *connection) noexcept;
+
+            void EnsureActive() const;
+            void ReleaseNoThrow() noexcept;
+
+            ConnectionPool *pool_;
+            MYSQL *connection_;
+            bool active_;
+        };
+
         ConnectionPool(
             const std::string &host,
             std::uint16_t port,
@@ -65,7 +107,11 @@ namespace jobpilot::core
             const std::string &sql,
             const std::vector<SqlParam> &params);
 
+        Transaction BeginTransaction();
+
     private:
+        friend class Transaction;
+
         std::string host_;
         std::uint16_t port_;
         std::string user_;

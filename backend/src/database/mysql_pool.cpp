@@ -172,35 +172,12 @@ namespace
 
         std::unique_ptr<MysqlNullFlag[]> nullFlags_;
     };
-}
 
-namespace jobpilot::core
-{
-    ExecutionResult ConnectionPool::Execute(
+    jobpilot::core::ExecutionResult ExecuteOnConnection(
+        MYSQL *connection,
         const std::string &sql,
-        const std::vector<SqlParam> &params)
+        const std::vector<jobpilot::core::SqlParam> &params)
     {
-        MYSQL *connection = Get();
-
-        struct ConnectionGuard
-        {
-            ConnectionPool *pool;
-            MYSQL *connection;
-
-            ~ConnectionGuard()
-            {
-                if (pool != nullptr &&
-                    connection != nullptr)
-                {
-                    pool->Return(connection);
-                }
-            }
-        };
-
-        ConnectionGuard connectionGuard{
-            this,
-            connection};
-
         MYSQL_STMT *rawStmt =
             mysql_stmt_init(connection);
 
@@ -267,41 +244,18 @@ namespace jobpilot::core
                 "Execute must not be used for row-returning SQL");
         }
 
-        return ExecutionResult{
+        return jobpilot::core::ExecutionResult{
             static_cast<std::uint64_t>(
                 mysql_stmt_affected_rows(stmt.get())),
             static_cast<std::uint64_t>(
                 mysql_stmt_insert_id(stmt.get()))};
     }
 
-    Result ConnectionPool::Query(
+    jobpilot::core::Result QueryOnConnection(
+        MYSQL *connection,
         const std::string &sql,
-        const std::vector<SqlParam> &params)
+        const std::vector<jobpilot::core::SqlParam> &params)
     {
-        MYSQL *connection = Get();
-
-        // RAII：
-        // Query 正常返回或者抛出异常时，
-        // 都自动把连接归还连接池。
-        struct ConnectionGuard
-        {
-            ConnectionPool *pool;
-            MYSQL *connection;
-
-            ~ConnectionGuard()
-            {
-                if (pool != nullptr &&
-                    connection != nullptr)
-                {
-                    pool->Return(connection);
-                }
-            }
-        };
-
-        ConnectionGuard connectionGuard{
-            this,
-            connection};
-
         MYSQL_STMT *rawStmt =
             mysql_stmt_init(connection);
 
@@ -342,17 +296,15 @@ namespace jobpilot::core
 
         ParamBindContext paramContext(params);
 
-        if (!params.empty())
+        if (!params.empty() &&
+            mysql_stmt_bind_param(
+                stmt.get(),
+                paramContext.data()) != 0)
         {
-            if (mysql_stmt_bind_param(
-                    stmt.get(),
-                    paramContext.data()) != 0)
-            {
-                throw std::runtime_error(
-                    std::string(
-                        "mysql_stmt_bind_param failed: ") +
-                    mysql_stmt_error(stmt.get()));
-            }
+            throw std::runtime_error(
+                std::string(
+                    "mysql_stmt_bind_param failed: ") +
+                mysql_stmt_error(stmt.get()));
         }
 
         if (mysql_stmt_execute(stmt.get()) != 0)
@@ -367,11 +319,9 @@ namespace jobpilot::core
             mysql_stmt_field_count(
                 stmt.get());
 
-        // 没有结果集，例如：
-        // INSERT / UPDATE / DELETE。
         if (fieldCount == 0)
         {
-            return Result{};
+            return jobpilot::core::Result{};
         }
 
         if (mysql_stmt_store_result(
@@ -412,7 +362,6 @@ namespace jobpilot::core
         }
 
         std::vector<std::string> columnNames;
-
         columnNames.reserve(fieldCount);
 
         for (unsigned int i = 0;
@@ -425,10 +374,6 @@ namespace jobpilot::core
                     : "");
         }
 
-        // 每列初始使用 64 KiB 缓冲区。
-        // 如果字段超过该大小，
-        // 则使用 mysql_stmt_fetch_column()
-        // 重新获取完整字段。
         constexpr std::size_t kInitialBufferSize =
             64 * 1024;
 
@@ -441,9 +386,6 @@ namespace jobpilot::core
             fieldCount,
             0);
 
-        // 不能使用 vector<bool>。
-        // 使用真正连续的 bool 数组，
-        // 保证可以取得 bool* 传给 MYSQL_BIND。
         std::unique_ptr<MysqlNullFlag[]>
             nullFlags =
                 fieldCount == 0
@@ -460,20 +402,15 @@ namespace jobpilot::core
              ++i)
         {
             resultBinds[i] = MYSQL_BIND{};
-
             resultBinds[i].buffer_type =
                 MYSQL_TYPE_STRING;
-
             resultBinds[i].buffer =
                 buffers[i].data();
-
             resultBinds[i].buffer_length =
                 static_cast<unsigned long>(
                     buffers[i].size());
-
             resultBinds[i].length =
                 &lengths[i];
-
             resultBinds[i].is_null =
                 &nullFlags[i];
         }
@@ -488,17 +425,15 @@ namespace jobpilot::core
                 mysql_stmt_error(stmt.get()));
         }
 
-        std::vector<Result::Row> rows;
+        std::vector<jobpilot::core::Result::Row> rows;
 
         while (true)
         {
-            // 清理每一行的长度。
             std::fill(
                 lengths.begin(),
                 lengths.end(),
                 0);
 
-            // 清理每一行的 NULL 标志。
             for (unsigned int i = 0;
                  i < fieldCount;
                  ++i)
@@ -524,24 +459,20 @@ namespace jobpilot::core
                     mysql_stmt_error(stmt.get()));
             }
 
-            Result::Row row;
-
+            jobpilot::core::Result::Row row;
             row.reserve(fieldCount);
 
             for (unsigned int i = 0;
                  i < fieldCount;
                  ++i)
             {
-                // SQL NULL -> std::nullopt
                 if (nullFlags[i])
                 {
                     row.emplace_back(
                         std::nullopt);
-
                     continue;
                 }
 
-                // 当前列数据超过初始缓冲区。
                 if (fetchResult ==
                         MYSQL_DATA_TRUNCATED &&
                     lengths[i] >
@@ -563,30 +494,21 @@ namespace jobpilot::core
                         1;
 
                     std::vector<char>
-                        fullBuffer(
-                            fullSize);
+                        fullBuffer(fullSize);
 
-                    unsigned long fullLength =
-                        0;
-
-                    MysqlNullFlag fullNull =
-                        0;
-
+                    unsigned long fullLength = 0;
+                    MysqlNullFlag fullNull = 0;
                     MYSQL_BIND columnBind{};
 
                     columnBind.buffer_type =
                         MYSQL_TYPE_STRING;
-
                     columnBind.buffer =
                         fullBuffer.data();
-
                     columnBind.buffer_length =
                         static_cast<unsigned long>(
                             fullBuffer.size());
-
                     columnBind.length =
                         &fullLength;
-
                     columnBind.is_null =
                         &fullNull;
 
@@ -629,9 +551,236 @@ namespace jobpilot::core
                 std::move(row));
         }
 
-        return Result(
+        return jobpilot::core::Result(
             std::move(columnNames),
             std::move(rows));
+    }
+}
+
+namespace jobpilot::core
+{
+    ExecutionResult ConnectionPool::Execute(
+        const std::string &sql,
+        const std::vector<SqlParam> &params)
+    {
+        MYSQL *connection = Get();
+
+        struct ConnectionGuard
+        {
+            ConnectionPool *pool;
+            MYSQL *connection;
+
+            ~ConnectionGuard()
+            {
+                if (pool != nullptr &&
+                    connection != nullptr)
+                {
+                    pool->Return(connection);
+                }
+            }
+        };
+
+        ConnectionGuard connectionGuard{
+            this,
+            connection};
+
+        return ExecuteOnConnection(
+            connection,
+            sql,
+            params);
+    }
+
+    Result ConnectionPool::Query(
+        const std::string &sql,
+        const std::vector<SqlParam> &params)
+    {
+        MYSQL *connection = Get();
+
+        struct ConnectionGuard
+        {
+            ConnectionPool *pool;
+            MYSQL *connection;
+
+            ~ConnectionGuard()
+            {
+                if (pool != nullptr &&
+                    connection != nullptr)
+                {
+                    pool->Return(connection);
+                }
+            }
+        };
+
+        ConnectionGuard connectionGuard{
+            this,
+            connection};
+
+        return QueryOnConnection(
+            connection,
+            sql,
+            params);
+    }
+
+    ConnectionPool::Transaction::Transaction(
+        ConnectionPool *pool,
+        MYSQL *connection) noexcept
+        : pool_(pool),
+          connection_(connection),
+          active_(true)
+    {
+    }
+
+    ConnectionPool::Transaction::~Transaction()
+    {
+        ReleaseNoThrow();
+    }
+
+    ConnectionPool::Transaction::Transaction(
+        Transaction &&other) noexcept
+        : pool_(other.pool_),
+          connection_(other.connection_),
+          active_(other.active_)
+    {
+        other.pool_ = nullptr;
+        other.connection_ = nullptr;
+        other.active_ = false;
+    }
+
+    ConnectionPool::Transaction &
+    ConnectionPool::Transaction::operator=(
+        Transaction &&other) noexcept
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        ReleaseNoThrow();
+
+        pool_ = other.pool_;
+        connection_ = other.connection_;
+        active_ = other.active_;
+
+        other.pool_ = nullptr;
+        other.connection_ = nullptr;
+        other.active_ = false;
+
+        return *this;
+    }
+
+    Result ConnectionPool::Transaction::Query(
+        const std::string &sql,
+        const std::vector<SqlParam> &params)
+    {
+        EnsureActive();
+        return QueryOnConnection(
+            connection_,
+            sql,
+            params);
+    }
+
+    ExecutionResult ConnectionPool::Transaction::Execute(
+        const std::string &sql,
+        const std::vector<SqlParam> &params)
+    {
+        EnsureActive();
+        return ExecuteOnConnection(
+            connection_,
+            sql,
+            params);
+    }
+
+    void ConnectionPool::Transaction::Commit()
+    {
+        EnsureActive();
+
+        if (::mysql_query(
+                connection_,
+                "COMMIT") != 0)
+        {
+            throw std::runtime_error(
+                std::string(
+                    "mysql transaction commit failed: ") +
+                ::mysql_error(connection_));
+        }
+
+        active_ = false;
+        ReleaseNoThrow();
+    }
+
+    void ConnectionPool::Transaction::Rollback()
+    {
+        EnsureActive();
+
+        if (::mysql_query(
+                connection_,
+                "ROLLBACK") != 0)
+        {
+            throw std::runtime_error(
+                std::string(
+                    "mysql transaction rollback failed: ") +
+                ::mysql_error(connection_));
+        }
+
+        active_ = false;
+        ReleaseNoThrow();
+    }
+
+    void ConnectionPool::Transaction::EnsureActive() const
+    {
+        if (!active_ ||
+            connection_ == nullptr ||
+            pool_ == nullptr)
+        {
+            throw std::logic_error(
+                "transaction is no longer active");
+        }
+    }
+
+    void ConnectionPool::Transaction::ReleaseNoThrow() noexcept
+    {
+        if (connection_ == nullptr ||
+            pool_ == nullptr)
+        {
+            return;
+        }
+
+        if (active_)
+        {
+            ::mysql_query(
+                connection_,
+                "ROLLBACK");
+        }
+
+        active_ = false;
+
+        pool_->Return(connection_);
+        connection_ = nullptr;
+        pool_ = nullptr;
+    }
+
+    ConnectionPool::Transaction
+    ConnectionPool::BeginTransaction()
+    {
+        MYSQL *connection = Get();
+
+        if (::mysql_query(
+                connection,
+                "START TRANSACTION") != 0)
+        {
+            const std::string message =
+                std::string(
+                    "mysql transaction begin failed: ") +
+                ::mysql_error(connection);
+
+            Return(connection);
+
+            throw std::runtime_error(message);
+        }
+
+        return Transaction(
+            this,
+            connection);
     }
 
     ConnectionPool::ConnectionPool(

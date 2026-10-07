@@ -324,6 +324,103 @@ namespace
 
         cleanup();
     }
+
+    void TestTransactions(
+        jobpilot::core::ConnectionPool &pool)
+    {
+        const std::string table =
+            "jobpilot_transaction_test";
+
+        const auto cleanup =
+            [&pool, &table]()
+            {
+                pool.Execute(
+                    "DROP TABLE IF EXISTS " + table,
+                    {});
+            };
+
+        cleanup();
+
+        try
+        {
+            pool.Execute(
+                "CREATE TABLE " + table +
+                    " ("
+                    "id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,"
+                    "value VARCHAR(32) NOT NULL"
+                    ") ENGINE=InnoDB",
+                {});
+
+            {
+                auto transaction =
+                    pool.BeginTransaction();
+
+                transaction.Execute(
+                    "INSERT INTO " + table +
+                        " (value) VALUES (?)",
+                    {std::string("committed")});
+
+                transaction.Commit();
+            }
+
+            {
+                auto transaction =
+                    pool.BeginTransaction();
+
+                transaction.Execute(
+                    "INSERT INTO " + table +
+                        " (value) VALUES (?)",
+                    {std::string("explicit-rollback")});
+
+                transaction.Rollback();
+            }
+
+            try
+            {
+                auto transaction =
+                    pool.BeginTransaction();
+
+                transaction.Execute(
+                    "INSERT INTO " + table +
+                        " (value) VALUES (?)",
+                    {std::string("raii-rollback")});
+
+                throw std::runtime_error(
+                    "force transaction rollback");
+            }
+            catch (const std::runtime_error &)
+            {
+            }
+
+            const jobpilot::core::Result result =
+                pool.Query(
+                    "SELECT value FROM " + table,
+                    {});
+
+            Check(
+                result.rowCount() == 1,
+                "transaction rollback left unexpected rows");
+
+            Check(
+                result.value(0, 0).has_value() &&
+                    *result.value(0, 0) == "committed",
+                "committed transaction value mismatch");
+        }
+        catch (...)
+        {
+            try
+            {
+                cleanup();
+            }
+            catch (...)
+            {
+            }
+
+            throw;
+        }
+
+        cleanup();
+    }
 }
 
 int main()
@@ -397,6 +494,12 @@ int main()
 
         std::cout
             << "execute metadata test passed"
+            << std::endl;
+
+        TestTransactions(pool);
+
+        std::cout
+            << "transaction test passed"
             << std::endl;
 
         std::cout

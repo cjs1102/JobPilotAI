@@ -356,6 +356,9 @@ POST /api/v1/applications
 }
 ```
 
+`resume_version_id` 为必填项，且对应版本必须属于当前登录用户；`job_id`
+必须对应启用中的岗位。重复投递返回 `40004`。
+
 ### 6.2 投递列表
 
 ```
@@ -385,6 +388,9 @@ GET /api/v1/applications?status=2&page=1&page_size=20
 }
 ```
 
+`status` 可选；`page >= 1`；`1 <= page_size <= 100`。列表仅返回当前登录
+用户的投递记录，并按 `update_time DESC, id DESC` 排序。
+
 ### 6.3 更新投递状态
 
 ```
@@ -410,6 +416,9 @@ GET /api/v1/applications/statistics
   "data": { "total": 50, "interview": 5, "offer": 1, "rejected": 12 }
 }
 ```
+
+统计范围仅限当前登录用户：`total` 为全部投递，`interview` 为状态
+`3/4/5`，`offer` 为状态 `6`，`rejected` 为状态 `7`。
 
 > 注：`statistics` 为静态路径，网关/路由需在 `{id}` 参数路由之前注册。
 

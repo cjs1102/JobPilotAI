@@ -57,8 +57,8 @@ MYSQL_PASSWORD=root \
   ctest --preset asan
 ```
 
-Scope: all 87 current tests, including live MySQL, Redis, schema, User,
-Resume, and Job checks.
+Scope: all 97 current tests, including live MySQL, Redis, schema, User,
+Resume, Job, and Application checks.
 
 ## UBSan
 
@@ -70,7 +70,7 @@ MYSQL_PASSWORD=root \
   ctest --preset ubsan
 ```
 
-Scope: all 87 current tests and `-fno-sanitize-recover=undefined`.
+Scope: all 97 current tests and `-fno-sanitize-recover=undefined`.
 
 ## TSan
 
@@ -89,7 +89,8 @@ The default TSan gate covers:
 - ThreadPool submission, completion, exception handling, and shutdown;
 - TcpConnection read, write, callback, and socket lifecycle behavior;
 - TcpServer request/connection integration;
-- HttpServer request concurrency and response ordering.
+- HttpServer request concurrency and response ordering;
+- Application service duplicate-create concurrency and transaction behavior.
 
 GCC TSan on this Ubuntu VM can fail during process startup with
 `unexpected memory mapping` when ASLR is enabled. The CMake targets set
@@ -107,11 +108,11 @@ Date: 2026-10-07
 
 | Check | Result |
 |---|---|
-| ASan full CTest | 87/87 passed |
-| UBSan full CTest | 87/87 passed |
-| TSan default gate | 32/32 passed |
+| ASan full CTest | 97/97 passed |
+| UBSan full CTest | 97/97 passed |
+| TSan default gate | 36/36 passed |
 | TSan external-service tests | 6/6 passed |
-| Focused Release regression | 9/9 passed |
+| Service and root Release builds | passed |
 
 TSan initially found a race in `test_thread_pool.cpp`: the completion counter
 was updated before `condition.notify_one()` while the test could leave scope

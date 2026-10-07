@@ -2,10 +2,11 @@
 
 > Snapshot: 2026-10-07
 >
-> Baseline HEAD: `1b95602 docs(resume): record resume vertical slice`
+> Baseline HEAD: `5f49551 docs(job): record job read vertical slice baseline`
 >
-> `origin/main` matches this baseline. The 0008 Job Read Vertical Slice is
-> implemented and verified in the working tree but is not committed yet.
+> `origin/main` remains `1b95602`. The two 0008 Job commits are present
+> locally but not pushed. The 0009 Application Vertical Slice is implemented
+> and verified in the working tree but is not committed yet.
 
 This is the concise takeover entry. Detailed evidence and historical sections
 are preserved in
@@ -30,9 +31,12 @@ are preserved in
   authentication.
 - The Resume Vertical Slice is implemented, committed, and pushed:
   upload, paginated list, text version creation, and version listing.
-- The Job Read Vertical Slice is implemented and verified in the working
-  tree: public active-job search, pagination, detail, and requirements.
-- Application and AI Task remain outside completed slices.
+- The Job Read Vertical Slice is committed locally: public active-job search,
+  pagination, detail, and requirements.
+- The Application Vertical Slice is implemented and verified in the working
+  tree: authenticated create/list/status/statistics with Job and
+  ResumeVersion validation, duplicate protection, and a strict state machine.
+- AI Task remains outside completed slices.
 
 ## Architecture Summary
 
@@ -49,18 +53,18 @@ HTTP request
   developer entry.
 - `jobpilot_core` owns network/HTTP, config/logging, database, and cache
   primitives.
-- `jobpilot_service_core` owns routing plus User, Resume, and Job read
-  modules.
+- `jobpilot_service_core` owns routing plus User, Resume, Job, and
+  Application modules.
 - P1 ownership rules remain mandatory for changes under
   `backend/{include,src}/jobpilot/{network,http}/`.
 
 ## Verified Snapshot
 
 - Pre-0006 clean `service/` and root CTest: 54/54.
-- Full Debug CTest after 0008: 87/87.
-- ASan full CTest after 0008: 87/87.
-- UBSan full CTest after 0008: 87/87.
-- TSan default gate after 0007: 32/32.
+- Full Debug CTest after 0009: 97/97.
+- ASan full CTest after 0009: 97/97.
+- UBSan full CTest after 0009: 97/97.
+- TSan default gate after 0009: 36/36.
 - TSan external-service subset: 6/6.
 - Focused Release regression after the `PUT`/`DELETE` method extension: 9/9.
 - Both `service/` and root Release builds completed successfully.
@@ -86,8 +90,8 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review and commit the completed 0008 Job Read Vertical Slice.
-2. Continue P2 with Application.
+1. Review and commit the completed 0009 Application Vertical Slice.
+2. Push the local 0008 and 0009 commits together after review.
 3. Keep Job writes/admin and AI tasks behind separate approved plans.
 
 Do not start a new P2 module without its own approved plan.

@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted
+Accepted for the C++ modular-monolith shape. RabbitMQ and Crawler-centered
+MVP assumptions are superseded by
+[ADR-0007](0007-open-source-first-positioning.md),
+[ADR-0008](0008-source-adapters-and-job-discovery.md), and
+[ADR-0009](0009-ai-pipeline-and-provider-strategy.md).
 
 ## Context
 

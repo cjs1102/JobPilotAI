@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted
+Superseded for MVP by
+[ADR-0009](0009-ai-pipeline-and-provider-strategy.md). The AI worker should
+use the C++ internal boundary rather than direct business-table access.
+
+The direct-MySQL decision below is retained only as historical context.
 
 ## Context
 

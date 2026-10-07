@@ -2,7 +2,15 @@
 
 ## Status
 
-Accepted
+Accepted as a target direction; MVP sequencing and MQ assumptions are revised
+by [ADR-0009](0009-ai-pipeline-and-provider-strategy.md).
+
+For the current effective baseline:
+
+- The Python worker talks to the C++ internal AI API.
+- RabbitMQ is not required.
+- LangChain/Agent remains future work.
+- Provider selection is BYOK and provider-neutral.
 
 ## Context
 

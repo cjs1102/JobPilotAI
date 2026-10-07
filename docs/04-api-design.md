@@ -385,6 +385,8 @@ X-Internal-Token: <environment secret>
 - `INTERNAL_API_TOKEN` 仅从环境变量读取。
 - 当前没有 Gateway，该 token 只是应用层保护，不等同于网络隔离。
 - 错误响应继续使用统一 `{code,message,data}` 格式。
+- Greenhouse / Lever / Ashby 等 Source Adapter 只能通过本接口写入，
+  不允许直接写业务数据库。
 
 ---
 
@@ -534,6 +536,14 @@ GET /api/v1/ai/tasks/{task_id}
 - `status=0/1`：前端继续轮询（建议间隔 2s）
 - `status=3`：展示 `error_msg`，可重试
 
+AI Provider 采用 BYOK：
+
+- 核心搜索、排序、岗位入库与投递跟踪不依赖 AI。
+- 支持 OpenAI-compatible、DeepSeek、Qwen、Ollama。
+- Provider key 不进入 Git。
+- LLM 失败时先降级到 Rule / Embedding 结果，并明确标记 degraded。
+- MVP 不要求 RabbitMQ；任务通过 C++ AI Task 状态机与 Python Worker 轮询。
+
 ---
 
 ## 8. 健康检查
@@ -578,3 +588,62 @@ GET /health
 | POST | /internal/jobs/import | Internal Token | 可信岗位导入 |
 
 > 内部接口（AI 服务取简历/岗位、Crawler 入库）为 `/internal/*`，仅内网可达，不对外暴露。
+
+## 10. Open-source MVP 边界
+
+以下接口不属于 MVP：
+
+- AutoApply 或自动登录招聘平台。
+- SaaS 计费 / 套餐 / platform-funded AI key。
+- 多租户 RBAC / Admin 管理面。
+- 通用浏览器 Crawler。
+- RabbitMQ 管理接口。
+
+后续如果增加岗位搜索筛选，只允许在当前 `GET /api/v1/jobs` 契约上评审扩展
+`skill`、`salary_min`、`salary_max` 等过滤条件；`work_mode` 和
+`employment_type` 需要先确认数据模型。
+
+### 10.1 0011 搜索约定
+
+- Hard Filter 与 Soft Ranking 分离。
+- Hard Filter 只决定是否进入结果集。
+- Soft Ranking 只对已通过 Hard Filter 的 Job 计分。
+- 同一条件不得先作为硬排除、再在 score 中重复惩罚。
+- 排名必须包含 `score_version` 和可解释 breakdown。
+- 0011 不调用 LLM、Embedding 或 Search Engine。
+
+### 10.2 Freshness 契约预留
+
+Freshness 字段在 0012 落库后加入公开响应：
+
+```text
+posted_at
+first_seen_at
+last_seen_at
+last_verified_at
+freshness
+source_status
+ghost_score
+```
+
+支持：
+
+```text
+include_stale=true
+posted_within_days=N
+```
+
+`ghost_score` 只表达风险，不代表岗位关闭。
+
+### 10.3 Internal AI API 预留
+
+AI Worker 通过内部 API 操作任务，不直接访问业务表：
+
+```text
+POST /internal/ai/tasks/claim
+POST /internal/ai/tasks/{id}/complete
+POST /internal/ai/tasks/{id}/fail
+GET  /internal/ai/tasks/{id}/input
+```
+
+这些接口在 0013 正式定义，不属于 0011。

@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted
+Accepted as the future target; RabbitMQ is deferred from the MVP by
+[ADR-0009](0009-ai-pipeline-and-provider-strategy.md).
+
+The decision below remains historical target architecture. Its MVP sequencing
+and Crawler-driven ingestion assumptions are not the current effective plan.
 
 ## Context
 

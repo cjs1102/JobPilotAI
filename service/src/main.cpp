@@ -5,12 +5,18 @@
 #include "jobpilot/database/mysql_pool.h"
 #include "jobpilot/http/http_server.h"
 #include "jobpilot/network/event_loop.h"
+#include "jobpilot/storage/file_storage.h"
+#include "jobpilot/service/auth/session_authenticator.h"
+#include "jobpilot/service/resume/resume_controller.h"
+#include "jobpilot/service/resume/resume_dao.h"
+#include "jobpilot/service/resume/resume_service.h"
 #include "jobpilot/service/router.h"
 #include "jobpilot/service/user/user_controller.h"
 #include "jobpilot/service/user/user_dao.h"
 #include "jobpilot/service/user/user_service.h"
 
 #include <exception>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -102,6 +108,13 @@ int main(int argc, char *argv[])
         jobpilot::core::SessionManager sessions(
             redisClient);
 
+        jobpilot::service::SessionAuthenticator authenticator(
+            sessions);
+
+        std::unique_ptr<jobpilot::core::FileStorage> resumeStorage =
+            jobpilot::core::MakeLocalFileStorage(
+                config.storage.root);
+
         jobpilot::service::UserDao userDao(
             mysqlPool);
 
@@ -112,6 +125,19 @@ int main(int argc, char *argv[])
         jobpilot::service::UserController userController(
             userService);
 
+        jobpilot::service::ResumeDao resumeDao(
+            mysqlPool);
+
+        jobpilot::service::ResumeService resumeService(
+            resumeDao,
+            mysqlPool,
+            *resumeStorage,
+            authenticator,
+            config.storage.maxFileBytes);
+
+        jobpilot::service::ResumeController resumeController(
+            resumeService);
+
         jobpilot::core::EventLoop loop;
 
         jobpilot::core::HttpServer server(
@@ -121,7 +147,8 @@ int main(int argc, char *argv[])
 
         jobpilot::service::RegisterRoutes(
             &server,
-            &userController);
+            &userController,
+            &resumeController);
 
         server.Start();
 

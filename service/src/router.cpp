@@ -4,6 +4,7 @@
 
 #include "jobpilot/http/http_request.h"
 #include "jobpilot/http/http_response.h"
+#include "jobpilot/service/resume/resume_controller.h"
 #include "jobpilot/service/user/user_controller.h"
 
 namespace jobpilot::service
@@ -11,7 +12,8 @@ namespace jobpilot::service
 
     void RegisterRoutes(
         jobpilot::core::HttpServer *server,
-        UserController *userController)
+        UserController *userController,
+        ResumeController *resumeController)
     {
         if (server == nullptr ||
             userController == nullptr)
@@ -137,6 +139,57 @@ namespace jobpilot::service
                     "\"data\":{\"status\":\"ok\"}}");
                 response.SetKeepAlive(true);
             });
+
+        if (resumeController != nullptr)
+        {
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/api/v1/resumes/upload",
+                [resumeController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    resumeController->Upload(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
+                "/api/v1/resumes",
+                [resumeController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    resumeController->List(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/api/v1/resumes/{id}/versions",
+                [resumeController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    resumeController->CreateVersion(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
+                "/api/v1/resumes/{id}/versions",
+                [resumeController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    resumeController->ListVersions(
+                        request,
+                        response);
+                });
+        }
 
         router.RegisterRoute(
             jobpilot::core::HttpMethod::kPost,

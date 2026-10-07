@@ -18,6 +18,9 @@ find_package(GTest CONFIG REQUIRED)
 add_library(jobpilot_service_core STATIC
     src/router.cpp
     src/auth/session_authenticator.cpp
+    src/resume/resume_controller.cpp
+    src/resume/resume_dao.cpp
+    src/resume/resume_service.cpp
     src/user/user_controller.cpp
     src/user/user_dao.cpp
     src/user/user_service.cpp
@@ -100,6 +103,42 @@ target_link_libraries(
         GTest::gtest_main
 )
 
+add_executable(
+    test_resume_dao
+    tests/test_resume_dao.cpp
+)
+
+target_link_libraries(
+    test_resume_dao
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
+    test_resume_service
+    tests/test_resume_service.cpp
+)
+
+target_link_libraries(
+    test_resume_service
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
+    test_resume_http
+    tests/test_resume_http.cpp
+)
+
+target_link_libraries(
+    test_resume_http
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
 if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(_jp_service_tsan_launcher
         setarch
@@ -112,6 +151,9 @@ if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         test_user_service
         test_user_http
         test_session_authenticator
+        test_resume_dao
+        test_resume_service
+        test_resume_http
         PROPERTIES
             CROSSCOMPILING_EMULATOR
                 "${_jp_service_tsan_launcher}"
@@ -144,4 +186,22 @@ gtest_discover_tests(
     test_session_authenticator
     PROPERTIES
         LABELS "auth;integration"
+)
+
+gtest_discover_tests(
+    test_resume_dao
+    PROPERTIES
+        LABELS "resume;external;integration"
+)
+
+gtest_discover_tests(
+    test_resume_service
+    PROPERTIES
+        LABELS "resume;integration;tsan"
+)
+
+gtest_discover_tests(
+    test_resume_http
+    PROPERTIES
+        LABELS "resume;integration;tsan"
 )

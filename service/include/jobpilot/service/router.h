@@ -4,10 +4,12 @@
 
 namespace jobpilot::service
 {
+    class ResumeController;
     class UserController;
 
     void RegisterRoutes(
         jobpilot::core::HttpServer *server,
-        UserController *userController);
+        UserController *userController,
+        ResumeController *resumeController = nullptr);
 
 } // namespace jobpilot::service

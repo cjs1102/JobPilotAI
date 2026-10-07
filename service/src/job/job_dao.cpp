@@ -335,6 +335,20 @@ namespace jobpilot::service
         return detail;
     }
 
+    bool JobDao::ActiveJobExists(
+        jobpilot::core::ConnectionPool::Transaction &transaction,
+        std::uint64_t jobId)
+    {
+        const jobpilot::core::Result result =
+            transaction.Query(
+                "SELECT id FROM jobs "
+                "WHERE id = ? AND status = 1 "
+                "LIMIT 1",
+                {jobId});
+
+        return result.rowCount() == 1;
+    }
+
     std::vector<JobRequirement> JobDao::ListRequirements(
         std::uint64_t jobId)
     {

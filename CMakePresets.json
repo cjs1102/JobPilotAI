@@ -129,7 +129,7 @@
       "configurePreset": "tsan",
       "filter": {
         "include": {
-          "name": "^(event_loop_test|tcp_connection_test|tcp_connection_hangup_test|tcp_connection_send_test|tcp_connection_peer_close_test|tcp_connection_write_buffer_test|tcp_server_test|http_server_test|thread_pool_test|UserServiceTest\\..*|UserHttpTest\\..*|SessionAuthenticatorTest\\..*|ResumeServiceTest\\..*|ResumeHttpTest\\..*)$"
+          "name": "^(event_loop_test|tcp_connection_test|tcp_connection_hangup_test|tcp_connection_send_test|tcp_connection_peer_close_test|tcp_connection_write_buffer_test|tcp_server_test|http_server_test|thread_pool_test|UserServiceTest\\..*|UserHttpTest\\..*|SessionAuthenticatorTest\\..*|ResumeServiceTest\\..*|ResumeHttpTest\\..*|ApplicationServiceTest\\..*)$"
         }
       }
     },

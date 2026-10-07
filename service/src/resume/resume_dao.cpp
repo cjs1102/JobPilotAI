@@ -287,6 +287,23 @@ namespace jobpilot::service
         return MakeResumeRecord(result.row(0));
     }
 
+    bool ResumeDao::OwnedVersionExists(
+        jobpilot::core::ConnectionPool::Transaction &transaction,
+        std::uint64_t userId,
+        std::uint64_t resumeVersionId)
+    {
+        const jobpilot::core::Result result =
+            transaction.Query(
+                "SELECT rv.id "
+                "FROM resume_versions rv "
+                "JOIN resumes r ON r.id = rv.resume_id "
+                "WHERE rv.id = ? AND r.user_id = ? "
+                "LIMIT 1",
+                {resumeVersionId, userId});
+
+        return result.rowCount() == 1;
+    }
+
     std::vector<ResumeVersionRecord> ResumeDao::ListVersions(
         std::uint64_t userId,
         std::uint64_t resumeId)

@@ -37,9 +37,11 @@ namespace jobpilot::service
                 return 200;
             case ErrorCode::kInvalidParam:
             case ErrorCode::kMalformedRequest:
+            case ErrorCode::kInvalidStatusTransition:
                 return 400;
             case ErrorCode::kJobNotFound:
             case ErrorCode::kResumeNotFound:
+            case ErrorCode::kApplicationNotFound:
                 return 404;
             case ErrorCode::kUnauthorized:
             case ErrorCode::kTokenExpired:
@@ -49,6 +51,7 @@ namespace jobpilot::service
             case ErrorCode::kForbidden:
                 return 403;
             case ErrorCode::kEmailExists:
+            case ErrorCode::kDuplicateApplication:
                 return 409;
             case ErrorCode::kInternalError:
             case ErrorCode::kDatabaseError:

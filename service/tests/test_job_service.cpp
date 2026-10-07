@@ -64,6 +64,13 @@ namespace jobpilot::service
                 return detail;
             }
 
+            bool ActiveJobExists(
+                jobpilot::core::ConnectionPool::Transaction &,
+                std::uint64_t) override
+            {
+                return activeJobExists;
+            }
+
             std::vector<JobRequirement> ListRequirements(
                 std::uint64_t jobId) override
             {
@@ -78,6 +85,7 @@ namespace jobpilot::service
             bool throwOnSearch = false;
             bool throwOnCount = false;
             bool throwOnDetail = false;
+            bool activeJobExists = true;
 
             std::optional<std::string> capturedKeyword;
             std::optional<std::string> capturedLocation;

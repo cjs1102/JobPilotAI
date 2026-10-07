@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "jobpilot/database/mysql_pool.h"
+
 namespace jobpilot::service
 {
     struct JobSummary
@@ -53,6 +55,10 @@ namespace jobpilot::service
             const std::optional<std::string> &location) = 0;
 
         virtual std::optional<JobDetail> FindActiveJobById(
+            std::uint64_t jobId) = 0;
+
+        virtual bool ActiveJobExists(
+            jobpilot::core::ConnectionPool::Transaction &transaction,
             std::uint64_t jobId) = 0;
 
         virtual std::vector<JobRequirement> ListRequirements(

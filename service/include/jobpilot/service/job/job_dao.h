@@ -28,6 +28,10 @@ namespace jobpilot::service
         std::optional<JobDetail> FindActiveJobById(
             std::uint64_t jobId) override;
 
+        bool ActiveJobExists(
+            jobpilot::core::ConnectionPool::Transaction &transaction,
+            std::uint64_t jobId) override;
+
         std::vector<JobRequirement> ListRequirements(
             std::uint64_t jobId) override;
 

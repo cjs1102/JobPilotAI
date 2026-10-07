@@ -6,6 +6,9 @@
 #include "jobpilot/http/http_server.h"
 #include "jobpilot/network/event_loop.h"
 #include "jobpilot/storage/file_storage.h"
+#include "jobpilot/service/application/application_controller.h"
+#include "jobpilot/service/application/application_dao.h"
+#include "jobpilot/service/application/application_service.h"
 #include "jobpilot/service/auth/session_authenticator.h"
 #include "jobpilot/service/job/job_controller.h"
 #include "jobpilot/service/job/job_dao.h"
@@ -150,6 +153,19 @@ int main(int argc, char *argv[])
         jobpilot::service::JobController jobController(
             jobService);
 
+        jobpilot::service::ApplicationDao applicationDao(
+            mysqlPool);
+
+        jobpilot::service::ApplicationService applicationService(
+            applicationDao,
+            jobDao,
+            resumeDao,
+            mysqlPool,
+            authenticator);
+
+        jobpilot::service::ApplicationController applicationController(
+            applicationService);
+
         jobpilot::core::EventLoop loop;
 
         jobpilot::core::HttpServer server(
@@ -161,7 +177,8 @@ int main(int argc, char *argv[])
             &server,
             &userController,
             &resumeController,
-            &jobController);
+            &jobController,
+            &applicationController);
 
         server.Start();
 

@@ -146,6 +146,10 @@ namespace jobpilot::test
                         idValue.value()));
 
             pool->Execute(
+                "DELETE FROM applications WHERE user_id = ?",
+                {userId});
+
+            pool->Execute(
                 "DELETE rv FROM resume_versions rv "
                 "JOIN resumes r ON r.id = rv.resume_id "
                 "WHERE r.user_id = ?",

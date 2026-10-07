@@ -4,6 +4,7 @@
 
 namespace jobpilot::service
 {
+    class ApplicationController;
     class JobController;
     class ResumeController;
     class UserController;
@@ -12,6 +13,7 @@ namespace jobpilot::service
         jobpilot::core::HttpServer *server,
         UserController *userController,
         ResumeController *resumeController = nullptr,
-        JobController *jobController = nullptr);
+        JobController *jobController = nullptr,
+        ApplicationController *applicationController = nullptr);
 
 } // namespace jobpilot::service

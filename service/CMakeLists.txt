@@ -18,6 +18,9 @@ find_package(GTest CONFIG REQUIRED)
 add_library(jobpilot_service_core STATIC
     src/router.cpp
     src/auth/session_authenticator.cpp
+    src/application/application_controller.cpp
+    src/application/application_dao.cpp
+    src/application/application_service.cpp
     src/job/job_controller.cpp
     src/job/job_dao.cpp
     src/job/job_service.cpp
@@ -178,6 +181,42 @@ target_link_libraries(
         GTest::gtest_main
 )
 
+add_executable(
+    test_application_dao
+    tests/test_application_dao.cpp
+)
+
+target_link_libraries(
+    test_application_dao
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
+    test_application_service
+    tests/test_application_service.cpp
+)
+
+target_link_libraries(
+    test_application_service
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
+    test_application_http
+    tests/test_application_http.cpp
+)
+
+target_link_libraries(
+    test_application_http
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
 if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(_jp_service_tsan_launcher
         setarch
@@ -193,6 +232,12 @@ if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         test_resume_dao
         test_resume_service
         test_resume_http
+        test_job_dao
+        test_job_service
+        test_job_http
+        test_application_dao
+        test_application_service
+        test_application_http
         PROPERTIES
             CROSSCOMPILING_EMULATOR
                 "${_jp_service_tsan_launcher}"
@@ -261,4 +306,22 @@ gtest_discover_tests(
     test_job_http
     PROPERTIES
         LABELS "job;integration"
+)
+
+gtest_discover_tests(
+    test_application_dao
+    PROPERTIES
+        LABELS "application;external;integration"
+)
+
+gtest_discover_tests(
+    test_application_service
+    PROPERTIES
+        LABELS "application;integration"
+)
+
+gtest_discover_tests(
+    test_application_http
+    PROPERTIES
+        LABELS "application;integration"
 )

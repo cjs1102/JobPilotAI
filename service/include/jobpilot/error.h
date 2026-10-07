@@ -14,6 +14,9 @@ enum class ErrorCode : int {
     kInvalidPassword = 30003,
     kJobNotFound = 40001,
     kResumeNotFound = 40002,
+    kApplicationNotFound = 40003,
+    kDuplicateApplication = 40004,
+    kInvalidStatusTransition = 40005,
     kInternalError = 60001,
     kDatabaseError = 60002
 };
@@ -44,6 +47,12 @@ inline const char *ErrorMessage(ErrorCode code)
         return "job not found";
     case ErrorCode::kResumeNotFound:
         return "resume not found";
+    case ErrorCode::kApplicationNotFound:
+        return "application not found";
+    case ErrorCode::kDuplicateApplication:
+        return "duplicate application";
+    case ErrorCode::kInvalidStatusTransition:
+        return "invalid status transition";
     case ErrorCode::kInternalError:
         return "internal error";
     case ErrorCode::kDatabaseError:

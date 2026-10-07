@@ -68,6 +68,11 @@ namespace jobpilot::service
             std::uint64_t userId,
             std::uint64_t resumeId) = 0;
 
+        virtual bool OwnedVersionExists(
+            jobpilot::core::ConnectionPool::Transaction &transaction,
+            std::uint64_t userId,
+            std::uint64_t resumeVersionId) = 0;
+
         virtual std::vector<ResumeVersionRecord> ListVersions(
             std::uint64_t userId,
             std::uint64_t resumeId) = 0;

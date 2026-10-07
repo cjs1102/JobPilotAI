@@ -18,6 +18,21 @@ AI directory by default.
 | Old phase planning | `archive/next-phase-plan-2026-10.md` |
 | Quality or benchmark evidence | `../quality/README.md` or `../benchmarks/README.md` |
 
+## Source Reading Policy
+
+1. Start with `git diff --stat` and identify the changed targets.
+2. Use `git diff -- <specific files>` before opening whole files.
+3. Use `rg -n` to locate symbols, functions, routes, error handling,
+   authentication, ownership, and call sites.
+4. Read a complete file only when surrounding control flow, invariants, or
+   lifetime context cannot be established from the targeted diff/search.
+5. Do not reread large unchanged files or repeat context already confirmed.
+6. For tests, keep the first failure and a concise result summary; do not
+   replay complete successful logs.
+
+If new evidence invalidates an earlier conclusion, reopen only the affected
+files or sections.
+
 ## Authoritative Sources
 
 - Execution order and stop lines: `../08-execution-guide.md`

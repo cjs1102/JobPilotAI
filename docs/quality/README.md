@@ -17,6 +17,36 @@ Conan packages. They do not pretend to provide Debug dependency builds.
 Normal tests keep assertions active because backend test targets append
 `-UNDEBUG` after the Release `-DNDEBUG` flag.
 
+## Verification Levels
+
+Use the smallest level that covers the changed behavior. Escalate when the
+change crosses into a higher-risk boundary.
+
+- **L1 local change**: build only affected targets; run directly related
+  tests. Do not run full CTest or sanitizers.
+- **L2 business-module change**: incremental build; run affected DAO, Service,
+  Controller, or module tests. Add relevant HTTP/integration tests when the
+  behavior crosses that boundary. Sanitizers are not the default.
+- **L3 infrastructure/high-risk change**: HTTP parser, Router, EventLoop,
+  Poller, Connection, thread/concurrency, lifetime, or protocol/serialization
+  boundaries require their focused regression tests. Run TSan only when the
+  change exercises concurrency, and run ASan/UBSan when the risk requires
+  them.
+- **L4 stage completion**: run full Debug CTest, full ASan, and full UBSan.
+  Run TSan when concurrency was touched and Release build when the stage
+  changes release-relevant build behavior.
+- **L5 pre-commit**: choose the minimum sufficient verification for the final
+  diff. If L4 passed after the last relevant code change, reuse that evidence
+  and do not repeat the full matrix. If relevant files changed afterward,
+  rerun the affected checks and repeat the invalidated L4 gates.
+
+Documentation-only changes do not require a rebuild unless generated or
+runtime behavior depends on the documentation.
+
+Record the command, scope, result count, failures, and environment. On success,
+report a concise summary instead of replaying the complete log. On failure,
+preserve the first causal error and the relevant failing output.
+
 ## ASan
 
 ```bash

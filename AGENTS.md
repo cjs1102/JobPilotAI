@@ -21,6 +21,7 @@ network/HTTP remains behaviorally frozen.
 - Network/HTTP Reactor change: `jobpilot-reactor-review` and only its relevant
   reference.
 - AI documentation routing: `docs/ai/README.md`.
+- Verification scope and test evidence: `docs/quality/README.md`.
 
 Read only the sections needed for the current task.
 
@@ -48,6 +49,12 @@ explicitly approved correctness plan permits it. Network work must load
 - Use `service/CMakeLists.txt`, `service/conanfile.txt`, and
   `docs/08-execution-guide.md`; do not invent flags.
 - Prefer documented CMake presets and `ctest --test-dir <build>`.
-- Quality commands and recorded results are in `docs/quality/README.md`.
+- Select the smallest sufficient L1-L5 verification level from
+  `docs/quality/README.md`.
+- The L1-L5 labels here are verification levels, not personal task-size levels.
+- Follow the diff-first source-reading policy in `docs/ai/README.md`.
+- Do not rerun a full test or sanitizer matrix that already passed unless
+  relevant files changed, the environment was invalidated, or a stage/commit
+  gate explicitly requires it.
 - A change is complete only after relevant tests run or a verification gap is
   explicitly reported.

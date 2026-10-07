@@ -109,7 +109,8 @@ enum class ErrorCode : int {
 - 单元测试：GoogleTest，`backend/tests/`，核心模块必须覆盖（Buffer/HTTP解析/EventLoop/Service/DAO）
 - DAO/Service 测试用 mock 或内存实现，不依赖真实数据库（可用 Testcontainers 做集成）
 - 命名：`test_<module>.cc`
-- 提交前本地 `ctest` 全绿
+- 按 `docs/quality/README.md` 的 L1-L5 选择最小充分验证；阶段完成执行 L4，
+  commit 前按 L5 复用刚通过的验证结果或在相关文件变化后补跑失效门禁。
 
 ## 12. Git 规范
 

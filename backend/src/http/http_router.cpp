@@ -1,12 +1,26 @@
 #include "jobpilot/http/http_router.h"
 
 #include <string>
+#include <string_view>
 
 namespace jobpilot::core
 {
 
 namespace
 {
+
+std::string_view PathWithoutQuery(
+    const std::string &path)
+{
+    const std::size_t queryPosition =
+        path.find('?');
+
+    return std::string_view(
+        path.data(),
+        queryPosition == std::string::npos
+            ? path.size()
+            : queryPosition);
+}
 
 bool IsParameterSegment(const std::string &segment)
 {
@@ -17,7 +31,7 @@ bool IsParameterSegment(const std::string &segment)
 
 bool MatchPath(
     const std::string &routePath,
-    const std::string &requestPath)
+    std::string_view requestPath)
 {
     if (routePath == requestPath)
     {
@@ -41,7 +55,7 @@ bool MatchPath(
                     ? std::string::npos
                     : routeSlash - routeStart);
 
-        const std::string requestSegment =
+        const std::string_view requestSegment =
             requestPath.substr(
                 requestStart,
                 requestSlash == std::string::npos
@@ -55,7 +69,8 @@ bool MatchPath(
                 return false;
             }
         }
-        else if (routeSegment != requestSegment)
+        else if (std::string_view(routeSegment) !=
+                 requestSegment)
         {
             return false;
         }
@@ -99,6 +114,9 @@ bool HttpRouter::Route(
         return false;
     }
 
+    const std::string_view requestPath =
+        PathWithoutQuery(request.Path());
+
     // 1. 先进行静态路径匹配。
     //    这样可以保证静态路径优先于参数路径。
     for (const auto &route : routes_)
@@ -113,7 +131,7 @@ bool HttpRouter::Route(
             continue;
         }
 
-        if (route.path == request.Path())
+        if (std::string_view(route.path) == requestPath)
         {
             route.handler(request, *response);
             return true;
@@ -133,7 +151,7 @@ bool HttpRouter::Route(
             continue;
         }
 
-        if (MatchPath(route.path, request.Path()))
+        if (MatchPath(route.path, requestPath))
         {
             route.handler(request, *response);
             return true;

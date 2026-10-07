@@ -217,6 +217,29 @@ void TestDeleteMethodDispatch()
     assert(response.Body() == "deleted");
 }
 
+void TestQueryStringDoesNotBreakRouteMatching()
+{
+    HttpRouter router;
+
+    router.RegisterRoute(
+        HttpMethod::kGet,
+        "/api/v1/resumes",
+        [](const HttpRequest &, HttpResponse &response)
+        {
+            response.SetBody("resumes");
+        });
+
+    HttpRequest request =
+        MakeRequest(
+            HttpMethod::kGet,
+            "/api/v1/resumes?page=1&page_size=20");
+
+    HttpResponse response;
+
+    assert(router.Route(request, &response));
+    assert(response.Body() == "resumes");
+}
+
 }  // namespace jobpilot::core
 
 int main()
@@ -231,6 +254,7 @@ int main()
     TestNotFound();
     TestPutMethodDispatch();
     TestDeleteMethodDispatch();
+    TestQueryStringDoesNotBreakRouteMatching();
 
     std::cout << "http router tests passed\n";
 

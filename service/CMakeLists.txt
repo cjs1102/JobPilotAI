@@ -23,6 +23,9 @@ add_library(jobpilot_service_core STATIC
     src/application/application_service.cpp
     src/job/job_controller.cpp
     src/job/job_dao.cpp
+    src/job/job_ingestion_dao.cpp
+    src/job/job_ingestion_service.cpp
+    src/job/internal_job_import_controller.cpp
     src/job/job_service.cpp
     src/resume/resume_controller.cpp
     src/resume/resume_dao.cpp
@@ -158,6 +161,42 @@ target_link_libraries(
 )
 
 add_executable(
+    test_job_ingestion_dao
+    tests/test_job_ingestion_dao.cpp
+)
+
+target_link_libraries(
+    test_job_ingestion_dao
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
+    test_job_ingestion_service
+    tests/test_job_ingestion_service.cpp
+)
+
+target_link_libraries(
+    test_job_ingestion_service
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
+    test_job_ingestion_http
+    tests/test_job_ingestion_http.cpp
+)
+
+target_link_libraries(
+    test_job_ingestion_http
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
     test_job_service
     tests/test_job_service.cpp
 )
@@ -233,6 +272,9 @@ if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         test_resume_service
         test_resume_http
         test_job_dao
+        test_job_ingestion_dao
+        test_job_ingestion_service
+        test_job_ingestion_http
         test_job_service
         test_job_http
         test_application_dao
@@ -294,6 +336,24 @@ gtest_discover_tests(
     test_job_dao
     PROPERTIES
         LABELS "job;external;integration"
+)
+
+gtest_discover_tests(
+    test_job_ingestion_dao
+    PROPERTIES
+        LABELS "job;external;integration"
+)
+
+gtest_discover_tests(
+    test_job_ingestion_service
+    PROPERTIES
+        LABELS "job;external;integration"
+)
+
+gtest_discover_tests(
+    test_job_ingestion_http
+    PROPERTIES
+        LABELS "job;integration;tsan"
 )
 
 gtest_discover_tests(

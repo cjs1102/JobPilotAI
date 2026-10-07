@@ -30,6 +30,8 @@ namespace jobpilot::core
         constexpr const char *kStorageRootEnv = "STORAGE_ROOT";
         constexpr const char *kStorageMaxFileBytesEnv =
             "STORAGE_MAX_FILE_BYTES";
+        constexpr const char *kInternalApiTokenEnv =
+            "INTERNAL_API_TOKEN";
 
         std::string ToLower(std::string value)
         {
@@ -510,6 +512,14 @@ namespace jobpilot::core
                         *value,
                         kStorageMaxFileBytesEnv);
             }
+
+            if (const std::string *value =
+                    FindEnvironment(
+                        environment,
+                        kInternalApiTokenEnv))
+            {
+                config->internalApi.token = *value;
+            }
         }
 
         void Validate(const Config &config)
@@ -631,7 +641,8 @@ namespace jobpilot::core
             kRedisTimeoutEnv,
             kLogLevelEnv,
             kStorageRootEnv,
-            kStorageMaxFileBytesEnv};
+            kStorageMaxFileBytesEnv,
+            kInternalApiTokenEnv};
 
         Environment environment;
 

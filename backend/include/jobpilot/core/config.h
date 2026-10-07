@@ -57,6 +57,11 @@ namespace jobpilot::core
             10U * 1024U * 1024U};
     };
 
+    struct InternalApiConfig
+    {
+        std::string token;
+    };
+
     struct Config
     {
         ServerConfig server;
@@ -64,6 +69,7 @@ namespace jobpilot::core
         RedisConfig redis;
         LoggingConfig log;
         StorageConfig storage;
+        InternalApiConfig internalApi;
 
         static Config LoadFromFile(
             const std::string &path,

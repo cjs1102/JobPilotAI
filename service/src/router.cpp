@@ -6,6 +6,7 @@
 #include "jobpilot/http/http_response.h"
 #include "jobpilot/service/application/application_controller.h"
 #include "jobpilot/service/job/job_controller.h"
+#include "jobpilot/service/job/internal_job_import_controller.h"
 #include "jobpilot/service/resume/resume_controller.h"
 #include "jobpilot/service/user/user_controller.h"
 
@@ -17,7 +18,8 @@ namespace jobpilot::service
         UserController *userController,
         ResumeController *resumeController,
         JobController *jobController,
-        ApplicationController *applicationController)
+        ApplicationController *applicationController,
+        InternalJobImportController *internalJobImportController)
     {
         if (server == nullptr ||
             userController == nullptr)
@@ -268,6 +270,21 @@ namespace jobpilot::service
                     jobpilot::core::HttpResponse &response)
                 {
                     applicationController->UpdateStatus(
+                        request,
+                        response);
+                });
+        }
+
+        if (internalJobImportController != nullptr)
+        {
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/internal/jobs/import",
+                [internalJobImportController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    internalJobImportController->Import(
                         request,
                         response);
                 });

@@ -1,0 +1,46 @@
+{
+  "jobs": [
+    {
+      "company": "Example Systems",
+      "title": "C++ Backend Engineer",
+      "location": "Shenzhen",
+      "salary_min": 20,
+      "salary_max": 35,
+      "salary_currency": "CNY",
+      "description": "Build Linux backend services for a job platform.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/cpp-backend-1",
+      "requirements": [
+        {
+          "skill": "C++",
+          "level": 3
+        },
+        {
+          "skill": "Linux",
+          "level": 2
+        }
+      ]
+    },
+    {
+      "company": "Data Platform Labs",
+      "title": "Distributed Systems Engineer",
+      "location": "Shanghai",
+      "salary_min": 25,
+      "salary_max": 40,
+      "salary_currency": "CNY",
+      "description": "Design reliable services for distributed workloads.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/distributed-systems-2",
+      "requirements": [
+        {
+          "skill": "C++",
+          "level": 3
+        },
+        {
+          "skill": "MySQL",
+          "level": 2
+        }
+      ]
+    }
+  ]
+}

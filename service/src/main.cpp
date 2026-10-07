@@ -12,7 +12,10 @@
 #include "jobpilot/service/auth/session_authenticator.h"
 #include "jobpilot/service/job/job_controller.h"
 #include "jobpilot/service/job/job_dao.h"
+#include "jobpilot/service/job/job_ingestion_dao.h"
+#include "jobpilot/service/job/job_ingestion_service.h"
 #include "jobpilot/service/job/job_service.h"
+#include "jobpilot/service/job/internal_job_import_controller.h"
 #include "jobpilot/service/resume/resume_controller.h"
 #include "jobpilot/service/resume/resume_dao.h"
 #include "jobpilot/service/resume/resume_service.h"
@@ -150,6 +153,17 @@ int main(int argc, char *argv[])
         jobpilot::service::JobService jobService(
             jobDao);
 
+        jobpilot::service::JobIngestionDao jobIngestionDao;
+
+        jobpilot::service::JobIngestionService jobIngestionService(
+            jobIngestionDao,
+            mysqlPool);
+
+        jobpilot::service::InternalJobImportController
+            internalJobImportController(
+                jobIngestionService,
+                config.internalApi.token);
+
         jobpilot::service::JobController jobController(
             jobService);
 
@@ -178,7 +192,10 @@ int main(int argc, char *argv[])
             &userController,
             &resumeController,
             &jobController,
-            &applicationController);
+            &applicationController,
+            config.internalApi.token.empty()
+                ? nullptr
+                : &internalJobImportController);
 
         server.Start();
 

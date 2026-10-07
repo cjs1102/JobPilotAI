@@ -334,6 +334,58 @@ GET /api/v1/jobs/{id}
 }
 ```
 
+### 5.3 岗位内部导入
+
+该接口不属于公共 `/api/v1/*` API，仅供可信导入器或后续 Crawler 使用：
+
+```
+POST /internal/jobs/import
+X-Internal-Token: <environment secret>
+```
+
+请求：
+
+```json
+{
+  "jobs": [
+    {
+      "company": "某公司",
+      "title": "C++后端开发",
+      "location": "深圳",
+      "salary_min": 20,
+      "salary_max": 35,
+      "salary_currency": "CNY",
+      "description": "...",
+      "source": "import",
+      "source_url": "https://example.com/job/1",
+      "requirements": [
+        { "skill": "C++", "level": 3 },
+        { "skill": "Linux", "level": 2 }
+      ]
+    }
+  ]
+}
+```
+
+响应：
+
+```json
+{
+  "created": 1,
+  "updated": 0,
+  "total": 1
+}
+```
+
+- `jobs` 数量必须为 `1..100`。
+- `source_url` 必填，并以唯一索引做幂等键。
+- 同一 `source_url` 再次导入时更新已有岗位，不创建重复岗位。
+- `requirements` 采用整组替换，旧数据不会残留。
+- 整个 batch 使用单一事务，任一条失败时全部回滚。
+- `INTERNAL_API_TOKEN` 仅从环境变量读取。
+- 当前没有 Gateway，该 token 只是应用层保护，不等同于网络隔离。
+- 错误响应继续使用统一 `{code,message,data}` 格式。
+
 ---
 
 ## 6. 投递接口
@@ -523,5 +575,6 @@ GET /health
 | POST | /api/v1/ai/interview/generate | 是 | 面试题(异步) |
 | GET | /api/v1/ai/tasks/{task_id} | 是 | 任务轮询 |
 | GET | /health | 否 | 健康检查 |
+| POST | /internal/jobs/import | Internal Token | 可信岗位导入 |
 
 > 内部接口（AI 服务取简历/岗位、Crawler 入库）为 `/internal/*`，仅内网可达，不对外暴露。

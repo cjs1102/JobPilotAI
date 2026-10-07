@@ -17,6 +17,9 @@
 #include "jobpilot/service/job/job_ranking_service.h"
 #include "jobpilot/service/job/job_service.h"
 #include "jobpilot/service/job/internal_job_import_controller.h"
+#include "jobpilot/service/job/internal_source_sync_controller.h"
+#include "jobpilot/service/job/source_sync_dao.h"
+#include "jobpilot/service/job/source_sync_service.h"
 #include "jobpilot/service/resume/resume_controller.h"
 #include "jobpilot/service/resume/resume_dao.h"
 #include "jobpilot/service/resume/resume_service.h"
@@ -174,6 +177,17 @@ int main(int argc, char *argv[])
                 jobIngestionService,
                 config.internalApi.token);
 
+        jobpilot::service::SourceSyncDao sourceSyncDao;
+
+        jobpilot::service::SourceSyncService sourceSyncService(
+            sourceSyncDao,
+            mysqlPool);
+
+        jobpilot::service::InternalSourceSyncController
+            internalSourceSyncController(
+                sourceSyncService,
+                config.internalApi.token);
+
         jobpilot::service::ApplicationDao applicationDao(
             mysqlPool);
 
@@ -202,7 +216,10 @@ int main(int argc, char *argv[])
             &applicationController,
             config.internalApi.token.empty()
                 ? nullptr
-                : &internalJobImportController);
+                : &internalJobImportController,
+            config.internalApi.token.empty()
+                ? nullptr
+                : &internalSourceSyncController);
 
         server.Start();
 

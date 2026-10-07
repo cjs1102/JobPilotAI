@@ -7,6 +7,7 @@
 #include "jobpilot/service/application/application_controller.h"
 #include "jobpilot/service/job/job_controller.h"
 #include "jobpilot/service/job/internal_job_import_controller.h"
+#include "jobpilot/service/job/internal_source_sync_controller.h"
 #include "jobpilot/service/resume/resume_controller.h"
 #include "jobpilot/service/user/user_controller.h"
 
@@ -19,7 +20,8 @@ namespace jobpilot::service
         ResumeController *resumeController,
         JobController *jobController,
         ApplicationController *applicationController,
-        InternalJobImportController *internalJobImportController)
+        InternalJobImportController *internalJobImportController,
+        InternalSourceSyncController *internalSourceSyncController)
     {
         if (server == nullptr ||
             userController == nullptr)
@@ -297,6 +299,21 @@ namespace jobpilot::service
                     jobpilot::core::HttpResponse &response)
                 {
                     internalJobImportController->Import(
+                        request,
+                        response);
+                });
+        }
+
+        if (internalSourceSyncController != nullptr)
+        {
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/internal/jobs/source-sync",
+                [internalSourceSyncController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    internalSourceSyncController->Sync(
                         request,
                         response);
                 });

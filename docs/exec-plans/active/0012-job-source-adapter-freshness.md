@@ -1,8 +1,8 @@
 # ExecPlan 0012: Job Source Adapter + Freshness
 
-> Status: Research, Design, and Planning complete. Steps 1-4 (Schema migration,
-> Source observation domain, Source Sync DAO, Source Sync Service) implemented;
-> Step 5 onward not started.
+> Status: Research, Design, and Planning complete. Steps 1-5 (Schema migration,
+> Source observation domain, Source Sync DAO, Source Sync Service, Internal
+> Source Sync API) implemented; Step 6 onward not started.
 >
 > Task level: L4.
 
@@ -577,7 +577,7 @@ Stop and return to design if:
 - [x] Source observation domain
 - [x] Source Sync DAO
 - [x] Source Sync Service
-- [ ] Internal Source Sync API
+- [x] Internal Source Sync API
 - [ ] Search freshness integration
 - [ ] Python source adapters
 - [ ] End-to-end integration
@@ -611,6 +611,12 @@ Implementation decisions (keep later steps consistent):
   always calls `ApplyObservation`, and calls `CloseUnseenForScope` only when
   `complete=true`. It uses `MissingPolicy{}` defaults until per-source
   thresholds exist.
+- `POST /internal/jobs/source-sync` requires `source`, `source_scope`,
+  `complete` (boolean), `observed_at`, and `jobs`; every job keeps the 5.4 job
+  shape plus `external_id`/`published_at` and must repeat its `source`, which
+  must equal the observation `source`. Success returns the bare counter object
+  `{created,updated,seen,closed,complete}`; errors use the `{code,message,data}`
+  envelope like `/internal/jobs/import`.
 
 ## 19. Rejected Alternatives
 

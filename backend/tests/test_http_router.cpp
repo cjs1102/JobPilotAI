@@ -173,6 +173,50 @@ void TestNotFound()
     assert(!router.Route(request, &response));
 }
 
+void TestPutMethodDispatch()
+{
+    HttpRouter router;
+
+    router.RegisterRoute(
+        HttpMethod::kPut,
+        "/profile",
+        [](const HttpRequest &, HttpResponse &response)
+        {
+            response.SetBody("updated");
+        });
+
+    HttpRequest request =
+        MakeRequest(HttpMethod::kPut, "/profile");
+
+    HttpResponse response;
+
+    assert(router.Route(request, &response));
+    assert(response.Body() == "updated");
+}
+
+void TestDeleteMethodDispatch()
+{
+    HttpRouter router;
+
+    router.RegisterRoute(
+        HttpMethod::kDelete,
+        "/api/v1/users/skills/{id}",
+        [](const HttpRequest &, HttpResponse &response)
+        {
+            response.SetBody("deleted");
+        });
+
+    HttpRequest request =
+        MakeRequest(
+            HttpMethod::kDelete,
+            "/api/v1/users/skills/42");
+
+    HttpResponse response;
+
+    assert(router.Route(request, &response));
+    assert(response.Body() == "deleted");
+}
+
 }  // namespace jobpilot::core
 
 int main()
@@ -185,6 +229,8 @@ int main()
     TestStaticRouteHasPriority();
     TestMethodMismatch();
     TestNotFound();
+    TestPutMethodDispatch();
+    TestDeleteMethodDispatch();
 
     std::cout << "http router tests passed\n";
 

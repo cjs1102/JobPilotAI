@@ -171,7 +171,53 @@ int main()
     }
 
     // ------------------------------------------------------------
-    // 5. 非法请求
+    // 5. PUT + JSON Body
+    // ------------------------------------------------------------
+    {
+        Buffer buffer;
+
+        buffer.Append(
+            "PUT /profile HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Length: 2\r\n"
+            "\r\n"
+            "{}");
+
+        HttpRequestParser parser;
+
+        const ParseResult result = parser.Parse(&buffer);
+
+        assert(result == ParseResult::kComplete);
+        assert(parser.Request().Method() == HttpMethod::kPut);
+        assert(parser.Request().Body() == "{}");
+        assert(parser.Request().KeepAlive());
+    }
+
+    // ------------------------------------------------------------
+    // 6. DELETE
+    // ------------------------------------------------------------
+    {
+        Buffer buffer;
+
+        buffer.Append(
+            "DELETE /api/v1/users/skills/42 HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "\r\n");
+
+        HttpRequestParser parser;
+
+        const ParseResult result = parser.Parse(&buffer);
+
+        assert(result == ParseResult::kComplete);
+        assert(parser.Request().Method() == HttpMethod::kDelete);
+        assert(
+            parser.Request().Path() ==
+            "/api/v1/users/skills/42");
+        assert(parser.Request().KeepAlive());
+    }
+
+    // ------------------------------------------------------------
+    // 7. 非法请求
     // ------------------------------------------------------------
     {
         Buffer buffer;

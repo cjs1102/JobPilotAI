@@ -10,6 +10,8 @@ namespace jobpilot::core
     {
         kGet,
         kPost,
+        kPut,
+        kDelete,
         kInvalid
     };
 

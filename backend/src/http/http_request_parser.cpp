@@ -204,6 +204,14 @@ namespace jobpilot::core
         {
             request_.SetMethod(HttpMethod::kPost);
         }
+        else if (method == "PUT")
+        {
+            request_.SetMethod(HttpMethod::kPut);
+        }
+        else if (method == "DELETE")
+        {
+            request_.SetMethod(HttpMethod::kDelete);
+        }
         else
         {
             return ParseResult::kError;

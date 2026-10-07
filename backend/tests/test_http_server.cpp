@@ -526,7 +526,7 @@ void TestInvalidRequest()
     assert(ConnectToServer(socketFd));
 
     const std::string request =
-        "PUT /hello HTTP/1.1\r\n"
+        "PATCH /hello HTTP/1.1\r\n"
         "Host: 127.0.0.1\r\n"
         "\r\n";
 

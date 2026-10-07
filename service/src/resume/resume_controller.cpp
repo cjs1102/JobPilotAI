@@ -36,6 +36,7 @@ namespace jobpilot::service
                 return 401;
             case ErrorCode::kForbidden:
                 return 403;
+            case ErrorCode::kJobNotFound:
             case ErrorCode::kResumeNotFound:
                 return 404;
             case ErrorCode::kEmailExists:

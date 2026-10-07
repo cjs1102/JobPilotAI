@@ -7,6 +7,9 @@
 #include "jobpilot/network/event_loop.h"
 #include "jobpilot/storage/file_storage.h"
 #include "jobpilot/service/auth/session_authenticator.h"
+#include "jobpilot/service/job/job_controller.h"
+#include "jobpilot/service/job/job_dao.h"
+#include "jobpilot/service/job/job_service.h"
 #include "jobpilot/service/resume/resume_controller.h"
 #include "jobpilot/service/resume/resume_dao.h"
 #include "jobpilot/service/resume/resume_service.h"
@@ -138,6 +141,15 @@ int main(int argc, char *argv[])
         jobpilot::service::ResumeController resumeController(
             resumeService);
 
+        jobpilot::service::JobDao jobDao(
+            mysqlPool);
+
+        jobpilot::service::JobService jobService(
+            jobDao);
+
+        jobpilot::service::JobController jobController(
+            jobService);
+
         jobpilot::core::EventLoop loop;
 
         jobpilot::core::HttpServer server(
@@ -148,7 +160,8 @@ int main(int argc, char *argv[])
         jobpilot::service::RegisterRoutes(
             &server,
             &userController,
-            &resumeController);
+            &resumeController,
+            &jobController);
 
         server.Start();
 

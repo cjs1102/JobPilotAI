@@ -4,6 +4,7 @@
 
 #include "jobpilot/http/http_request.h"
 #include "jobpilot/http/http_response.h"
+#include "jobpilot/service/job/job_controller.h"
 #include "jobpilot/service/resume/resume_controller.h"
 #include "jobpilot/service/user/user_controller.h"
 
@@ -13,7 +14,8 @@ namespace jobpilot::service
     void RegisterRoutes(
         jobpilot::core::HttpServer *server,
         UserController *userController,
-        ResumeController *resumeController)
+        ResumeController *resumeController,
+        JobController *jobController)
     {
         if (server == nullptr ||
             userController == nullptr)
@@ -191,6 +193,33 @@ namespace jobpilot::service
                 });
         }
 
+        if (jobController != nullptr)
+        {
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
+                "/api/v1/jobs",
+                [jobController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    jobController->Search(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
+                "/api/v1/jobs/{id}",
+                [jobController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    jobController->Detail(
+                        request,
+                        response);
+                });
+        }
+
         router.RegisterRoute(
             jobpilot::core::HttpMethod::kPost,
             "/hello",
@@ -210,23 +239,6 @@ namespace jobpilot::service
                     request.KeepAlive());
             });
 
-        router.RegisterRoute(
-            jobpilot::core::HttpMethod::kGet,
-            "/api/v1/jobs/{id}",
-            [](const jobpilot::core::HttpRequest &request,
-               jobpilot::core::HttpResponse &response)
-            {
-                (void)request;
-
-                response.SetStatusCode(200);
-                response.SetStatusMessage("OK");
-                response.SetHeader(
-                    "Content-Type",
-                    "application/json");
-                response.SetBody(
-                    "{\"code\":0,\"message\":\"job found\"}");
-                response.SetKeepAlive(true);
-            });
     }
 
 } // namespace jobpilot::service

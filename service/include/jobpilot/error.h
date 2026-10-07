@@ -12,6 +12,7 @@ enum class ErrorCode : int {
     kEmailExists = 30001,
     kUserNotFound = 30002,
     kInvalidPassword = 30003,
+    kJobNotFound = 40001,
     kResumeNotFound = 40002,
     kInternalError = 60001,
     kDatabaseError = 60002
@@ -39,6 +40,8 @@ inline const char *ErrorMessage(ErrorCode code)
         return "user not found";
     case ErrorCode::kInvalidPassword:
         return "invalid password";
+    case ErrorCode::kJobNotFound:
+        return "job not found";
     case ErrorCode::kResumeNotFound:
         return "resume not found";
     case ErrorCode::kInternalError:

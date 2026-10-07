@@ -18,6 +18,9 @@ find_package(GTest CONFIG REQUIRED)
 add_library(jobpilot_service_core STATIC
     src/router.cpp
     src/auth/session_authenticator.cpp
+    src/job/job_controller.cpp
+    src/job/job_dao.cpp
+    src/job/job_service.cpp
     src/resume/resume_controller.cpp
     src/resume/resume_dao.cpp
     src/resume/resume_service.cpp
@@ -139,6 +142,42 @@ target_link_libraries(
         GTest::gtest_main
 )
 
+add_executable(
+    test_job_dao
+    tests/test_job_dao.cpp
+)
+
+target_link_libraries(
+    test_job_dao
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
+    test_job_service
+    tests/test_job_service.cpp
+)
+
+target_link_libraries(
+    test_job_service
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
+    test_job_http
+    tests/test_job_http.cpp
+)
+
+target_link_libraries(
+    test_job_http
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
 if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(_jp_service_tsan_launcher
         setarch
@@ -204,4 +243,22 @@ gtest_discover_tests(
     test_resume_http
     PROPERTIES
         LABELS "resume;integration;tsan"
+)
+
+gtest_discover_tests(
+    test_job_dao
+    PROPERTIES
+        LABELS "job;external;integration"
+)
+
+gtest_discover_tests(
+    test_job_service
+    PROPERTIES
+        LABELS "job;integration"
+)
+
+gtest_discover_tests(
+    test_job_http
+    PROPERTIES
+        LABELS "job;integration"
 )

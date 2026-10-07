@@ -113,6 +113,7 @@ add_library(jobpilot_core STATIC
     src/network/tcp_server.cpp
     src/http/http_request.cpp
     src/http/http_request_parser.cpp
+    src/http/multipart_form_data_parser.cpp
     src/http/http_response.cpp
     src/http/http_router.cpp
     src/http/http_server.cpp
@@ -366,6 +367,23 @@ add_test(
     NAME http_server_test
     COMMAND test_http_server
 )
+
+add_executable(
+    test_multipart_form_data_parser
+    tests/test_multipart_form_data_parser.cpp
+)
+
+target_link_libraries(
+    test_multipart_form_data_parser
+    PRIVATE
+        jobpilot_core
+)
+
+add_test(
+    NAME multipart_form_data_parser_test
+    COMMAND test_multipart_form_data_parser
+)
+
 add_executable(test_thread_pool
     tests/test_thread_pool.cpp
 )
@@ -499,6 +517,7 @@ if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         test_http_response
         test_http_router
         test_http_server
+        test_multipart_form_data_parser
         test_thread_pool
         test_mysql_pool
         test_sql_result

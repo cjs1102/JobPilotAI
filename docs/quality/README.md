@@ -57,8 +57,8 @@ MYSQL_PASSWORD=root \
   ctest --preset asan
 ```
 
-Scope: all 76 current tests, including live MySQL, Redis, schema, User, and
-Resume checks.
+Scope: all 87 current tests, including live MySQL, Redis, schema, User,
+Resume, and Job checks.
 
 ## UBSan
 
@@ -70,7 +70,7 @@ MYSQL_PASSWORD=root \
   ctest --preset ubsan
 ```
 
-Scope: all 76 current tests and `-fno-sanitize-recover=undefined`.
+Scope: all 87 current tests and `-fno-sanitize-recover=undefined`.
 
 ## TSan
 
@@ -107,8 +107,8 @@ Date: 2026-10-07
 
 | Check | Result |
 |---|---|
-| ASan full CTest | 76/76 passed |
-| UBSan full CTest | 76/76 passed |
+| ASan full CTest | 87/87 passed |
+| UBSan full CTest | 87/87 passed |
 | TSan default gate | 32/32 passed |
 | TSan external-service tests | 6/6 passed |
 | Focused Release regression | 9/9 passed |

@@ -323,7 +323,11 @@ GET /api/v1/jobs/{id}
     "salary_max": 35,
     "salary_currency": "CNY",
     "description": "负责...",
-    "requirements": ["C++", "Linux", "Redis"],
+    "requirements": [
+      { "skill": "C++", "level": 3 },
+      { "skill": "Linux", "level": 2 },
+      { "skill": "Redis", "level": 2 }
+    ],
     "source_url": "https://...",
     "created_at": "2026-08-09 10:00:00"
   }

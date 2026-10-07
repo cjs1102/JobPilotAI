@@ -2,9 +2,9 @@
 
 > Snapshot: 2026-10-07
 >
-> Baseline HEAD: `90f52c9 docs(ai): record 0007A infrastructure baseline`
+> Baseline HEAD: `1b95602 docs(resume): record resume vertical slice`
 >
-> `origin/main` matches this baseline. The 0007 Resume Vertical Slice is
+> `origin/main` matches this baseline. The 0008 Job Read Vertical Slice is
 > implemented and verified in the working tree but is not committed yet.
 
 This is the concise takeover entry. Detailed evidence and historical sections
@@ -15,7 +15,7 @@ are preserved in
 
 - P0 config, logging, and schema are complete.
 - P1 network/HTTP remains behaviorally frozen after the minimum correctness
-  gate, with one approved working-tree exception for `PUT`/`DELETE` request
+  gate, with one approved exception for `PUT`/`DELETE` request
   method parsing and routing.
 - Quality infrastructure is complete: ASan, UBSan, TSan, presets, and baseline
   benchmarks.
@@ -24,13 +24,15 @@ are preserved in
 - The 0006 profile/skill vertical slice is implemented and verified in the
   committed baseline: authenticated profile read/update and skill
   list/create/upsert/delete.
-- The 0007A infrastructure slice is implemented and verified in the working
-  committed baseline: bounded HTTP bodies, multipart parsing, MySQL
+- The 0007A infrastructure slice is implemented and verified in the committed
+  baseline: bounded HTTP bodies, multipart parsing, MySQL
   transactions, local file storage, storage configuration, and shared session
   authentication.
-- The Resume Vertical Slice is implemented and verified in the working tree:
+- The Resume Vertical Slice is implemented, committed, and pushed:
   upload, paginated list, text version creation, and version listing.
-- Job and application domains remain outside completed slices.
+- The Job Read Vertical Slice is implemented and verified in the working
+  tree: public active-job search, pagination, detail, and requirements.
+- Application and AI Task remain outside completed slices.
 
 ## Architecture Summary
 
@@ -47,16 +49,17 @@ HTTP request
   developer entry.
 - `jobpilot_core` owns network/HTTP, config/logging, database, and cache
   primitives.
-- `jobpilot_service_core` owns routing and User DAO/Service/Controller.
+- `jobpilot_service_core` owns routing plus User, Resume, and Job read
+  modules.
 - P1 ownership rules remain mandatory for changes under
   `backend/{include,src}/jobpilot/{network,http}/`.
 
 ## Verified Snapshot
 
 - Pre-0006 clean `service/` and root CTest: 54/54.
-- Full Debug CTest after 0007: 76/76.
-- ASan full CTest after 0007: 76/76.
-- UBSan full CTest after 0007: 76/76.
+- Full Debug CTest after 0008: 87/87.
+- ASan full CTest after 0008: 87/87.
+- UBSan full CTest after 0008: 87/87.
 - TSan default gate after 0007: 32/32.
 - TSan external-service subset: 6/6.
 - Focused Release regression after the `PUT`/`DELETE` method extension: 9/9.
@@ -83,9 +86,9 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review and commit the completed 0007 Resume Vertical Slice.
-2. Continue P2 with job and application modules.
-3. Keep all new business work separate from the frozen P1 network layer.
+1. Review and commit the completed 0008 Job Read Vertical Slice.
+2. Continue P2 with Application.
+3. Keep Job writes/admin and AI tasks behind separate approved plans.
 
 Do not start a new P2 module without its own approved plan.
 

@@ -26,3 +26,24 @@ docs/exec-plans/
 - Known issues and follow-up work
 
 Do not create an ExecPlan for documentation fixes or small local changes.
+
+## Cross-Agent Handoff
+
+Each stage has one logical ExecPlan. The handoff order is:
+
+```text
+AGENTS.md
+  -> docs/ai/README.md
+  -> docs/ai/project-state.md
+  -> active or relevant completed ExecPlan
+  -> targeted code/tests/contracts
+  -> Git diff/history only when needed
+```
+
+Rules:
+
+- `active/` contains the only plan currently allowed to drive implementation.
+- `completed/` is the stage evidence archive.
+- Do not restart research for a completed stage unless current code contradicts
+  its recorded evidence.
+- Do not rely on chat history as the source of truth.

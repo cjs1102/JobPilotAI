@@ -1,6 +1,18 @@
 # JobPilot AI 需求分析文档 V1.0
 
-> 文档编号 01 · 依据架构 V3.0 与 [ADR-0001~0005](adr/README.md) 编写。本文档为**需求权威依据**，功能范围/边界以本文件为准，后续文档（02/03/04）与本文件冲突时以更细粒度文档为准。
+> ⚠️ **历史资料 / Historical — Superseded**
+>
+> 本文档属于 ADR-0007 ~ ADR-0010 之前的旧设计方向，仅作历史参考，
+> **不得作为新的实现规范**。现行架构见
+> [architecture/open-source-mvp.md](architecture/open-source-mvp.md)，
+> 现行决策见 [adr/README.md](adr/README.md)（ADR-0007 ~ ADR-0010）。
+>
+> Do not use this document for new implementation decisions.
+
+> 文档编号 01 · 依据架构 V3.0 与 [ADR-0001~0005](adr/README.md) 编写。
+> Historical / Superseded，不作为当前 MVP 实现依据；现行依据见
+> [architecture/open-source-mvp.md](architecture/open-source-mvp.md) 与
+> [adr/README.md](adr/README.md)（ADR-0007 ~ ADR-0010）。历史正文保留。
 
 ## 1. 项目背景
 
@@ -200,7 +212,7 @@
 
 | ID | 要求 | 说明 |
 |---|---|---|
-| NFR-M01 | 文档先行 | 02/03/04 为权威契约，代码严格遵循 |
+| NFR-M01 | 文档先行 | `03`/`04` 为权威契约；`02` 已 Historical / Superseded |
 | NFR-M02 | 单元测试 | 引擎核心模块（Buffer/HTTP 解析/Poller）有单测 |
 | NFR-M03 | 日志 | 统一 spdlog，异常可定位 |
 | NFR-M04 | 可部署 | Docker Compose 一键部署，任何阶段可演示 |

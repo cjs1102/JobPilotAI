@@ -5,13 +5,32 @@
 C++17 Linux backend for an AI-assisted job application platform. `service/` is
 the canonical runnable entry; root CMake is the unified developer entry.
 
-Current phase: P2 after the completed user/auth vertical slice. P1
-network/HTTP remains behaviorally frozen.
+Current phase: 0012 Job Source Adapter + Freshness is the active plan.
+Research / Design / Planning are complete; implementation has not started.
+P1 network/HTTP remains behaviorally frozen.
+
+## Agent Takeover
+
+Repository files are authoritative. Do not rely on chat history.
+
+Read in this order:
+
+1. This `AGENTS.md`.
+2. `docs/ai/README.md`.
+3. `docs/ai/project-state.md`.
+4. The relevant active/completed ExecPlan.
+5. Only the code, tests, API, DB, architecture, or quality sections needed for
+   the task.
+
+Do not require the user to restate project history. If the repository is
+ambiguous, inspect Git history and the referenced ExecPlans before asking.
 
 ## Task Routing
 
 - Ordinary code change: target code/tests plus relevant `docs/06` sections.
-- Architecture or module boundary: relevant `docs/02` sections.
+- Architecture or module boundary: `docs/architecture/open-source-mvp.md` and
+  relevant accepted ADRs; historical architecture only when its history is
+  relevant (see Historical Documents).
 - API or database contract change: `docs/04` or `docs/03`, including impact.
 - Project takeover/status: `docs/ai/project-state.md`.
 - Level 3/4 work: `engineering-research-plan`, `docs/exec-plans/README.md`,
@@ -24,6 +43,23 @@ network/HTTP remains behaviorally frozen.
 - Verification scope and test evidence: `docs/quality/README.md`.
 
 Read only the sections needed for the current task.
+
+## Historical Documents
+
+The following are Historical / Superseded for the current MVP. They must not be
+used as the basis for new design decisions; read them only for history. This
+list matches `docs/ai/README.md`.
+
+- `docs/00-project-overview.md`
+- `docs/01-requirements.md`
+- `docs/02-system-architecture.md`
+- `docs/05-development-plan.md`
+- `docs/07-deployment.md`
+- `docs/08-execution-guide.md`
+- `docs/project-structure.md`
+
+Current architecture: `docs/architecture/open-source-mvp.md`. Current decisions:
+`docs/adr/README.md` (ADR-0007 through ADR-0010).
 
 ## Hard Constraints
 
@@ -46,8 +82,8 @@ explicitly approved correctness plan permits it. Network work must load
 
 ## Build and Verify
 
-- Use `service/CMakeLists.txt`, `service/conanfile.txt`, and
-  `docs/08-execution-guide.md`; do not invent flags.
+- Use `service/CMakeLists.txt`, `service/conanfile.txt`, active ExecPlan, and
+  `docs/quality/README.md`; `docs/08-execution-guide.md` is historical.
 - Prefer documented CMake presets and `ctest --test-dir <build>`.
 - Select the smallest sufficient L1-L5 verification level from
   `docs/quality/README.md`.

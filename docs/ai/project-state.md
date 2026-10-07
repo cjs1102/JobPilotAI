@@ -2,11 +2,15 @@
 
 > Snapshot: 2026-10-08
 >
-> Baseline HEAD: `a1074d5 docs(application): record application vertical slice baseline`
+> Baseline HEAD: `214dc9e feat(job): add search and ranking`
 >
-> `origin/main` matches this baseline. The 0010 Job Ingestion and 0011 Job
-> Search / Ranking Vertical Slices are implemented and verified in the
-> working tree but are not committed yet.
+> `origin/main` matches this baseline. The 0010 Job Ingestion, Architecture
+> Re-Research, and 0011 Job Search / Ranking work is committed and pushed.
+> The active plan is 0012 Job Source Adapter + Freshness.
+
+Repository files and Git history are the cross-agent fact source. This concise
+state plus the active ExecPlan should be enough for a new Agent to continue
+without asking the user to replay project history.
 
 This is the concise takeover entry. Detailed evidence and historical sections
 are preserved in
@@ -33,17 +37,17 @@ are preserved in
   authentication.
 - The Resume Vertical Slice is implemented, committed, and pushed:
   upload, paginated list, text version creation, and version listing.
-- The Job Read Vertical Slice is committed locally: public active-job search,
-  pagination, detail, and requirements.
+- The Job Read Vertical Slice is committed and pushed: public active-job
+  search, pagination, detail, and requirements.
 - The Application Vertical Slice is implemented, committed, and pushed:
   authenticated create/list/status/statistics with Job and ResumeVersion
   validation, duplicate protection, and a strict state machine.
-- The Job Ingestion Vertical Slice is implemented and verified in the working
-  tree: internal token-protected batch import, `source_url` idempotent upsert,
+- The Job Ingestion Vertical Slice is implemented, committed, and pushed:
+  internal token-protected batch import, `source_url` idempotent upsert,
   transactional requirements replacement, and Import -> Job Read ->
   Application integration coverage.
-- The Job Search / Ranking Vertical Slice is implemented and verified in the
-  working tree: salary/skill hard filters, authenticated `rule_v1`
+- The Job Search / Ranking Vertical Slice is implemented, committed, and
+  pushed: salary/skill hard filters, authenticated `rule_v1`
   recommendations, deterministic score breakdown, stable pagination, and a
   bounded ranking candidate set.
 - AI Task remains outside completed slices.
@@ -61,6 +65,53 @@ Key decisions:
 - RabbitMQ, Gateway, general Crawler, and AutoApply are not MVP requirements.
 - Freshness lifecycle is introduced with 0012 Source Adapter, not 0011.
 - A single missing fetch never closes a Job.
+
+## Stage Handoff Map
+
+| Stage | ExecPlan evidence | Primary implementation/tests | Primary commits |
+|---|---|---|---|
+| P0 Config / Logging / Schema | `completed/0002-p0-config-logging-schema.md` | `backend/src/core`, `database/schema`, backend config/logger/schema tests | `1d3bcbd`, `2c2f344`, `682e26d` |
+| Quality / Benchmark | `completed/0003-quality-and-performance-baseline.md` | CMake presets, backend benchmarks | `baefe55` |
+| P1 Correctness Gate | `completed/0004-p1-correctness-gate.md` | `backend/src/network`, `backend/src/http`, P1 tests | `2f54cb6`, `2655e05` and preceding P1 fixes |
+| User / Auth | `completed/0005-p2-user-vertical-slice.md` | `service/{include,src}/jobpilot/service/user`, `service/tests/test_user_*` | `8e501ce`, `6ed94cb`, `70051c7`, `889e1e7` |
+| Profile / Skill | `completed/0006-p2-profile-skill-vertical-slice.md` | User profile/skill DAO/Service/Controller and tests | `73b1172` |
+| Resume Infrastructure | `completed/0007A-resume-infrastructure.md` | HTTP body/multipart, Transaction, FileStorage, SessionAuthenticator | `5d145d7`, `516837f`, `dd7cc78`, `638d73f`, `ecf9b68`, `90f52c9` |
+| Resume | `completed/0007-p2-resume-vertical-slice.md` | `service/{include,src}/jobpilot/service/resume`, resume tests | `644c7b0`, `1b95602` |
+| Job Read | `completed/0008-p2-job-read-vertical-slice.md` | `service/{include,src}/jobpilot/service/job`, job read tests | `3c027b1`, `5f49551` |
+| Application | `completed/0009-p2-application-vertical-slice.md` | `service/{include,src}/jobpilot/service/application`, application tests | `2bebcfe`, `a1074d5` |
+| Job Ingestion | `completed/0010-p2-job-ingestion-vertical-slice.md` | Job ingestion DAO/Service/Controller, `/internal/jobs/import`, ingestion tests | `9e87686` |
+| Architecture Re-Research | `../architecture/open-source-mvp.md`, `../adr/README.md` | ADR-0007 through ADR-0010 | `635fc31` |
+| Job Search / Ranking | `completed/0011-job-search-ranking.md` | Job ranking/search modules and tests | `214dc9e` |
+
+## Active Plan
+
+[0012-job-source-adapter-freshness.md](../exec-plans/active/0012-job-source-adapter-freshness.md)
+
+Current step:
+
+```text
+Research / Capability Check / Design / Plan complete
+Implementation not started
+```
+
+0012 scope:
+
+- Manual Greenhouse / Lever / Ashby source configuration.
+- Python source adapters publishing through C++ internal APIs.
+- Source Adapter observations use `POST /internal/jobs/source-sync`
+  (`complete=true` accepts `0..200`, `complete=false` accepts `1..200`); manual
+  and dataset loads keep using `POST /internal/jobs/import` (`1..100`).
+- Complete observation and source-sync semantics.
+- Additive freshness fields and safe disappearance handling.
+- Fresh / aging / stale / closed search behavior.
+
+0012 non-goals include canonical multi-source Job identity, RabbitMQ, browser
+crawler, AI freshness authority, AutoApply, and schema changes outside the
+additive freshness fields.
+
+Stop and return to design if complete board coverage cannot be proven, the
+provider requires authentication, adapters need direct MySQL access, or a
+larger schema redesign becomes necessary.
 
 ## Architecture Summary
 
@@ -119,8 +170,8 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review and commit the completed 0010 and 0011 Vertical Slices.
-2. Continue with 0012 Source Adapter + Freshness.
+1. Execute `active/0012-job-source-adapter-freshness.md`.
+2. Do not start 0013 until 0012 is complete and reviewed.
 3. Follow 0013 AI Matching, 0014 Resume Tailoring, and 0015 Open-source
    Packaging.
 4. Keep AutoApply, RabbitMQ, general Crawler, Gateway, and SaaS RBAC out of
@@ -148,6 +199,8 @@ Do not start a new P2 module without its own approved plan.
   [references/project-state-full.md](references/project-state-full.md)
 - Current architecture:
   [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md)
+- Active ExecPlan:
+  [../exec-plans/active/0012-job-source-adapter-freshness.md](../exec-plans/active/0012-job-source-adapter-freshness.md)
 - Current ADR decisions: [../adr/README.md](../adr/README.md)
 - Coding and testing rules:
   [../06-coding-standard.md](../06-coding-standard.md)
@@ -156,6 +209,9 @@ Do not start a new P2 module without its own approved plan.
 - GitHub and tooling research:
   [references/github_resources.md](references/github_resources.md)
 
-`docs/02-system-architecture.md` and `docs/08-execution-guide.md` remain
-historical design material. Where they conflict with ADR-0007 through
-ADR-0010, the current architecture document and accepted ADRs take precedence.
+`docs/00-project-overview.md`, `docs/01-requirements.md`,
+`docs/02-system-architecture.md`, `docs/05-development-plan.md`,
+`docs/07-deployment.md`, `docs/08-execution-guide.md`, and
+`docs/project-structure.md` remain historical design material, each marked
+with a Superseded banner. Where they conflict with ADR-0007 through ADR-0010,
+the current architecture document and accepted ADRs take precedence.

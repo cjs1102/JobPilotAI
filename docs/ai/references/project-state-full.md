@@ -1,6 +1,10 @@
-# JobPilotAI Current Project State
+# JobPilotAI Historical Project State Snapshot
 
 > Snapshot date: 2026-10-06
+>
+> Status: Historical archive. This file is superseded by
+> [`../project-state.md`](../project-state.md) for current project state.
+> Keep this file for historical comparison only.
 >
 > Branch: `main`
 >

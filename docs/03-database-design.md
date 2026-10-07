@@ -1,6 +1,6 @@
 # JobPilot AI 数据库设计文档 V2.0
 
-> 依据架构 V3.0 与 [ADR-0003](adr/0003-database-choice.md) 编写。本文档为**数据库唯一权威依据**，DDL 全部锁定，代码/前端/AI 三方以此为准，禁止未评审改表。
+> 依据架构 V3.0 与 [ADR-0003](adr/0003-database-choice.md) 编写。本文档是当前 database contract authority，数据库字段、索引和迁移语义以本文档为准。
 
 ## 1. 数据库总览
 
@@ -224,3 +224,51 @@ CREATE TABLE notifications (
 - `database/schema/` 挂载到容器 `docker-entrypoint-initdb.d`，首次启动自动建表
 - 种子数据尚未纳入当前 P0 schema；后续引入时必须保持幂等
 - 所有脚本幂等可重复执行
+
+## 7. 0012 Additive Freshness Migration Contract（增量契约）
+
+本节登记 0012 Job Source Adapter + Freshness 的**增量字段契约**。
+`database/schema/*.sql` **当前不修改**；实际迁移在 0012 Step 1 落地，落地时再
+同步本节与 `database/schema/03_job.sql`。
+
+对齐来源：
+[`exec-plans/active/0012-job-source-adapter-freshness.md`](exec-plans/active/0012-job-source-adapter-freshness.md) §8
+与 [`adr/0010-job-freshness-and-lifecycle.md`](adr/0010-job-freshness-and-lifecycle.md)。
+
+### 7.1 `jobs` 新增列
+
+```sql
+source_scope      VARCHAR(128) NULL
+external_id       VARCHAR(255) NULL
+published_at      DATETIME NULL
+last_seen_at      DATETIME NULL
+last_verified_at  DATETIME NULL
+closed_at         DATETIME NULL
+missing_count     INT NOT NULL DEFAULT 0
+source_status     VARCHAR(32) NOT NULL DEFAULT 'unknown'
+```
+
+建议索引：
+
+```sql
+KEY idx_source_scope_status (source, source_scope, status)
+```
+
+### 7.2 不变量
+
+- `source_url UNIQUE`（`uk_source_url`）不变，仍是唯一幂等键。
+- `create_time` 继续表示 first seen；**不新增** `first_seen_at` 列。
+- `update_time` **不等于** `last_seen_at`：它只在已存元数据变化时更新。
+- freshness 状态（fresh / aging / stale / closed）与阈值（24h / 7d / 48h 宽限）
+  都是**计算值，不落库**；数据库只存观测事实。
+- 现有 `status`（`1` 有效 / `0` 下线）语义不变。
+- 既有行默认 `source_status='unknown'`，保持向后兼容。
+- **不引入** Canonical Job / JobSource / 多源 alias 拆分；当前 `jobs` 行仍是
+  唯一规范行。
+
+### 7.3 实施顺序
+
+1. 0012 Step 1：更新本节 DDL 与 `database/schema/03_job.sql`。
+2. 再实现 Source Observation 领域模型与 Source Sync DAO / Service / API
+   （写入路径 `POST /internal/jobs/source-sync`，见 `docs/04` §5.5）。
+3. 迁移落地后，`docs/04` §10.2 的 freshness 公开响应字段才生效。

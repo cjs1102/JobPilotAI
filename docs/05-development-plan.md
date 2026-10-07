@@ -1,6 +1,19 @@
 # JobPilot AI 开发计划 V2.0（诚实分阶段版）
 
-> ⚠️ **执行以 [08-execution-guide.md](08-execution-guide.md) 为准**：本文档为完整版规划（约 26 周），08 手册按 2026 秋招 1-3 个月窗口整合为 P0-P5 可执行路线，两者不冲突——08 是执行版本，本文档是完整目标形态。阶段编号/排期如有出入，以 08 为准。
+> ⚠️ **历史资料 / Historical — Superseded**
+>
+> 本文档属于 ADR-0007 ~ ADR-0010 之前的旧设计方向，仅作历史参考，
+> **不得作为新的实现规范**。现行架构见
+> [architecture/open-source-mvp.md](architecture/open-source-mvp.md)，
+> 现行决策见 [adr/README.md](adr/README.md)（ADR-0007 ~ ADR-0010）。
+>
+> Do not use this document for new implementation decisions.
+
+> ⚠️ **Historical / Superseded，不作为当前 MVP 实现依据**：本文档为完整版规划
+> （约 26 周），其阶段编号与排期已被现行架构、ADR 与 ExecPlan 体系取代。
+> 现行依据见 [architecture/open-source-mvp.md](architecture/open-source-mvp.md)、
+> [adr/README.md](adr/README.md)（ADR-0007 ~ ADR-0010）与
+> [exec-plans/](exec-plans/README.md)。
 
 > 本计划依据架构 V3.0 与 ADR-0001~0005 编写，但**按学生业余时间与面试价值重新排序**。它不是乐观排期，而是"一个人晚上+周末、约 6 个月、每阶段都能演示"的真实路径。
 

@@ -10,7 +10,7 @@ MVP assumptions are superseded by
 
 ## Context
 
-JobPilot AI 需要确定系统整体形态。曾存在一份 V1.0 设计采用「Gateway + 5 个 C++ 微服务 + 自研 RPC + 服务注册中心」，后经评审认定为过度设计。本 ADR 记录最终裁决，作为后续所有设计的唯一依据。
+JobPilot AI 需要确定系统整体形态。曾存在一份 V1.0 设计采用「Gateway + 5 个 C++ 微服务 + 自研 RPC + 服务注册中心」，后经评审认定为过度设计。本 ADR 记录最终裁决，作为 C++ 模块化单体形态的基础架构决策；后续具体边界以更新、更具体的 Accepted ADR 为准，尤其 ADR-0007 ~ ADR-0010。
 
 约束：
 

@@ -124,7 +124,10 @@ the recorded baseline, but are intentionally not part of the default TSan gate.
 
 ## Recorded Baseline
 
-Date: 2026-10-07
+Date: 2026-10-08
+
+The ASan, UBSan, and Release rows are the 0011 L4 results. The TSan rows remain
+the last concurrency-relevant baseline, recorded after 0010 on 2026-10-07.
 
 | Check | Result |
 |---|---|

@@ -1,10 +1,25 @@
 # JobPilot AI 执行手册 V1.1（跟着做就能跑）
 
-> 本文档是**唯一执行依据**：它整合了 00–07 全部设计文档，裁决了它们之间的所有冲突，并按「写什么文件 / 干什么 / 怎么干 / 不会的补什么 / 怎么验收 / 怎么交给我检查」组织成可执行的阶段清单。
+> ⚠️ **历史资料 / Historical — Superseded**
+>
+> 本文档属于 ADR-0007 ~ ADR-0010 之前的旧设计方向，仅作历史参考，
+> **不得作为新的实现规范**。其中 P0-P5 路线、RabbitMQ、gateway、ai_service、
+> crawler 等方案已被现行架构与 ADR 取代（见
+> [architecture/open-source-mvp.md](architecture/open-source-mvp.md) 与
+> [adr/README.md](adr/README.md)，ADR-0007 ~ ADR-0010）。
+> 构建与验证一律以 `AGENTS.md`、活动 ExecPlan 和 `quality/README.md` 为准。
+>
+> Do not use this document for new implementation decisions.
+
+> Historical / Superseded，不作为当前 MVP 实现依据：本文档曾整合 00–07 设计文档，
+> 并按「写什么文件 / 干什么 / 怎么干 / 不会的补什么 / 怎么验收 / 怎么交给我检查」
+> 组织成阶段清单。现行依据见 `AGENTS.md`、活动 ExecPlan、
+> [quality/README.md](quality/README.md) 与
+> [architecture/open-source-mvp.md](architecture/open-source-mvp.md)。
 >
 > 参考文档：00 总览 · 01 需求 · 02 架构 · 03 数据库 · 04 API · 05 开发计划 · 06 编码规范 · 07 部署 · project-structure · adr/
 >
-> 状态：Ready For Development · 配套修正：根目录总纲已标 Superseded，本文档为唯一执行权威
+> 状态：Historical / Superseded，不作为当前 MVP 实现依据（原状态：Ready For Development）；根目录总纲已标 Superseded
 >
 > **V1.1 修正说明**（本版相对 V1.0 的改动）：① nginx `limit_req_zone` 位置修正并豁免 GET 轮询；② config.yaml 去掉 `${}` 插值写法，改为"yaml 存非敏感默认值 + 环境变量覆盖 + 密码 fail-fast"；③ 依赖选型定稿（`hiredis` 走 Conan、`amqp-cpp` 包名修正、`libbcrypt` 改 vendored）；④ 统一构建入口为 `service/`（删除 backend 独立 conan 构建）；⑤ docker-compose 移到仓库根目录，`.env` 同步在根；⑥ P0/P1 HTTP Server 演进关系明确（P0 占位 `health_stub.cc`，P1 完成 HttpServer 后删除）；⑦ AI 任务抢占/超时补偿、RabbitMQ ACK/NACK/重试上限/死信/发布失败补偿机制全部给最终方案；⑧ MySQL 连接池、配置读取、环境变量表、CI 全部细化定稿；⑨ 01/02/00/05/07/project-structure/adr 同步修正。
 
@@ -82,8 +97,8 @@
 | R2 | 登录路径：02 写 `/api/v1/auth/login`，04 写 `/api/v1/users/login` | **`/api/v1/users/register`、`/api/v1/users/login`（04 为准）** | 02 时序图已修正 |
 | R3 | 岗位接口鉴权：04 §1.3 说全鉴权，§9 说 jobs 公开 | **岗位搜索/详情公开，其余接口鉴权** | 演示友好，04 §1.3 已修正 |
 | R4 | 简历格式：01 写 PDF/DOCX，04 写 PDF/TXT/MD | **PDF/TXT/MD**（DOCX 解析砍掉） | 01 已修正 |
-| R5 | 两套排期：05 是 Phase 0-7 / 26 周，project-structure §10 是 A-F | **本文档 P0-P5（1-3 个月）为准**；05 已加 banner 标注"执行以 08 为准"，project-structure §10 已标注废弃（V1.1 修正） | 本文档整合了 05 并砍掉加分项 |
-| R6 | 根目录总纲 vs docs 体系 | **docs/ 为准**，根目录总纲已标 Superseded | 面试引用时用 docs/02 架构 V3.0 |
+| R5 | 两套排期：05 是 Phase 0-7 / 26 周，project-structure §10 是 A-F | **Historical / Superseded，不作为当前 MVP 实现依据**；05、project-structure §10 与本手册均已加 Historical banner，执行分期以现行 ExecPlan 为准 | 本文档原整合了 05 并砍掉加分项 |
+| R6 | 根目录总纲 vs docs 体系 | **docs/ 为准**，根目录总纲已标 Superseded | 面试引用时用 `docs/architecture/open-source-mvp.md` 与 ADR-0007 ~ ADR-0010 |
 | R7 | AI 队列形态：P3 轮询 vs P4 MQ | **P3 先轮询打通闭环，P4 再升级 MQ** | 目标架构与实现顺序分离（05 理念） |
 | R8 | 技术栈口径：00 列 ECharts，V1.0 砍"ECharts 大屏" | **保留 ECharts 组件，只画 1 张投递统计图，不做大屏**（V1.1 修正） | 与 00 一致，见 §10.2 ⑤ |
 

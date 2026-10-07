@@ -1,5 +1,14 @@
 # JobPilot AI 部署文档 V1.0
 
+> ⚠️ **历史资料 / Historical — Superseded**
+>
+> 本文档属于 ADR-0007 ~ ADR-0010 之前的旧设计方向，仅作历史参考，
+> **不得作为新的实现规范**。现行架构见
+> [architecture/open-source-mvp.md](architecture/open-source-mvp.md)，
+> 现行决策见 [adr/README.md](adr/README.md)（ADR-0007 ~ ADR-0010）。
+>
+> Do not use this document for new implementation decisions.
+
 > 依据架构 V3.0 §11 编写。覆盖：本地开发（WSL）、docker-compose 一键部署、CI、运维要点。
 
 ## 1. 开发环境

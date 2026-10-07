@@ -180,8 +180,15 @@ then reduce the score of an already excluded job.
 ### 0012 Job Source Adapter + Freshness
 
 - Manual Greenhouse / Lever / Ashby board configuration.
-- Adapter calls `POST /internal/jobs/import`; no direct MySQL writes.
+- Adapter calls the dedicated observation API
+  `POST /internal/jobs/source-sync`; `POST /internal/jobs/import` stays the
+  manual/dataset path. No adapter writes MySQL directly.
 - Complete observation and source status are introduced here.
+- `/internal/jobs/source-sync` batch limits: `0..200` when `complete=true`
+  (`0` is an empty board), `1..200` when `complete=false`.
+  `/internal/jobs/import` keeps its `1..100` manual-batch limit.
+- `source-sync` is the only path that may update `last_seen_at`, missing
+  counters, `closed_at`, or reopen a job.
 - `last_seen_at`, disappearance, stale, and closed semantics are introduced
   here.
 - A single missing fetch never closes a job.

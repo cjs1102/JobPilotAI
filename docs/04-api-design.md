@@ -1,6 +1,9 @@
 # JobPilot AI API 接口设计文档 V2.0
 
-> 依据架构 V3.0 编写。本文档为**接口契约唯一权威依据**，前端/后端/AI 三方以此为准。所有接口走 Nginx 网关（`/api` 前缀）转发至 C++ Backend。
+> 依据架构 V3.0 编写。本文档是当前 API contract authority（接口契约权威依据），
+> 前端/后端/AI 三方以此为准。
+> 当前 MVP 的 `/api/v1/*` 由 C++ Backend `HttpServer` 直接提供；
+> Gateway/Nginx 属于 Future Work，不是当前运行时的前置依赖。
 
 ## 1. 通用约定
 
@@ -398,7 +401,10 @@ Authorization: Bearer <token>
 
 ### 5.4 岗位内部导入
 
-该接口不属于公共 `/api/v1/*` API，仅供可信导入器或后续 Crawler 使用：
+该接口不属于公共 `/api/v1/*` API，用于手工录入、数据集导入与测试数据准备。
+它不携带来源观测语义（`complete` / `source_scope` / `observed_at`），
+独立于 freshness 生命周期；Source Adapter 统一使用 5.5 的 source-sync。
+示例请求见 [`examples/job-import.json`](examples/job-import.json)。
 
 ```
 POST /internal/jobs/import
@@ -439,7 +445,7 @@ X-Internal-Token: <environment secret>
 }
 ```
 
-- `jobs` 数量必须为 `1..100`。
+- `jobs` 数量必须为 `1..100`（手工批次上限；来源观测批次见 5.5）。
 - `source_url` 必填，并以唯一索引做幂等键。
 - 同一 `source_url` 再次导入时更新已有岗位，不创建重复岗位。
 - `requirements` 采用整组替换，旧数据不会残留。
@@ -447,8 +453,67 @@ X-Internal-Token: <environment secret>
 - `INTERNAL_API_TOKEN` 仅从环境变量读取。
 - 当前没有 Gateway，该 token 只是应用层保护，不等同于网络隔离。
 - 错误响应继续使用统一 `{code,message,data}` 格式。
-- Greenhouse / Lever / Ashby 等 Source Adapter 只能通过本接口写入，
-  不允许直接写业务数据库。
+- Greenhouse / Lever / Ashby 等 Source Adapter 不使用本接口，统一走 5.5 的
+  `/internal/jobs/source-sync`；任何适配器都不允许直接写业务数据库。
+
+### 5.5 岗位来源同步（Source Sync，0012）
+
+该接口不属于公共 `/api/v1/*` API，仅供可信 Source Adapter 上报一次来源观测：
+
+```
+POST /internal/jobs/source-sync
+X-Internal-Token: <environment secret>
+```
+
+请求：
+
+```json
+{
+  "source": "greenhouse",
+  "source_scope": "example-company",
+  "complete": true,
+  "observed_at": "2026-10-08 12:00:00",
+  "jobs": []
+}
+```
+
+- `source` 必填，来源类型（如 `greenhouse` / `lever` / `ashby`）。
+- `source_scope` 必填，board / scope 标识，用于隔离不同 board 的缺失判定。
+- `complete=true` 表示适配器能证明本次已观测该 scope 的完整岗位集合。
+- `observed_at` 必填，本次观测时间。
+- `jobs` 为归一化岗位数组，单个岗位对象字段与 5.4 一致。
+
+响应：
+
+```json
+{
+  "created": 10,
+  "updated": 2,
+  "seen": 12,
+  "closed": 0,
+  "complete": true
+}
+```
+
+批量与完整性约束：
+
+- `jobs` 数量：`complete=true` 时允许 `0..200`（`0` 表示空 board）；`complete=false` 时允许 `1..200`。
+- 这是完整 board 观测批次，与 5.4 手工批次的 `1..100` 是两套独立规则。
+- `complete=false` 时服务端只更新实际观测到的岗位：不递增缺失计数、不关闭任何岗位。
+- board 超过 200 个岗位时，适配器必须发送 `complete=false` 并分批上报，同样不得关闭缺失岗位。
+
+生命周期语义（依据 ADR-0010 与 ExecPlan 0012）：
+
+- 完整观测且岗位存在：刷新 `last_seen_at` / `last_verified_at`，`missing_count=0`，
+  `source_status='ok'`，`status=1`，重开时清空 `closed_at`。
+- 完整观测且岗位缺失：`missing_count += 1`，`source_status='missing'`；仅当
+  `missing_count >= 2` 或超过来源宽限期（ATS 默认 48h）才关闭
+  （`closed_at` 置位、`status=0`、`source_status='closed'`）。
+- 不完整观测（分页截断 / 限流 / 超时 / 结构不确定）：不递增缺失计数，不关闭任何岗位。
+- 一次观测使用单一事务，任一条失败时全部回滚。
+- `source_url` 仍是唯一幂等键，本接口不改变 `uk_source_url`。
+- `INTERNAL_API_TOKEN` 仅从环境变量读取；当前无 Gateway，该 token 只是应用层保护。
+- 错误响应继续使用统一 `{code,message,data}` 格式。
 
 ---
 
@@ -536,7 +601,7 @@ GET /api/v1/applications/statistics
 统计范围仅限当前登录用户：`total` 为全部投递，`interview` 为状态
 `3/4/5`，`offer` 为状态 `6`，`rejected` 为状态 `7`。
 
-> 注：`statistics` 为静态路径，网关/路由需在 `{id}` 参数路由之前注册。
+> 注：`statistics` 是静态路径，路由必须在 `{id}` 参数路由之前注册。
 
 ---
 
@@ -649,8 +714,9 @@ GET /health
 | GET | /api/v1/ai/tasks/{task_id} | 是 | 任务轮询 |
 | GET | /health | 否 | 健康检查 |
 | POST | /internal/jobs/import | Internal Token | 可信岗位导入 |
+| POST | /internal/jobs/source-sync | Internal Token | 来源观测同步（Source Adapter） |
 
-> 内部接口（AI 服务取简历/岗位、Crawler 入库）为 `/internal/*`，仅内网可达，不对外暴露。
+> 内部接口（AI 服务取简历/岗位、Source Adapter 上报观测）为 `/internal/*`，仅内网可达，不对外暴露。
 
 ## 10. Open-source MVP 边界
 
@@ -675,9 +741,10 @@ GET /health
 - 排名必须包含 `score_version` 和可解释 breakdown。
 - 0011 不调用 LLM、Embedding 或 Search Engine。
 
-### 10.2 Freshness 契约预留
+### 10.2 Freshness 契约（0012）
 
-Freshness 字段在 0012 落库后加入公开响应：
+写入路径是 5.5 的 `/internal/jobs/source-sync`。公开响应字段在当前
+`GET /api/v1/jobs` 契约上扩展，**在 0012 落库并实现后才生效**：
 
 ```text
 posted_at

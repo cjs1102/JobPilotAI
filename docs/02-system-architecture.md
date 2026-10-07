@@ -1,6 +1,19 @@
 # JobPilot AI 系统架构设计文档 V3.0
 
-> 依据 ADR-0001 ~ ADR-0006 修订。本文档为系统架构唯一权威依据，替代早期 V1.0（微服务）与 V2.0（单体总纲）中的冲突内容。
+> ⚠️ **历史资料 / Historical — Superseded**
+>
+> 本文档属于 ADR-0007 ~ ADR-0010 之前的旧设计方向，仅作历史参考，
+> **不得作为新的实现规范**。现行架构见
+> [architecture/open-source-mvp.md](architecture/open-source-mvp.md)，
+> 现行决策见 [adr/README.md](adr/README.md)（ADR-0007 ~ ADR-0010）。
+>
+> Do not use this document for new implementation decisions.
+
+> 依据 ADR-0001 ~ ADR-0006 修订。Historical / Superseded，不作为当前 MVP
+> 实现依据；现行架构见
+> [architecture/open-source-mvp.md](architecture/open-source-mvp.md)，现行决策见
+> [adr/README.md](adr/README.md)（ADR-0007 ~ ADR-0010）。本文档曾用于替代早期
+> V1.0（微服务）与 V2.0（单体总纲）中的冲突内容。
 
 ## 文档说明
 

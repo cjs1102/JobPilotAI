@@ -1,5 +1,15 @@
 # JobPilot AI 项目目录结构与模块职责
 
+> ⚠️ **历史资料 / Historical — Superseded**
+>
+> 本文档属于 ADR-0007 ~ ADR-0010 之前的旧设计方向，仅作历史参考，
+> **不得作为新的实现规范**。文中的 `gateway/`、`ai_service/`、`crawler/`
+> 目录并不存在。现行架构见
+> [architecture/open-source-mvp.md](architecture/open-source-mvp.md)，
+> 现行决策见 [adr/README.md](adr/README.md)（ADR-0007 ~ ADR-0010）。
+>
+> Do not use this document for new implementation decisions.
+
 > 依据 ADR-0001 ~ 0005 与 `02-system-architecture.md` 生成。目录即架构：依赖只能从上层流向下层，禁止反向引用。
 
 ---
@@ -316,7 +326,10 @@ ai ──内部HTTP──► service
 
 # 10. 分阶段构建计划
 
-> ⚠️ **本节已废弃（Superseded）**：执行分期以 **[08-execution-guide.md](08-execution-guide.md)（P0-P5，1-3 个月窗口）** 为准。下表 A-F 分期为历史版本，保留仅作参考，请勿按此执行。
+> ⚠️ **本节已废弃（Superseded）**：执行分期以现行 ExecPlan
+> （[exec-plans/](exec-plans/README.md)）为准；`08-execution-guide.md` 自身亦为
+> Historical / Superseded，不作为当前 MVP 实现依据。下表 A-F 分期为历史版本，
+> 保留仅作参考，请勿按此执行。
 
 > 详细排期、止损线与验收见 **[05-development-plan.md](05-development-plan.md)**（诚实分阶段版，按学生业余时间估算，约 26 周）。本节为目录视角的填充顺序。
 

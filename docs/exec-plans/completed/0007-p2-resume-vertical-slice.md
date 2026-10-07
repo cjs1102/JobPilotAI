@@ -1,5 +1,7 @@
 # ExecPlan 0007: P2 Resume Vertical Slice
 
+> Status: Completed.
+
 ## Background
 
 The P2 user/auth/profile/skill path is complete and synchronized. The Resume
@@ -529,15 +531,37 @@ Items requiring user approval before implementation:
 - [x] ExecPlan
 - [x] Prerequisite infrastructure stage
   ([0007A](../completed/0007A-resume-infrastructure.md))
-- [ ] Phase 1: Resume DAO
-- [ ] Phase 2: Resume Service
-- [ ] Phase 3: Controller and Routes
-- [ ] Phase 4: HTTP and Storage Integration Tests
-- [ ] Phase 5: Verification and Documentation
+- [x] Phase 1: Resume DAO
+- [x] Phase 2: Resume Service
+- [x] Phase 3: Controller and Routes
+- [x] Phase 4: HTTP and Storage Integration Tests
+- [x] Phase 5: Verification and Documentation
 
-Implementation is blocked at the infrastructure gate. No business code,
-schema, API contract, or runtime behavior was changed while creating this
-plan.
+Implementation notes:
+
+- Added minimal query-aware route matching so `GET /api/v1/resumes?page=...`
+  reaches the Resume route without changing HTTP body framing.
+- Moved Bearer header parsing into the shared auth module so User and Resume
+  controllers use the same authentication parsing.
+- Implemented the approved collision-free storage path
+  `<root>/{user_id}/resumes/{resume_id}/v{version}.{ext}`, and updated
+  `docs/08-execution-guide.md` to match.
+- These changes were required by the approved API and authentication-reuse
+  constraints. No schema or API contract change was introduced.
+
+## Verification Results
+
+- Focused Resume DAO/Service tests: 6/6 passed.
+- Resume HTTP integration tests: 3/3 passed.
+- User/Auth/Router regression subset: 16/16 passed.
+- Debug full CTest: 76/76 passed.
+- ASan full CTest: 76/76 passed.
+- UBSan full CTest: 76/76 passed.
+- TSan default gate: 32/32 passed.
+- TSan external-service subset: 6/6 passed.
+- Service and root builds passed.
+
+The implementation is complete in the working tree and awaits review/commit.
 
 ## Verification and Rollback
 

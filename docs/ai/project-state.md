@@ -2,10 +2,10 @@
 
 > Snapshot: 2026-10-07
 >
-> Baseline HEAD: `470384e docs(ai): optimize verification and context workflow`
+> Baseline HEAD: `90f52c9 docs(ai): record 0007A infrastructure baseline`
 >
-> `origin/main` matches this baseline. The 0007A infrastructure changes are
-> present in the working tree and are not committed yet.
+> `origin/main` matches this baseline. The 0007 Resume Vertical Slice is
+> implemented and verified in the working tree but is not committed yet.
 
 This is the concise takeover entry. Detailed evidence and historical sections
 are preserved in
@@ -25,9 +25,12 @@ are preserved in
   committed baseline: authenticated profile read/update and skill
   list/create/upsert/delete.
 - The 0007A infrastructure slice is implemented and verified in the working
-  tree: bounded HTTP bodies, multipart parsing, MySQL transactions, local file
-  storage, storage configuration, and shared session authentication.
-- Resume, job, and application domains remain outside completed slices.
+  committed baseline: bounded HTTP bodies, multipart parsing, MySQL
+  transactions, local file storage, storage configuration, and shared session
+  authentication.
+- The Resume Vertical Slice is implemented and verified in the working tree:
+  upload, paginated list, text version creation, and version listing.
+- Job and application domains remain outside completed slices.
 
 ## Architecture Summary
 
@@ -51,10 +54,10 @@ HTTP request
 ## Verified Snapshot
 
 - Pre-0006 clean `service/` and root CTest: 54/54.
-- Full Debug CTest after 0007A: 65/65.
-- ASan full CTest after 0007A: 65/65.
-- UBSan full CTest after 0007A: 65/65.
-- TSan concurrency/User subset after 0007A: 21/21.
+- Full Debug CTest after 0007: 76/76.
+- ASan full CTest after 0007: 76/76.
+- UBSan full CTest after 0007: 76/76.
+- TSan default gate after 0007: 32/32.
 - TSan external-service subset: 6/6.
 - Focused Release regression after the `PUT`/`DELETE` method extension: 9/9.
 - Both `service/` and root Release builds completed successfully.
@@ -71,7 +74,7 @@ Performance baseline:
 
 | Priority | Risk | Boundary |
 |---|---|---|
-| High | No HTTP request/header/body limits | Resource-exhaustion hardening remains open |
+| High | No HTTP request-header limit | Body is capped at 12 MiB; header exhaustion remains open |
 | High | Raw `Channel *` in epoll active list | Requires strict channel lifetime discipline |
 | Medium | No graceful shutdown/signal handling | Service cannot stop cleanly on signals |
 | Medium | Expired vs invalid Redis token cannot be distinguished | Both currently return `20001`; `20002` is reserved |
@@ -80,10 +83,9 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review and commit the completed 0007A infrastructure working tree.
-2. Implement ExecPlan 0007 Resume Vertical Slice.
-3. Continue P2 with job and application modules.
-4. Keep all new business work separate from the frozen P1 network layer.
+1. Review and commit the completed 0007 Resume Vertical Slice.
+2. Continue P2 with job and application modules.
+3. Keep all new business work separate from the frozen P1 network layer.
 
 Do not start a new P2 module without its own approved plan.
 

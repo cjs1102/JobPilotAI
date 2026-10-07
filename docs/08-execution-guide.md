@@ -826,7 +826,7 @@ Transaction：BEGIN → 多次 Execute → COMMIT/ROLLBACK（同一连接的连�
 ### ④ resume 模块（上传/版本）
 
 - **接口**（对齐 04 §4）：`POST /resumes/upload`（multipart）、`GET /resumes`、`POST /resumes/{id}/versions`、`GET /resumes/{id}/versions`。
-- **实现要点**：**multipart 解析限时 2 天**，只支持单文件 PDF/TXT/MD；文件落盘 `storage/{user_id}/resume/v{version}.{ext}`；`resume_versions` 插记录；文本内容存 `content` 列（供 AI 用）。
+- **实现要点**：**multipart 解析限时 2 天**，只支持单文件 PDF/TXT/MD；文件落盘 `<storage.root>/{user_id}/resumes/{resume_id}/v{version}.{ext}`；`resume_versions` 插记录；文本内容存 `content` 列（供 AI 用）。
 - **止损**：multipart 2 天搞不定 → 改 **base64 JSON 上传**（面试不问这个细节）。
 - **验收**：上传→列表→新版本→版本列表；下载文件与上传一致（base64 方案则验 content）。
 

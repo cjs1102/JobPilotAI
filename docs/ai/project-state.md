@@ -91,16 +91,16 @@ Key decisions:
 | Architecture Re-Research | `../architecture/open-source-mvp.md`, `../adr/README.md` | ADR-0007 through ADR-0010 | `635fc31` |
 | Job Search / Ranking | `completed/0011-job-search-ranking.md` | Job ranking/search modules and tests | `214dc9e` |
 
-## Active Plan
+## Latest Completed Plan
 
-[0012-job-source-adapter-freshness.md](../exec-plans/active/0012-job-source-adapter-freshness.md)
+[../exec-plans/completed/0012-job-source-adapter-freshness.md](../exec-plans/completed/0012-job-source-adapter-freshness.md)
 
-Current step:
+Progress:
 
 ```text
-Research / Capability Check / Design / Plan complete
-Steps 1-8 implemented, committed, and pushed
-Step 9 (documentation) and Step 10 (L4 verification) remain
+Steps 1-10 complete
+L4 verified: Debug / ASan / UBSan 172/172 each, Release builds passed
+No plan is active; 0013 AI Matching is next after 0012 is reviewed
 ```
 
 0012 scope:
@@ -152,9 +152,9 @@ HTTP request
 - TSan external-service subset: 6/6.
 - Focused Release regression after the `PUT`/`DELETE` method extension: 9/9.
 - Both `service/` and root Release builds completed successfully.
-- 0012 Steps 1-8 focused evidence: `SchemaTest` 8/8, source observation domain
-  26/26, Source Sync DAO 12/12, Source Sync Service 6/6, source-sync HTTP 5/5,
-  source sync E2E 1/1, `ctest -L job` 84/84, Python adapter suite 81/81.
+- 0012 L4: full Debug, ASan, and UBSan CTest 172/172 each (0 failures, no
+  sanitizer diagnostics); `service/` and root Release builds passed; Python
+  adapter suite 85/85; `ctest -L job` 84/84.
 - Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
   all published with `complete=false` only where the 200-job limit required it.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test
@@ -186,8 +186,9 @@ Performance baseline:
 
 ## Next Entry
 
-1. Execute `active/0012-job-source-adapter-freshness.md`.
-2. Do not start 0013 until 0012 is complete and reviewed.
+1. Review the completed 0012 plan and its L4 evidence
+   (`completed/0012-job-source-adapter-freshness.md`).
+2. No plan is active; 0013 AI Matching must not start until 0012 is reviewed.
 3. Follow 0013 AI Matching, 0014 Resume Tailoring, and 0015 Open-source
    Packaging.
 4. Keep AutoApply, RabbitMQ, general Crawler, Gateway, and SaaS RBAC out of
@@ -215,8 +216,8 @@ Do not start a new P2 module without its own approved plan.
   [references/project-state-full.md](references/project-state-full.md)
 - Current architecture:
   [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md)
-- Active ExecPlan:
-  [../exec-plans/active/0012-job-source-adapter-freshness.md](../exec-plans/active/0012-job-source-adapter-freshness.md)
+- Latest completed ExecPlan:
+  [../exec-plans/completed/0012-job-source-adapter-freshness.md](../exec-plans/completed/0012-job-source-adapter-freshness.md)
 - Current ADR decisions: [../adr/README.md](../adr/README.md)
 - Coding and testing rules:
   [../06-coding-standard.md](../06-coding-standard.md)

@@ -1,10 +1,10 @@
 # ExecPlan 0012: Job Source Adapter + Freshness
 
-> Status: Research, Design, and Planning complete. Steps 1-9 (Schema migration,
-> Source observation domain, Source Sync DAO, Source Sync Service, Internal
-> Source Sync API, Search freshness integration, Python source adapters,
-> End-to-end integration, Documentation) implemented; Step 10 (L4 verification)
-> remains.
+> Status: Completed and verified on 2026-10-08 (Steps 1-10).
+>
+> L4 evidence: Debug, ASan, and UBSan full CTest 172/172 each; `service/` and
+> root Release builds passed; Python adapter suite 85/85. TSan was not rerun
+> because 0012 introduced no new concurrency.
 >
 > Task level: L4.
 
@@ -584,7 +584,7 @@ Stop and return to design if:
 - [x] Python source adapters
 - [x] End-to-end integration
 - [x] Documentation
-- [ ] L4 verification
+- [x] L4 verification
 
 Implementation decisions (keep later steps consistent):
 

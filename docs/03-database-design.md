@@ -241,7 +241,7 @@ CREATE TABLE notifications (
 `database/schema/03_job.sql`（新库由初始化脚本直接创建）。
 
 对齐来源：
-[`exec-plans/active/0012-job-source-adapter-freshness.md`](exec-plans/active/0012-job-source-adapter-freshness.md) §8
+[`exec-plans/completed/0012-job-source-adapter-freshness.md`](exec-plans/completed/0012-job-source-adapter-freshness.md) §8
 与 [`adr/0010-job-freshness-and-lifecycle.md`](adr/0010-job-freshness-and-lifecycle.md)。
 
 ### 7.1 `jobs` 新增列（已落地）

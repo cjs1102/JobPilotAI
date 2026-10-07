@@ -149,20 +149,22 @@ the recorded baseline, but are intentionally not part of the default TSan gate.
 
 Date: 2026-10-08
 
-The ASan, UBSan, and Release rows are the 0011 L4 results. The TSan rows remain
-the last concurrency-relevant baseline, recorded after 0010 on 2026-10-07.
+0012 L4 results, 172 discovered tests per preset:
 
 | Check | Result |
 |---|---|
-| ASan full CTest | 115/115 passed |
-| UBSan full CTest | 115/115 passed |
-| TSan default gate | 42/42 passed |
-| TSan external-service tests | 6/6 passed |
+| Debug full CTest | 172/172 passed |
+| ASan full CTest | 172/172 passed |
+| UBSan full CTest | 172/172 passed |
+| Python source adapter suite | 85/85 passed |
+| TSan default gate | 42/42 passed (last concurrency baseline, after 0010) |
+| TSan external-service tests | 6/6 passed (same baseline) |
 | Service and root Release builds | passed |
 
-TSan was not rerun for 0011 because the slice introduced no new concurrency,
-thread, event-loop, connection-lifetime, or background-worker behavior. The
-42/42 TSan baseline remains recorded for the last concurrency-relevant stage.
+TSan was not rerun for 0011 or 0012 because neither slice introduced new
+concurrency, thread, event-loop, connection-lifetime, or background-worker
+behavior. The 42/42 TSan baseline remains recorded for the last
+concurrency-relevant stage.
 
 TSan initially found a race in `test_thread_pool.cpp`: the completion counter
 was updated before `condition.notify_one()` while the test could leave scope

@@ -1,5 +1,6 @@
 #include "jobpilot/service/auth/session_authenticator.h"
 
+#include <cctype>
 #include <exception>
 #include <optional>
 
@@ -8,6 +9,74 @@
 
 namespace jobpilot::service
 {
+    namespace
+    {
+        std::string Trim(
+            const std::string &value)
+        {
+            std::size_t begin = 0;
+            std::size_t end = value.size();
+
+            while (begin < end &&
+                   std::isspace(
+                       static_cast<unsigned char>(
+                           value[begin])))
+            {
+                ++begin;
+            }
+
+            while (end > begin &&
+                   std::isspace(
+                       static_cast<unsigned char>(
+                           value[end - 1])))
+            {
+                --end;
+            }
+
+            return value.substr(
+                begin,
+                end - begin);
+        }
+
+        std::string ToLower(
+            std::string value)
+        {
+            for (char &character : value)
+            {
+                character = static_cast<char>(
+                    std::tolower(
+                        static_cast<unsigned char>(
+                            character)));
+            }
+
+            return value;
+        }
+    } // namespace
+
+    std::optional<std::string> ParseBearerToken(
+        const std::string &authorization)
+    {
+        constexpr const char *kPrefix =
+            "Bearer ";
+
+        if (authorization.size() <= 7 ||
+            ToLower(authorization.substr(0, 7)) !=
+                ToLower(kPrefix))
+        {
+            return std::nullopt;
+        }
+
+        const std::string token =
+            Trim(authorization.substr(7));
+
+        if (token.empty())
+        {
+            return std::nullopt;
+        }
+
+        return token;
+    }
+
     SessionAuthenticator::SessionAuthenticator(
         jobpilot::core::SessionManager &sessions)
         : sessions_(sessions)

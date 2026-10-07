@@ -1,6 +1,5 @@
 #include "jobpilot/service/user/user_controller.h"
 
-#include <cctype>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -33,6 +32,8 @@ namespace jobpilot::service
                 return 401;
             case ErrorCode::kForbidden:
                 return 403;
+            case ErrorCode::kResumeNotFound:
+                return 404;
             case ErrorCode::kEmailExists:
                 return 409;
             case ErrorCode::kInternalError:
@@ -55,76 +56,13 @@ namespace jobpilot::service
                 return "Unauthorized";
             case 403:
                 return "Forbidden";
+            case 404:
+                return "Not Found";
             case 409:
                 return "Conflict";
             default:
                 return "Internal Server Error";
             }
-        }
-
-        std::string Trim(
-            const std::string &value)
-        {
-            std::size_t begin = 0;
-            std::size_t end = value.size();
-
-            while (begin < end &&
-                   std::isspace(
-                       static_cast<unsigned char>(
-                           value[begin])))
-            {
-                ++begin;
-            }
-
-            while (end > begin &&
-                   std::isspace(
-                       static_cast<unsigned char>(
-                           value[end - 1])))
-            {
-                --end;
-            }
-
-            return value.substr(
-                begin,
-                end - begin);
-        }
-
-        std::string ToLower(
-            std::string value)
-        {
-            for (char &character : value)
-            {
-                character = static_cast<char>(
-                    std::tolower(
-                        static_cast<unsigned char>(
-                            character)));
-            }
-
-            return value;
-        }
-
-        std::optional<std::string> ParseBearerToken(
-            const std::string &authorization)
-        {
-            constexpr const char *kPrefix =
-                "Bearer ";
-
-            if (authorization.size() <= 7 ||
-                ToLower(authorization.substr(0, 7)) !=
-                    ToLower(kPrefix))
-            {
-                return std::nullopt;
-            }
-
-            const std::string token =
-                Trim(authorization.substr(7));
-
-            if (token.empty())
-            {
-                return std::nullopt;
-            }
-
-            return token;
         }
 
         bool TryGetString(

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -75,5 +76,22 @@ namespace jobpilot::service
         EXPECT_EQ(
             missing.code,
             ErrorCode::kUnauthorized);
+    }
+
+    TEST_F(SessionAuthenticatorTest, ParsesBearerHeader)
+    {
+        const std::optional<std::string> token =
+            ParseBearerToken(
+                "Bearer abc123");
+
+        ASSERT_TRUE(token.has_value());
+        EXPECT_EQ(token.value(), "abc123");
+
+        EXPECT_FALSE(
+            ParseBearerToken("Basic abc123")
+                .has_value());
+        EXPECT_FALSE(
+            ParseBearerToken("Bearer ")
+                .has_value());
     }
 } // namespace jobpilot::service

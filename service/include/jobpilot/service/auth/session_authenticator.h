@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "jobpilot/service/result.h"
@@ -12,6 +13,9 @@ namespace jobpilot::core
 
 namespace jobpilot::service
 {
+    std::optional<std::string> ParseBearerToken(
+        const std::string &authorization);
+
     class ISessionAuthenticator
     {
     public:

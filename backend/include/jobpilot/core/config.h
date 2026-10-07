@@ -50,12 +50,20 @@ namespace jobpilot::core
         std::string level{"info"};
     };
 
+    struct StorageConfig
+    {
+        std::string root{"storage"};
+        std::size_t maxFileBytes{
+            10U * 1024U * 1024U};
+    };
+
     struct Config
     {
         ServerConfig server;
         MySqlConfig mysql;
         RedisConfig redis;
         LoggingConfig log;
+        StorageConfig storage;
 
         static Config LoadFromFile(
             const std::string &path,

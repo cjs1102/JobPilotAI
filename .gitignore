@@ -29,6 +29,9 @@ compile_commands.json
 *.local.yml
 config.local.yaml
 
+# Runtime storage
+/storage/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -27,6 +27,9 @@ namespace jobpilot::core
         constexpr const char *kRedisMaxConnEnv = "REDIS_MAX_CONN";
         constexpr const char *kRedisTimeoutEnv = "REDIS_TIMEOUT_MS";
         constexpr const char *kLogLevelEnv = "LOG_LEVEL";
+        constexpr const char *kStorageRootEnv = "STORAGE_ROOT";
+        constexpr const char *kStorageMaxFileBytesEnv =
+            "STORAGE_MAX_FILE_BYTES";
 
         std::string ToLower(std::string value)
         {
@@ -338,6 +341,35 @@ namespace jobpilot::core
                             "log.level");
                 }
             }
+
+            if (const YAML::Node storage = root["storage"])
+            {
+                if (!storage.IsMap())
+                {
+                    throw ConfigError(
+                        "storage must be a mapping");
+                }
+
+                if (const YAML::Node rootPath =
+                        storage["root"])
+                {
+                    config->storage.root =
+                        ParseYamlScalar<std::string>(
+                            rootPath,
+                            "storage.root");
+                }
+
+                if (const YAML::Node maxFileBytes =
+                        storage["max_file_bytes"])
+                {
+                    config->storage.maxFileBytes =
+                        ParsePositiveSize(
+                            ParseYamlScalar<std::string>(
+                                maxFileBytes,
+                                "storage.max_file_bytes"),
+                            "storage.max_file_bytes");
+                }
+            }
         }
 
         void ApplyEnvironment(
@@ -459,6 +491,25 @@ namespace jobpilot::core
             {
                 config->log.level = *value;
             }
+
+            if (const std::string *value =
+                    FindEnvironment(
+                        environment,
+                        kStorageRootEnv))
+            {
+                config->storage.root = *value;
+            }
+
+            if (const std::string *value =
+                    FindEnvironment(
+                        environment,
+                        kStorageMaxFileBytesEnv))
+            {
+                config->storage.maxFileBytes =
+                    ParsePositiveSize(
+                        *value,
+                        kStorageMaxFileBytesEnv);
+            }
         }
 
         void Validate(const Config &config)
@@ -503,6 +554,12 @@ namespace jobpilot::core
             {
                 throw ConfigError(
                     "log.level must not be empty");
+            }
+
+            if (config.storage.root.empty())
+            {
+                throw ConfigError(
+                    "storage.root must not be empty");
             }
         }
     } // namespace
@@ -572,7 +629,9 @@ namespace jobpilot::core
             kRedisPortEnv,
             kRedisMaxConnEnv,
             kRedisTimeoutEnv,
-            kLogLevelEnv};
+            kLogLevelEnv,
+            kStorageRootEnv,
+            kStorageMaxFileBytesEnv};
 
         Environment environment;
 

@@ -35,6 +35,10 @@ namespace jobpilot::core
         EXPECT_EQ(config.redis.maxConn, 4U);
         EXPECT_EQ(config.redis.timeoutMs, 1000);
         EXPECT_EQ(config.log.level, "info");
+        EXPECT_EQ(config.storage.root, "storage");
+        EXPECT_EQ(
+            config.storage.maxFileBytes,
+            10U * 1024U * 1024U);
     }
 
     TEST(ConfigTest, LoadsYaml)
@@ -56,7 +60,10 @@ namespace jobpilot::core
                 "  max_conn: 6\n"
                 "  timeout_ms: 2000\n"
                 "log:\n"
-                "  level: debug\n",
+                "  level: debug\n"
+                "storage:\n"
+                "  root: /var/lib/jobpilot/storage\n"
+                "  max_file_bytes: 2097152\n",
                 BaseEnvironment());
 
         EXPECT_EQ(config.server.host, "127.0.0.1");
@@ -71,6 +78,12 @@ namespace jobpilot::core
         EXPECT_EQ(config.redis.maxConn, 6U);
         EXPECT_EQ(config.redis.timeoutMs, 2000);
         EXPECT_EQ(config.log.level, "debug");
+        EXPECT_EQ(
+            config.storage.root,
+            "/var/lib/jobpilot/storage");
+        EXPECT_EQ(
+            config.storage.maxFileBytes,
+            2097152U);
     }
 
     TEST(ConfigTest, EnvironmentOverridesYaml)
@@ -88,7 +101,9 @@ namespace jobpilot::core
             {"REDIS_PORT", "36379"},
             {"REDIS_MAX_CONN", "8"},
             {"REDIS_TIMEOUT_MS", "3000"},
-            {"LOG_LEVEL", "warn"}};
+            {"LOG_LEVEL", "warn"},
+            {"STORAGE_ROOT", "/env/storage"},
+            {"STORAGE_MAX_FILE_BYTES", "4194304"}};
 
         const Config config =
             Config::LoadFromString(
@@ -107,7 +122,10 @@ namespace jobpilot::core
                 "  max_conn: 2\n"
                 "  timeout_ms: 100\n"
                 "log:\n"
-                "  level: error\n",
+                "  level: error\n"
+                "storage:\n"
+                "  root: /yaml/storage\n"
+                "  max_file_bytes: 1024\n",
                 environment);
 
         EXPECT_EQ(config.server.host, "0.0.0.0");
@@ -123,6 +141,10 @@ namespace jobpilot::core
         EXPECT_EQ(config.redis.maxConn, 8U);
         EXPECT_EQ(config.redis.timeoutMs, 3000);
         EXPECT_EQ(config.log.level, "warn");
+        EXPECT_EQ(config.storage.root, "/env/storage");
+        EXPECT_EQ(
+            config.storage.maxFileBytes,
+            4194304U);
     }
 
     TEST(ConfigTest, RequiresMySqlPassword)
@@ -200,6 +222,23 @@ namespace jobpilot::core
         EXPECT_THROW(
             Config::LoadFromString(
                 "server: [\n",
+                BaseEnvironment()),
+            ConfigError);
+    }
+
+    TEST(ConfigTest, RejectsInvalidStorageConfiguration)
+    {
+        EXPECT_THROW(
+            Config::LoadFromString(
+                "storage:\n"
+                "  max_file_bytes: 0\n",
+                BaseEnvironment()),
+            ConfigError);
+
+        EXPECT_THROW(
+            Config::LoadFromString(
+                "storage:\n"
+                "  root: \"\"\n",
                 BaseEnvironment()),
             ConfigError);
     }

@@ -1,9 +1,9 @@
 # ExecPlan 0012: Job Source Adapter + Freshness
 
-> Status: Research, Design, and Planning complete. Steps 1-6 (Schema migration,
+> Status: Research, Design, and Planning complete. Steps 1-7 (Schema migration,
 > Source observation domain, Source Sync DAO, Source Sync Service, Internal
-> Source Sync API, Search freshness integration) implemented; Step 7 onward not
-> started.
+> Source Sync API, Search freshness integration, Python source adapters)
+> implemented; Step 8 onward not started.
 >
 > Task level: L4.
 
@@ -580,7 +580,7 @@ Stop and return to design if:
 - [x] Source Sync Service
 - [x] Internal Source Sync API
 - [x] Search freshness integration
-- [ ] Python source adapters
+- [x] Python source adapters
 - [ ] End-to-end integration
 - [ ] Documentation
 - [ ] L4 verification
@@ -626,6 +626,23 @@ Implementation decisions (keep later steps consistent):
 - `posted_within_days` (1..3650) requires `published_at IS NOT NULL`; freshness
   is derived in the DAO projection via `ClassifyFreshness` from
   `TIMESTAMPDIFF(SECOND, last_seen_at, NOW())` plus `closed_at`.
+- Source adapters live in `source_adapters/` (stdlib HTTP/JSON plus PyYAML for
+  the manual config); entry point
+  `python -m jobpilot_sources sync --config <yaml> [--provider X] [--dry-run]`.
+  Providers: Greenhouse (`meta.total` must equal the returned row count to prove
+  completeness), Lever and Ashby (complete by contract). A board above 200 jobs
+  is chunked and published with `complete=false`; an unproven empty board is not
+  published at all.
+- Adapters normalize timestamps to UTC `YYYY-MM-DD HH:MM:SS` and omit any field
+  they cannot derive (never fabricate). Company comes from Greenhouse
+  `company_name`, else the configured `company`, else the board token. Ashby
+  unlisted postings (`isListed: false`) are dropped from the public board.
+- Known gap: provider salary is not published. Lever reports absolute yearly
+  amounts and Ashby a display summary, while the platform column contract is
+  monthly thousands, so storing them would be fabricated data. Lever and Ashby
+  expose no structured skills, so `requirements` stays empty (section 6).
+- A guard test asserts the adapter package has no database-driver imports, no
+  SQL statements, and no third-party dependency besides PyYAML.
 
 ## 19. Rejected Alternatives
 

@@ -1,0 +1,52 @@
+[
+  {
+    "categories": {
+      "commitment": "Regular Full Time (Salary)",
+      "department": "Customer Success",
+      "location": "Atlanta, Georgia",
+      "team": "Customer Success Team",
+      "allLocations": [
+        "Atlanta, Georgia"
+      ]
+    },
+    "createdAt": 1788199939703,
+    "descriptionPlain": "Own the customer relationship.\n\nWork with engineering.",
+    "id": "ad208490-4052-4f91-a57e-433f2d1e484b",
+    "salaryRange": {
+      "min": 85000,
+      "max": 175000,
+      "currency": "USD",
+      "interval": "per-year-salary"
+    },
+    "text": "Customer Success Manager",
+    "country": "US",
+    "workplaceType": "hybrid",
+    "hostedUrl": "https://jobs.lever.co/leverdemo/ad208490-4052-4f91-a57e-433f2d1e484b",
+    "applyUrl": "https://jobs.lever.co/leverdemo/ad208490-4052-4f91-a57e-433f2d1e484b/apply"
+  },
+  {
+    "categories": {
+      "commitment": "Regular Full Time (Salary)",
+      "department": "People (HR)",
+      "location": "Houston, TX",
+      "team": "People",
+      "allLocations": [
+        "Houston, TX"
+      ]
+    },
+    "createdAt": 1787600587936,
+    "descriptionPlain": "Own the customer relationship.\n\nWork with engineering.",
+    "id": "120b5976-ee4e-4dc5-b31b-2b1ca124460c",
+    "salaryRange": {
+      "min": 150000,
+      "max": 185000,
+      "currency": "USD",
+      "interval": "per-year-salary"
+    },
+    "text": "Dentist",
+    "country": "US",
+    "workplaceType": "onsite",
+    "hostedUrl": "https://jobs.lever.co/leverdemo/120b5976-ee4e-4dc5-b31b-2b1ca124460c",
+    "applyUrl": "https://jobs.lever.co/leverdemo/120b5976-ee4e-4dc5-b31b-2b1ca124460c/apply"
+  }
+]

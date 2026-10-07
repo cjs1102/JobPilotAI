@@ -1,0 +1,75 @@
+{
+  "jobs": [
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/gitlab/jobs/8860302002",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 6547054002,
+      "location": {
+        "name": "Remote, France"
+      },
+      "metadata": [
+        {
+          "id": 4595831002,
+          "name": "Quota Coverage Type",
+          "value": "Account Executive",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 8860302002,
+      "updated_at": "2026-10-02T11:31:50-04:00",
+      "requisition_id": "7109",
+      "title": "Account Executive - France",
+      "company_name": "GitLab",
+      "first_published": "2026-10-02T11:31:50-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "<p>Build <strong>backend</strong> services.</p><ul><li>C++ &amp; Linux</li></ul>"
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/gitlab/jobs/8638232002",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 6449994002,
+      "location": {
+        "name": "Remote, United States"
+      },
+      "metadata": [
+        {
+          "id": 4595831002,
+          "name": "Quota Coverage Type",
+          "value": "n/a",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 8638232002,
+      "updated_at": "2026-09-29T10:38:50-04:00",
+      "requisition_id": "6682",
+      "title": "AI Transformation Owner, CRO",
+      "company_name": "GitLab",
+      "first_published": "2026-07-22T13:38:40-04:00",
+      "language": "en",
+      "application_deadline": null,
+      "content": "<p>Build <strong>backend</strong> services.</p><ul><li>C++ &amp; Linux</li></ul>"
+    }
+  ],
+  "meta": {
+    "total": 2
+  }
+}

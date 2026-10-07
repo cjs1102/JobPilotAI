@@ -2,10 +2,10 @@
 
 > Snapshot: 2026-10-07
 >
-> Baseline HEAD: `cd55439 refactor(ai): optimize cross-agent context routing`
+> Baseline HEAD: `470384e docs(ai): optimize verification and context workflow`
 >
-> `origin/main` matches this baseline. The 0006 implementation is present in
-> the working tree and is not committed yet.
+> `origin/main` matches this baseline. The 0007A infrastructure changes are
+> present in the working tree and are not committed yet.
 
 This is the concise takeover entry. Detailed evidence and historical sections
 are preserved in
@@ -22,8 +22,11 @@ are preserved in
 - The first P2 user vertical slice is complete:
   `register -> login -> Redis session -> Authorization -> me`.
 - The 0006 profile/skill vertical slice is implemented and verified in the
-  working tree: authenticated profile read/update and skill
+  committed baseline: authenticated profile read/update and skill
   list/create/upsert/delete.
+- The 0007A infrastructure slice is implemented and verified in the working
+  tree: bounded HTTP bodies, multipart parsing, MySQL transactions, local file
+  storage, storage configuration, and shared session authentication.
 - Resume, job, and application domains remain outside completed slices.
 
 ## Architecture Summary
@@ -48,10 +51,10 @@ HTTP request
 ## Verified Snapshot
 
 - Pre-0006 clean `service/` and root CTest: 54/54.
-- Full Debug CTest after 0006: 60/60.
-- ASan full CTest after 0006: 60/60.
-- UBSan full CTest after 0006: 60/60.
-- TSan concurrency/User subset after 0006: 21/21.
+- Full Debug CTest after 0007A: 65/65.
+- ASan full CTest after 0007A: 65/65.
+- UBSan full CTest after 0007A: 65/65.
+- TSan concurrency/User subset after 0007A: 21/21.
 - TSan external-service subset: 6/6.
 - Focused Release regression after the `PUT`/`DELETE` method extension: 9/9.
 - Both `service/` and root Release builds completed successfully.
@@ -77,10 +80,10 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review, commit, and push the completed 0006 working tree after user
-   confirmation.
-2. Continue P2 with resume, job, and application modules.
-3. Keep all new business work separate from the frozen P1 network layer.
+1. Review and commit the completed 0007A infrastructure working tree.
+2. Implement ExecPlan 0007 Resume Vertical Slice.
+3. Continue P2 with job and application modules.
+4. Keep all new business work separate from the frozen P1 network layer.
 
 Do not start a new P2 module without its own approved plan.
 

@@ -15,6 +15,37 @@ MAX_BATCH_SIZE = 200
 SYNC_PATH = "/internal/jobs/source-sync"
 
 
+class BatchError(Exception):
+    """Raised when an observation cannot become valid source-sync requests."""
+
+
+def _validate_unique_source_urls(
+    jobs: Sequence[Mapping[str, Any]],
+) -> None:
+    """Reject duplicate keys before the server has to.
+
+    ``source_url`` is the platform idempotency key, so a batch containing the
+    same URL twice would be rejected by the API as an invalid parameter.
+    """
+
+    seen: set[str] = set()
+
+    for job in jobs:
+        url = job.get("source_url")
+
+        if not isinstance(url, str) or not url.strip():
+            raise BatchError("observation job is missing source_url")
+
+        folded = url.strip().casefold()
+
+        if folded in seen:
+            raise BatchError(
+                f"duplicate source_url in observation: {url}"
+            )
+
+        seen.add(folded)
+
+
 def build_batches(
     *,
     source: str,
@@ -24,6 +55,8 @@ def build_batches(
     complete: bool,
 ) -> list[dict[str, Any]]:
     """Split one observation into valid source-sync payloads."""
+
+    _validate_unique_source_urls(jobs)
 
     total = len(jobs)
     effective_complete = bool(complete) and total <= MAX_BATCH_SIZE

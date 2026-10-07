@@ -26,7 +26,7 @@ from .config import (
     resolve_internal_token,
 )
 from .providers import ProviderError, provider_module
-from .publisher import build_batches, publish_batches
+from .publisher import BatchError, build_batches, publish_batches
 
 
 def utc_now_timestamp() -> str:
@@ -65,13 +65,18 @@ def run_sync(
             log(f"{label}: fetch failed: {error}")
             continue
 
-        batches = build_batches(
-            source=source.type,
-            scope=source.board,
-            observed_at=observed_at,
-            jobs=board.jobs,
-            complete=board.complete,
-        )
+        try:
+            batches = build_batches(
+                source=source.type,
+                scope=source.board,
+                observed_at=observed_at,
+                jobs=board.jobs,
+                complete=board.complete,
+            )
+        except BatchError as error:
+            failures += 1
+            log(f"{label}: observation rejected: {error}")
+            continue
 
         if not batches:
             log(

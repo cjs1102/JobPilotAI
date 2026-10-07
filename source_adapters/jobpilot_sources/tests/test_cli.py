@@ -231,6 +231,41 @@ class RunSyncTest(unittest.TestCase):
         self.assertIn("nothing published", lines[0])
 
 
+    def test_duplicate_source_urls_are_rejected(self) -> None:
+        transport = RecordingTransport(
+            responses={
+                "api.lever.co": api_response(
+                    [
+                        {
+                            "text": "First",
+                            "hostedUrl": "https://x.invalid/1",
+                        },
+                        {
+                            "text": "Second",
+                            "hostedUrl": "HTTPS://X.INVALID/1",
+                        },
+                    ]
+                )
+            }
+        )
+        lines: list[str] = []
+
+        code = cli.run_sync(
+            make_config(),
+            token=TOKEN,
+            provider="lever",
+            dry_run=True,
+            client=HttpClient(transport=transport),
+            clock=lambda: "2026-10-08 12:00:00",
+            log=lines.append,
+        )
+
+        self.assertEqual(code, 1)
+        self.assertIn("observation rejected", lines[0])
+        self.assertIn("duplicate source_url", lines[0])
+        self.assertEqual(transport.posts(), [])
+
+
 class MainTest(unittest.TestCase):
     def setUp(self) -> None:
         self._temporary = tempfile.TemporaryDirectory()

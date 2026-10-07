@@ -8,6 +8,7 @@ import unittest
 from jobpilot_sources.client import HttpClient, HttpError
 from jobpilot_sources.publisher import (
     MAX_BATCH_SIZE,
+    BatchError,
     build_batches,
     publish_batches,
 )
@@ -100,6 +101,45 @@ class BuildBatchesTest(unittest.TestCase):
         self.assertEqual(len(batches), 1)
         self.assertEqual(batches[0]["jobs"], [])
         self.assertTrue(batches[0]["complete"])
+
+    def test_duplicate_source_urls_are_rejected(self) -> None:
+        jobs = make_jobs(2)
+        jobs[1]["source_url"] = jobs[0]["source_url"]
+
+        with self.assertRaises(BatchError):
+            build_batches(
+                source="lever",
+                scope="acme",
+                observed_at="2026-10-08 12:00:00",
+                jobs=jobs,
+                complete=True,
+            )
+
+    def test_duplicate_source_urls_are_case_insensitive(self) -> None:
+        jobs = make_jobs(2)
+        jobs[1]["source_url"] = jobs[0]["source_url"].upper()
+
+        with self.assertRaises(BatchError):
+            build_batches(
+                source="lever",
+                scope="acme",
+                observed_at="2026-10-08 12:00:00",
+                jobs=jobs,
+                complete=True,
+            )
+
+    def test_jobs_without_source_url_are_rejected(self) -> None:
+        jobs = make_jobs(1)
+        jobs[0].pop("source_url")
+
+        with self.assertRaises(BatchError):
+            build_batches(
+                source="lever",
+                scope="acme",
+                observed_at="2026-10-08 12:00:00",
+                jobs=jobs,
+                complete=True,
+            )
 
     def test_empty_incomplete_board_is_not_publishable(self) -> None:
         batches = build_batches(

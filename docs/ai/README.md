@@ -1,19 +1,22 @@
-# JobPilotAI AI Knowledge Map
+# JobPilotAI AI Context Router
 
-This directory contains AI-facing project documentation. It does not replace
-the architecture, API, database, or execution documents.
+Use this file to select the smallest relevant context. Do not read the entire
+AI directory by default.
 
-## Documents
+## Task Routing
 
-| Document | Purpose |
+| Task | Load |
 |---|---|
-| `github_resources.md` | GitHub resource research and classification. Reference only; do not copy third-party code. |
-| `project-state.md` | Current disk, Git, build, test, architecture, and technical-debt snapshot for AI takeover. |
-| `next-phase-plan.md` | Dependency-based plan for P0 completion, P1 correctness, P2 integration, and quality work. |
-| `../quality/README.md` | Repeatable ASan, UBSan, and TSan commands and recorded results. |
-| `../benchmarks/README.md` | Microbenchmark and HTTP throughput/latency baseline. |
-| `README.md` | Navigation and boundaries for AI-facing documentation. |
-| `../../.agents/skills/jobpilot-reactor-review/SKILL.md` | Project workflow for reviewing Reactor, epoll, fd, callback, threading, shutdown, and network-test changes. |
+| Level 1/2 code change | Project `AGENTS.md`, relevant code/tests, and only the relevant section of `docs/06-coding-standard.md` |
+| Build/CMake/Conan/CTest failure | `cpp-build-diagnose` |
+| C/C++ code review | `cpp-code-review` |
+| Network/HTTP lifetime or Reactor change | `jobpilot-reactor-review` and only its relevant reference |
+| Level 3/4 feature or architecture work | `engineering-research-plan`, `docs/exec-plans/README.md`, the active ExecPlan, and only the relevant architecture/API/DB sections |
+| Project takeover or status | `project-state.md` |
+| Historical project detail | `references/project-state-full.md` |
+| GitHub/tooling research | `references/github_resources.md` |
+| Old phase planning | `archive/next-phase-plan-2026-10.md` |
+| Quality or benchmark evidence | `../quality/README.md` or `../benchmarks/README.md` |
 
 ## Authoritative Sources
 
@@ -23,17 +26,16 @@ the architecture, API, database, or execution documents.
 - API contract: `../04-api-design.md`
 - Database contract: `../03-database-design.md`
 
-## Layer Boundary
+Read only the sections needed for the current task.
 
-- User-global workflows live in `~/.agents/skills/`.
-- Workspace-common AI architecture lives in `~/projects/docs/ai/`.
-- JobPilotAI-specific Skills live in `.agents/skills/`.
-- JobPilotAI-specific rules live in the root `AGENTS.md` and this directory.
+## Rule Ownership
 
-## Documentation Rules
+- Personal cross-project defaults: the active agent's user configuration
+- Project-specific rules: repository `AGENTS.md`
+- Reusable procedures: matching Skill
+- Detailed evidence and history: `references/` or completed ExecPlans
+- User-global workflows: `~/.agents/skills/`
+- Workspace-common AI architecture: `~/projects/docs/ai/`
+- JobPilotAI-specific Skills: `.agents/skills/`
 
-- Keep one source of truth; link instead of duplicating.
-- Put durable project facts in `AGENTS.md`.
-- Put reusable procedures in Skills.
-- Put detailed design or evidence in focused documents.
-- Create an ExecPlan only for Level 3 or Level 4 work.
+Do not duplicate rules across these layers; link to the authoritative file.

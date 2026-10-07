@@ -121,6 +121,7 @@ add_library(jobpilot_core STATIC
     src/database/sql_result.cpp
     src/cache/redis_client.cpp
     src/cache/session_manager.cpp
+    src/storage/local_file_storage.cpp
 )
 
 target_include_directories(jobpilot_core
@@ -384,6 +385,22 @@ add_test(
     COMMAND test_multipart_form_data_parser
 )
 
+add_executable(
+    test_file_storage
+    tests/test_file_storage.cpp
+)
+
+target_link_libraries(
+    test_file_storage
+    PRIVATE
+        jobpilot_core
+)
+
+add_test(
+    NAME file_storage_test
+    COMMAND test_file_storage
+)
+
 add_executable(test_thread_pool
     tests/test_thread_pool.cpp
 )
@@ -518,6 +535,7 @@ if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         test_http_router
         test_http_server
         test_multipart_form_data_parser
+        test_file_storage
         test_thread_pool
         test_mysql_pool
         test_sql_result

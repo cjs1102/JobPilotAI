@@ -329,4 +329,147 @@ namespace jobpilot::service
         ASSERT_EQ(records[1].requirements.size(), 1U);
         EXPECT_EQ(records[1].requirements[0].skill, "Go");
     }
+    TEST_F(JobDaoTest, AppliesFreshnessVisibilityAndFields)
+    {
+        const std::string token =
+            jobpilot::test::UniqueJobToken(
+                "freshness");
+
+        const std::uint64_t legacy =
+            AddJob(
+                "Legacy",
+                token + " legacy",
+                "Shenzhen",
+                std::nullopt,
+                1,
+                "2026-10-01 10:00:00");
+        const std::uint64_t fresh =
+            AddJob(
+                "Fresh",
+                token + " fresh",
+                "Shenzhen",
+                std::nullopt,
+                1,
+                "2026-10-02 10:00:00");
+        const std::uint64_t stale =
+            AddJob(
+                "Stale",
+                token + " stale",
+                "Shenzhen",
+                std::nullopt,
+                1,
+                "2026-10-03 10:00:00");
+        const std::uint64_t closed =
+            AddJob(
+                "Closed",
+                token + " closed",
+                "Shenzhen",
+                std::nullopt,
+                1,
+                "2026-10-04 10:00:00");
+
+        pool->Execute(
+            "UPDATE jobs SET "
+            "last_seen_at = TIMESTAMPADD(HOUR, -1, NOW()), "
+            "last_verified_at = TIMESTAMPADD(HOUR, -1, NOW()), "
+            "published_at = TIMESTAMPADD(DAY, -2, NOW()), "
+            "source_status = 'ok' WHERE id = ?",
+            {fresh});
+        pool->Execute(
+            "UPDATE jobs SET "
+            "last_seen_at = TIMESTAMPADD(DAY, -8, NOW()), "
+            "last_verified_at = TIMESTAMPADD(DAY, -8, NOW()), "
+            "published_at = TIMESTAMPADD(DAY, -30, NOW()), "
+            "source_status = 'ok' WHERE id = ?",
+            {stale});
+        pool->Execute(
+            "UPDATE jobs SET closed_at = NOW(), "
+            "source_status = 'closed' WHERE id = ?",
+            {closed});
+
+        JobSearchFilter filter;
+        filter.keyword = token;
+
+        const std::vector<JobSummary> visible =
+            dao->SearchJobs(filter, 20, 0);
+
+        ASSERT_EQ(visible.size(), 2U);
+        EXPECT_EQ(dao->CountJobs(filter), 2U);
+
+        bool sawFresh = false;
+        bool sawLegacy = false;
+
+        for (const JobSummary &job : visible)
+        {
+            EXPECT_NE(job.id, stale);
+            EXPECT_NE(job.id, closed);
+
+            if (job.id == fresh)
+            {
+                sawFresh = true;
+                ASSERT_TRUE(job.freshness.has_value());
+                EXPECT_EQ(
+                    job.freshness.value(),
+                    FreshnessState::kFresh);
+                ASSERT_TRUE(job.sourceStatus.has_value());
+                EXPECT_EQ(job.sourceStatus.value(), "ok");
+                EXPECT_TRUE(job.publishedAt.has_value());
+                EXPECT_TRUE(job.lastSeenAt.has_value());
+                EXPECT_TRUE(job.lastVerifiedAt.has_value());
+            }
+
+            if (job.id == legacy)
+            {
+                sawLegacy = true;
+                EXPECT_FALSE(job.freshness.has_value());
+                EXPECT_FALSE(job.lastSeenAt.has_value());
+                EXPECT_FALSE(job.publishedAt.has_value());
+                EXPECT_FALSE(job.createTime.empty());
+            }
+        }
+
+        EXPECT_TRUE(sawFresh);
+        EXPECT_TRUE(sawLegacy);
+
+        filter.includeStale = true;
+
+        const std::vector<JobSummary> withStale =
+            dao->SearchJobs(filter, 20, 0);
+
+        ASSERT_EQ(withStale.size(), 3U);
+        EXPECT_EQ(dao->CountJobs(filter), 3U);
+
+        bool sawStale = false;
+
+        for (const JobSummary &job : withStale)
+        {
+            EXPECT_NE(job.id, closed);
+
+            if (job.id == stale)
+            {
+                sawStale = true;
+                ASSERT_TRUE(job.freshness.has_value());
+                EXPECT_EQ(
+                    job.freshness.value(),
+                    FreshnessState::kStale);
+            }
+        }
+
+        EXPECT_TRUE(sawStale);
+
+        filter.postedWithinDays = std::uint32_t(7);
+
+        const std::vector<JobSummary> recent =
+            dao->SearchJobs(filter, 20, 0);
+
+        ASSERT_EQ(recent.size(), 1U);
+        EXPECT_EQ(recent.front().id, fresh);
+        EXPECT_EQ(dao->CountJobs(filter), 1U);
+
+        filter.postedWithinDays = std::uint32_t(31);
+
+        EXPECT_EQ(
+            dao->SearchJobs(filter, 20, 0).size(),
+            2U);
+    }
 } // namespace jobpilot::service

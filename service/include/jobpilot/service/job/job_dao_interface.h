@@ -8,6 +8,7 @@
 
 #include "jobpilot/database/mysql_pool.h"
 #include "jobpilot/service/job/job_search_filter.h"
+#include "jobpilot/service/job/source_observation.h"
 
 namespace jobpilot::service
 {
@@ -23,6 +24,14 @@ namespace jobpilot::service
         std::string source;
         std::string createTime;
         std::string updateTime;
+
+        // 0012 freshness projection. first_seen_at is createTime (ADR-0010).
+        // freshness is derived, never stored.
+        std::optional<std::string> publishedAt;
+        std::optional<std::string> lastSeenAt;
+        std::optional<std::string> lastVerifiedAt;
+        std::optional<std::string> sourceStatus;
+        std::optional<FreshnessState> freshness;
     };
 
     struct JobRequirement

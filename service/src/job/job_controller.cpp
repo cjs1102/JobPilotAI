@@ -261,6 +261,8 @@ namespace jobpilot::service
             bool hasSkill = false;
             bool hasPage = false;
             bool hasPageSize = false;
+            bool hasIncludeStale = false;
+            bool hasPostedWithinDays = false;
 
             std::size_t position = queryPosition + 1;
 
@@ -357,6 +359,34 @@ namespace jobpilot::service
 
                         hasSkill = true;
                         query->filter.skill = value;
+                    }
+                    else if (key == "include_stale")
+                    {
+                        if (hasIncludeStale ||
+                            (value != "true" &&
+                             value != "false"))
+                        {
+                            return false;
+                        }
+
+                        hasIncludeStale = true;
+                        query->filter.includeStale =
+                            (value == "true");
+                    }
+                    else if (key == "posted_within_days")
+                    {
+                        std::uint32_t days = 0;
+
+                        if (hasPostedWithinDays ||
+                            !ParseUnsigned32(
+                                value,
+                                &days))
+                        {
+                            return false;
+                        }
+
+                        hasPostedWithinDays = true;
+                        query->filter.postedWithinDays = days;
                     }
                     else if (key == "page")
                     {
@@ -489,7 +519,21 @@ namespace jobpilot::service
                  summary.salaryCurrency},
                 {"source", summary.source},
                 {"created_at", summary.createTime},
-                {"updated_at", summary.updateTime}};
+                {"updated_at", summary.updateTime},
+                {"posted_at",
+                 NullableString(summary.publishedAt)},
+                {"first_seen_at", summary.createTime},
+                {"last_seen_at",
+                 NullableString(summary.lastSeenAt)},
+                {"last_verified_at",
+                 NullableString(summary.lastVerifiedAt)},
+                {"freshness",
+                 summary.freshness.has_value()
+                     ? Json(ToString(
+                           summary.freshness.value()))
+                     : Json(nullptr)},
+                {"source_status",
+                 NullableString(summary.sourceStatus)}};
         }
 
         std::optional<std::uint64_t> AuthenticateRequest(

@@ -740,4 +740,139 @@ namespace jobpilot::service
                 .is_object());
     }
 
+    TEST_F(JobHttpTest, AppliesFreshnessVisibilityAndResponseFields)
+    {
+        const std::string token =
+            jobpilot::test::UniqueJobToken(
+                "job-http-freshness");
+
+        const std::uint64_t freshId =
+            jobpilot::test::InsertJob(
+                pool.get(),
+                "Fresh Co",
+                token + " fresh",
+                std::nullopt,
+                std::nullopt,
+                jobpilot::test::UniqueJobToken(
+                    "job-http-url"),
+                1,
+                "2026-10-01 10:00:00");
+        const std::uint64_t staleId =
+            jobpilot::test::InsertJob(
+                pool.get(),
+                "Stale Co",
+                token + " stale",
+                std::nullopt,
+                std::nullopt,
+                jobpilot::test::UniqueJobToken(
+                    "job-http-url"),
+                1,
+                "2026-10-01 10:00:00");
+        const std::uint64_t closedId =
+            jobpilot::test::InsertJob(
+                pool.get(),
+                "Closed Co",
+                token + " closed",
+                std::nullopt,
+                std::nullopt,
+                jobpilot::test::UniqueJobToken(
+                    "job-http-url"),
+                1,
+                "2026-10-01 10:00:00");
+
+        pool->Execute(
+            "UPDATE jobs SET "
+            "last_seen_at = TIMESTAMPADD(HOUR, -2, NOW()), "
+            "last_verified_at = TIMESTAMPADD(HOUR, -2, NOW()), "
+            "published_at = TIMESTAMPADD(DAY, -1, NOW()), "
+            "source_status = 'ok' WHERE id = ?",
+            {freshId});
+        pool->Execute(
+            "UPDATE jobs SET "
+            "last_seen_at = TIMESTAMPADD(DAY, -9, NOW()), "
+            "last_verified_at = TIMESTAMPADD(DAY, -9, NOW()), "
+            "published_at = TIMESTAMPADD(DAY, -40, NOW()), "
+            "source_status = 'ok' WHERE id = ?",
+            {staleId});
+        pool->Execute(
+            "UPDATE jobs SET closed_at = NOW(), "
+            "source_status = 'closed' WHERE id = ?",
+            {closedId});
+
+        const std::optional<HttpResponseData> defaultSearch =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token);
+
+        ASSERT_TRUE(defaultSearch.has_value());
+        ASSERT_TRUE(defaultSearch->hasJson);
+        EXPECT_EQ(defaultSearch->statusCode, 200);
+        EXPECT_EQ(
+            defaultSearch->jsonBody["data"]["total"],
+            1);
+        ASSERT_EQ(
+            defaultSearch->jsonBody["data"]["list"].size(),
+            1U);
+
+        const auto &item =
+            defaultSearch->jsonBody["data"]["list"][0];
+
+        EXPECT_EQ(item["id"], freshId);
+        EXPECT_EQ(item["freshness"], "fresh");
+        EXPECT_EQ(item["source_status"], "ok");
+        EXPECT_FALSE(item["posted_at"].is_null());
+        EXPECT_FALSE(item["first_seen_at"].is_null());
+        EXPECT_FALSE(item["last_seen_at"].is_null());
+        EXPECT_FALSE(item["last_verified_at"].is_null());
+
+        const std::optional<HttpResponseData> withStale =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token +
+                "&include_stale=true");
+
+        ASSERT_TRUE(withStale.has_value());
+        ASSERT_TRUE(withStale->hasJson);
+        EXPECT_EQ(withStale->statusCode, 200);
+        EXPECT_EQ(
+            withStale->jsonBody["data"]["total"],
+            2);
+
+        const std::optional<HttpResponseData> posted =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token +
+                "&include_stale=true&posted_within_days=7");
+
+        ASSERT_TRUE(posted.has_value());
+        ASSERT_TRUE(posted->hasJson);
+        EXPECT_EQ(posted->statusCode, 200);
+        EXPECT_EQ(
+            posted->jsonBody["data"]["total"],
+            1);
+        EXPECT_EQ(
+            posted->jsonBody["data"]["list"][0]["id"],
+            freshId);
+
+        const std::optional<HttpResponseData> invalidDays =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token +
+                "&posted_within_days=0");
+
+        ASSERT_TRUE(invalidDays.has_value());
+        ASSERT_TRUE(invalidDays->hasJson);
+        EXPECT_EQ(invalidDays->statusCode, 400);
+        EXPECT_EQ(invalidDays->jsonBody["code"], 10001);
+
+        const std::optional<HttpResponseData> invalidStale =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token +
+                "&include_stale=yes");
+
+        ASSERT_TRUE(invalidStale.has_value());
+        ASSERT_TRUE(invalidStale->hasJson);
+        EXPECT_EQ(invalidStale->statusCode, 400);
+        EXPECT_EQ(invalidStale->jsonBody["code"], 10001);
+
+        jobpilot::test::CleanupJob(pool.get(), freshId);
+        jobpilot::test::CleanupJob(pool.get(), staleId);
+        jobpilot::test::CleanupJob(pool.get(), closedId);
+    }
 } // namespace jobpilot::service

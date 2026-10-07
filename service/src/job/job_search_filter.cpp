@@ -12,6 +12,7 @@ namespace jobpilot::service
         constexpr std::size_t kMaxKeywordBytes = 128;
         constexpr std::size_t kMaxLocationBytes = 64;
         constexpr std::size_t kMaxSkillBytes = 64;
+        constexpr std::uint32_t kMaxPostedWithinDays = 3650;
 
         std::string Trim(
             const std::string &value)
@@ -93,6 +94,14 @@ namespace jobpilot::service
                 input.skill,
                 kMaxSkillBytes,
                 &result.skill))
+        {
+            return false;
+        }
+
+        if (result.postedWithinDays.has_value() &&
+            (result.postedWithinDays.value() < 1 ||
+             result.postedWithinDays.value() >
+                 kMaxPostedWithinDays))
         {
             return false;
         }

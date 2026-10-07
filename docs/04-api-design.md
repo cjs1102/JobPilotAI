@@ -287,6 +287,8 @@ GET /api/v1/jobs
   &salary_min=20
   &salary_max=35
   &skill=Redis
+  &include_stale=true
+  &posted_within_days=30
   &page=1
   &page_size=20
 ```
@@ -304,7 +306,13 @@ GET /api/v1/jobs
         "location": "深圳",
         "salary_min": 20,
         "salary_max": 35,
-        "source": "import"
+        "source": "import",
+        "posted_at": "2026-09-20 08:00:00",
+        "first_seen_at": "2026-09-21 10:00:00",
+        "last_seen_at": "2026-10-08 12:00:00",
+        "last_verified_at": "2026-10-08 12:00:00",
+        "freshness": "fresh",
+        "source_status": "ok"
       }
     ],
     "total": 42,
@@ -318,6 +326,21 @@ GET /api/v1/jobs
 - 使用薪资过滤时，未提供薪资区间的岗位不返回。
 - `skill` 为精确技能过滤，匹配 `job_requirements.skill`。
 - 公共搜索结果按 `create_time DESC, id DESC` 稳定排序。
+
+0012 Freshness 可见性与字段（Step 6 已生效）：
+
+- 默认可见性：`status = 1` **且** `closed_at IS NULL` **且**非 stale。
+- `stale` 判定：`last_seen_at` 早于 7 天（`fresh <= 24h`、`aging <= 7d`、`stale > 7d`）。
+- **没有观测记录的行（`last_seen_at IS NULL`，即 0012 之前的手工/导入岗位）不视为 stale，仍然可见**，
+  否则 0012 会让既有数据整批消失。
+- `include_stale=true` 时额外返回 stale 岗位；**已关闭岗位（`closed_at` 非空）始终不返回**。
+- `posted_within_days=N`（`1..3650`）按来源发布时间过滤：只返回
+  `published_at >= NOW() - N 天` 的岗位，**没有可靠 `published_at` 的岗位被排除**。
+- 新增响应字段：`posted_at`、`first_seen_at`（= `create_time`）、`last_seen_at`、
+  `last_verified_at`、`freshness`（`fresh`/`aging`/`stale`/`closed`，无观测时为 `null`）、
+  `source_status`。
+- `freshness` 与阈值都是**计算值，不落库**；`rule_v1` 排名公式不变，freshness 只作可见性信号。
+- 相同过滤与可见性规则同样作用于 `GET /api/v1/jobs/recommended`。
 
 ### 5.2 岗位详情
 
@@ -398,6 +421,8 @@ Authorization: Bearer <token>
 - `rule_v1` 权重：skill 55%、title 15%、salary 15%、location 10%、first_seen 5%。
 - 最多加载 2000 个候选岗位；超出时返回 `truncated=true`。
 - 不调用 LLM 或 Embedding。
+- 可见性规则与 5.1 相同：默认排除 `closed` 与 `stale`，支持 `include_stale` /
+  `posted_within_days`，响应条目同样带 `freshness` 等 0012 字段。
 
 ### 5.4 岗位内部导入
 
@@ -743,8 +768,9 @@ GET /health
 
 ### 10.2 Freshness 契约（0012）
 
-写入路径是 5.5 的 `/internal/jobs/source-sync`。公开响应字段在当前
-`GET /api/v1/jobs` 契约上扩展，**在 0012 落库并实现后才生效**：
+写入路径是 5.5 的 `/internal/jobs/source-sync`；公开响应字段与可见性规则已在
+0012 Step 6 对 `GET /api/v1/jobs` 与 `GET /api/v1/jobs/recommended` 生效
+（字段、默认过滤与 `include_stale` / `posted_within_days` 见 5.1）：
 
 ```text
 posted_at

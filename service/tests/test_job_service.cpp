@@ -33,6 +33,9 @@ namespace jobpilot::service
                 capturedSalaryMin = filter.salaryMin;
                 capturedSalaryMax = filter.salaryMax;
                 capturedSkill = filter.skill;
+                capturedIncludeStale = filter.includeStale;
+                capturedPostedWithinDays =
+                    filter.postedWithinDays;
                 capturedLimit = limit;
                 capturedOffset = offset;
                 return searchResults;
@@ -95,6 +98,8 @@ namespace jobpilot::service
             std::optional<std::uint32_t> capturedSalaryMin;
             std::optional<std::uint32_t> capturedSalaryMax;
             std::optional<std::string> capturedSkill;
+            bool capturedIncludeStale = false;
+            std::optional<std::uint32_t> capturedPostedWithinDays;
             std::size_t capturedLimit = 0;
             std::size_t capturedOffset = 0;
             std::uint64_t capturedJobId = 0;
@@ -273,5 +278,44 @@ namespace jobpilot::service
         EXPECT_EQ(
             service.GetJob(1).code,
             ErrorCode::kDatabaseError);
+    }
+    TEST(JobServiceTest, NormalizesFreshnessFilters)
+    {
+        FakeJobDao dao;
+        JobService service(dao);
+
+        JobSearchFilter filter;
+        filter.includeStale = true;
+        filter.postedWithinDays = std::uint32_t(7);
+
+        const ServiceResult<JobPage> result =
+            service.SearchJobs(filter, 1, 20);
+
+        ASSERT_EQ(result.code, ErrorCode::kSuccess);
+        EXPECT_TRUE(dao.capturedIncludeStale);
+        ASSERT_TRUE(
+            dao.capturedPostedWithinDays.has_value());
+        EXPECT_EQ(
+            dao.capturedPostedWithinDays.value(),
+            7U);
+        EXPECT_FALSE(dao.capturedKeyword.has_value());
+
+        JobSearchFilter zero;
+        zero.postedWithinDays = std::uint32_t(0);
+        EXPECT_EQ(
+            service.SearchJobs(zero, 1, 20).code,
+            ErrorCode::kInvalidParam);
+
+        JobSearchFilter tooLarge;
+        tooLarge.postedWithinDays = std::uint32_t(3651);
+        EXPECT_EQ(
+            service.SearchJobs(tooLarge, 1, 20).code,
+            ErrorCode::kInvalidParam);
+
+        JobSearchFilter limit;
+        limit.postedWithinDays = std::uint32_t(3650);
+        EXPECT_EQ(
+            service.SearchJobs(limit, 1, 20).code,
+            ErrorCode::kSuccess);
     }
 } // namespace jobpilot::service

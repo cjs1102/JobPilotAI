@@ -1,8 +1,9 @@
 # ExecPlan 0012: Job Source Adapter + Freshness
 
-> Status: Research, Design, and Planning complete. Steps 1-5 (Schema migration,
+> Status: Research, Design, and Planning complete. Steps 1-6 (Schema migration,
 > Source observation domain, Source Sync DAO, Source Sync Service, Internal
-> Source Sync API) implemented; Step 6 onward not started.
+> Source Sync API, Search freshness integration) implemented; Step 7 onward not
+> started.
 >
 > Task level: L4.
 
@@ -578,7 +579,7 @@ Stop and return to design if:
 - [x] Source Sync DAO
 - [x] Source Sync Service
 - [x] Internal Source Sync API
-- [ ] Search freshness integration
+- [x] Search freshness integration
 - [ ] Python source adapters
 - [ ] End-to-end integration
 - [ ] Documentation
@@ -617,6 +618,14 @@ Implementation decisions (keep later steps consistent):
   must equal the observation `source`. Success returns the bare counter object
   `{created,updated,seen,closed,complete}`; errors use the `{code,message,data}`
   envelope like `/internal/jobs/import`.
+- Public search visibility lives in the shared `BuildJobFilter`, so public search
+  and `rule_v1` ranking apply the same rules: `status=1 AND closed_at IS NULL`,
+  plus stale exclusion unless `include_stale=true`. Rows without an observation
+  (`last_seen_at IS NULL`, i.e. pre-0012 manual/import jobs) are **not** stale
+  and stay visible; hiding them would mass-hide existing data.
+- `posted_within_days` (1..3650) requires `published_at IS NOT NULL`; freshness
+  is derived in the DAO projection via `ClassifyFreshness` from
+  `TIMESTAMPDIFF(SECOND, last_seen_at, NOW())` plus `closed_at`.
 
 ## 19. Rejected Alternatives
 

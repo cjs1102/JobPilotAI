@@ -105,6 +105,26 @@ namespace jobpilot::service
                 result);
         }
 
+        std::int64_t ParseInt64(
+            const jobpilot::core::Result::Value &value,
+            const std::string &field)
+        {
+            const std::string text =
+                RequireValue(value, field);
+
+            std::size_t parsed = 0;
+            const long long result =
+                std::stoll(text, &parsed);
+
+            if (parsed != text.size())
+            {
+                throw std::runtime_error(
+                    field + " contains invalid characters");
+            }
+
+            return static_cast<std::int64_t>(result);
+        }
+
         std::string EscapeLikeLiteral(
             const std::string &value)
         {
@@ -130,7 +150,33 @@ namespace jobpilot::service
             const JobSearchFilter &filter)
         {
             JobFilter result;
-            result.sql = " WHERE j.status = 1";
+            result.sql =
+                " WHERE j.status = 1 AND j.closed_at IS NULL";
+
+            if (!filter.includeStale)
+            {
+                // Legacy rows without an observation stay visible (ADR-0010
+                // section 8); only rows observed longer ago than the aging
+                // window count as stale.
+                result.sql +=
+                    " AND (j.last_seen_at IS NULL "
+                    "OR j.last_seen_at >= "
+                    "TIMESTAMPADD(SECOND, ?, NOW()))";
+                result.params.emplace_back(
+                    static_cast<std::int64_t>(
+                        -kAgingMaxAgeSeconds));
+            }
+
+            if (filter.postedWithinDays.has_value())
+            {
+                result.sql +=
+                    " AND j.published_at IS NOT NULL "
+                    "AND j.published_at >= "
+                    "TIMESTAMPADD(DAY, ?, NOW())";
+                result.params.emplace_back(
+                    -static_cast<std::int64_t>(
+                        filter.postedWithinDays.value()));
+            }
 
             if (filter.location.has_value())
             {
@@ -195,7 +241,7 @@ namespace jobpilot::service
         JobSummary MakeJobSummary(
             const jobpilot::core::Result::Row &row)
         {
-            if (row.size() != 10)
+            if (row.size() != 16)
             {
                 throw std::runtime_error(
                     "job query returned an unexpected column count");
@@ -241,6 +287,41 @@ namespace jobpilot::service
             summary.updateTime =
                 RequireValue(row[9], "jobs.update_time");
 
+            if (row[10].has_value())
+            {
+                summary.publishedAt = row[10].value();
+            }
+
+            if (row[11].has_value())
+            {
+                summary.lastSeenAt = row[11].value();
+            }
+
+            if (row[12].has_value())
+            {
+                summary.lastVerifiedAt = row[12].value();
+            }
+
+            if (row[13].has_value())
+            {
+                summary.sourceStatus = row[13].value();
+            }
+
+            const bool closed = row[14].has_value();
+
+            std::optional<std::int64_t> ageSeconds;
+
+            if (row[15].has_value())
+            {
+                ageSeconds =
+                    ParseInt64(
+                        row[15],
+                        "jobs.last_seen_age_seconds");
+            }
+
+            summary.freshness =
+                ClassifyFreshness(closed, ageSeconds);
+
             return summary;
         }
     } // namespace
@@ -270,7 +351,10 @@ namespace jobpilot::service
             pool_.Query(
                 "SELECT j.id, j.company, j.title, j.location, "
                 "j.salary_min, j.salary_max, j.salary_currency, "
-                "j.source, j.create_time, j.update_time "
+                "j.source, j.create_time, j.update_time, "
+                "j.published_at, j.last_seen_at, j.last_verified_at, "
+                "j.source_status, j.closed_at, "
+                "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()) "
                 "FROM jobs j" +
                     sqlFilter.sql +
                     " ORDER BY j.create_time DESC, j.id DESC "
@@ -331,7 +415,10 @@ namespace jobpilot::service
             pool_.Query(
                 "SELECT j.id, j.company, j.title, j.location, "
                 "j.salary_min, j.salary_max, j.salary_currency, "
-                "j.source, j.create_time, j.update_time "
+                "j.source, j.create_time, j.update_time, "
+                "j.published_at, j.last_seen_at, j.last_verified_at, "
+                "j.source_status, j.closed_at, "
+                "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()) "
                 "FROM jobs j" +
                     sqlFilter.sql +
                     " ORDER BY j.create_time DESC, j.id DESC "
@@ -469,6 +556,9 @@ namespace jobpilot::service
                 "SELECT id, company, title, location, "
                 "salary_min, salary_max, salary_currency, "
                 "source, create_time, update_time, "
+                "published_at, last_seen_at, last_verified_at, "
+                "source_status, closed_at, "
+                "TIMESTAMPDIFF(SECOND, last_seen_at, NOW()), "
                 "description, source_url, status "
                 "FROM jobs "
                 "WHERE id = ? AND status = 1 "
@@ -482,7 +572,7 @@ namespace jobpilot::service
 
         const auto &row = result.row(0);
 
-        if (row.size() != 13)
+        if (row.size() != 19)
         {
             throw std::runtime_error(
                 "job detail query returned an unexpected column count");
@@ -493,20 +583,20 @@ namespace jobpilot::service
             MakeJobSummary(
                 jobpilot::core::Result::Row(
                     row.begin(),
-                    row.begin() + 10));
+                    row.begin() + 16));
 
-        if (row[10].has_value())
+        if (row[16].has_value())
         {
-            detail.description = row[10].value();
+            detail.description = row[16].value();
         }
 
-        if (row[11].has_value())
+        if (row[17].has_value())
         {
-            detail.sourceUrl = row[11].value();
+            detail.sourceUrl = row[17].value();
         }
 
         detail.status =
-            ParseInt32(row[12], "jobs.status");
+            ParseInt32(row[18], "jobs.status");
 
         return detail;
     }

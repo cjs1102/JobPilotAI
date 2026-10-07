@@ -114,13 +114,22 @@ CREATE TABLE jobs (
     source         VARCHAR(32)  NOT NULL DEFAULT 'manual' COMMENT 'manual/import/crawler',
     source_url     VARCHAR(255) DEFAULT NULL COMMENT '来源链接(去重键)',
     status         TINYINT      NOT NULL DEFAULT 1 COMMENT '1有效 0下线',
+    source_scope   VARCHAR(128) DEFAULT NULL COMMENT '来源 board/scope 标识(0012)',
+    external_id    VARCHAR(255) DEFAULT NULL COMMENT '来源侧岗位ID(0012)',
+    published_at   DATETIME     DEFAULT NULL COMMENT '来源发布时间(0012)',
+    last_seen_at   DATETIME     DEFAULT NULL COMMENT '最近一次完整观测到的时间(0012)',
+    last_verified_at DATETIME   DEFAULT NULL COMMENT '最近一次存活校验时间(0012)',
+    closed_at      DATETIME     DEFAULT NULL COMMENT '软关闭时间(0012)',
+    missing_count  INT          NOT NULL DEFAULT 0 COMMENT '连续完整观测缺失次数(0012)',
+    source_status  VARCHAR(32)  NOT NULL DEFAULT 'unknown' COMMENT 'unknown/ok/missing/closed(0012)',
     create_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_source_url (source_url),
     KEY idx_company (company),
     KEY idx_title (title),
     KEY idx_location (location),
-    KEY idx_status (status)
+    KEY idx_status (status),
+    KEY idx_source_scope_status (source, source_scope, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='岗位';
 
 CREATE TABLE job_requirements (
@@ -213,7 +222,7 @@ CREATE TABLE notifications (
 | users | 按 email 登录 | `uk_email` |
 | profiles | 按 user 查画像 | `uk_user_id` |
 | applications | 按用户×状态列表 | `idx_user_status` |
-| jobs | 按公司/地点/状态过滤 | `idx_company` `idx_location` `idx_status` |
+| jobs | 按公司/地点/状态过滤；按来源 scope 观测 | `idx_company` `idx_location` `idx_status` `idx_source_scope_status` |
 | ai_tasks | 用户查任务 + Worker 捞待办 | `idx_user_status` `idx_status` |
 | notifications | 用户查未读 | `idx_user_status` |
 
@@ -228,14 +237,16 @@ CREATE TABLE notifications (
 ## 7. 0012 Additive Freshness Migration Contract（增量契约）
 
 本节登记 0012 Job Source Adapter + Freshness 的**增量字段契约**。
-`database/schema/*.sql` **当前不修改**；实际迁移在 0012 Step 1 落地，落地时再
-同步本节与 `database/schema/03_job.sql`。
+该契约已作为 0012 Step 1 落地：列与索引已写入 §3 建表 DDL 与
+`database/schema/03_job.sql`（新库由初始化脚本直接创建）。
 
 对齐来源：
 [`exec-plans/active/0012-job-source-adapter-freshness.md`](exec-plans/active/0012-job-source-adapter-freshness.md) §8
 与 [`adr/0010-job-freshness-and-lifecycle.md`](adr/0010-job-freshness-and-lifecycle.md)。
 
-### 7.1 `jobs` 新增列
+### 7.1 `jobs` 新增列（已落地）
+
+已写入 §3 建表 DDL 与 `database/schema/03_job.sql`：
 
 ```sql
 source_scope      VARCHAR(128) NULL
@@ -248,7 +259,7 @@ missing_count     INT NOT NULL DEFAULT 0
 source_status     VARCHAR(32) NOT NULL DEFAULT 'unknown'
 ```
 
-建议索引：
+已建索引：
 
 ```sql
 KEY idx_source_scope_status (source, source_scope, status)
@@ -266,9 +277,30 @@ KEY idx_source_scope_status (source, source_scope, status)
 - **不引入** Canonical Job / JobSource / 多源 alias 拆分；当前 `jobs` 行仍是
   唯一规范行。
 
-### 7.3 实施顺序
+### 7.3 既有库升级
 
-1. 0012 Step 1：更新本节 DDL 与 `database/schema/03_job.sql`。
+`database/schema/*.sql` 使用 `CREATE TABLE IF NOT EXISTS`，对已存在的库不会自动
+加列。既有自建库按下述**增量 ALTER** 升级；重复执行会报 duplicate column，
+属预期行为，运维侧跳过即可：
+
+```sql
+ALTER TABLE jobs
+    ADD COLUMN source_scope      VARCHAR(128) DEFAULT NULL COMMENT '来源 board/scope 标识(0012)',
+    ADD COLUMN external_id       VARCHAR(255) DEFAULT NULL COMMENT '来源侧岗位ID(0012)',
+    ADD COLUMN published_at      DATETIME     DEFAULT NULL COMMENT '来源发布时间(0012)',
+    ADD COLUMN last_seen_at      DATETIME     DEFAULT NULL COMMENT '最近一次完整观测到的时间(0012)',
+    ADD COLUMN last_verified_at  DATETIME     DEFAULT NULL COMMENT '最近一次存活校验时间(0012)',
+    ADD COLUMN closed_at         DATETIME     DEFAULT NULL COMMENT '软关闭时间(0012)',
+    ADD COLUMN missing_count     INT          NOT NULL DEFAULT 0 COMMENT '连续完整观测缺失次数(0012)',
+    ADD COLUMN source_status     VARCHAR(32)  NOT NULL DEFAULT 'unknown' COMMENT 'unknown/ok/missing/closed(0012)',
+    ADD KEY idx_source_scope_status (source, source_scope, status);
+```
+
+既有行无需回填：`missing_count` 取默认 `0`，`source_status` 取 `'unknown'`。
+
+### 7.4 实施顺序
+
+1. [x] 0012 Step 1：列与索引已写入 §3 DDL 与 `database/schema/03_job.sql`。
 2. 再实现 Source Observation 领域模型与 Source Sync DAO / Service / API
    （写入路径 `POST /internal/jobs/source-sync`，见 `docs/04` §5.5）。
 3. 迁移落地后，`docs/04` §10.2 的 freshness 公开响应字段才生效。

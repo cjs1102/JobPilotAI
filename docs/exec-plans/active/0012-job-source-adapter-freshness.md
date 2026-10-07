@@ -1,6 +1,8 @@
 # ExecPlan 0012: Job Source Adapter + Freshness
 
-> Status: Research, Design, and Planning complete. Implementation not started.
+> Status: Research, Design, and Planning complete. Steps 1-3 (Schema migration,
+> Source observation domain, Source Sync DAO) implemented; Step 4 onward not
+> started.
 >
 > Task level: L4.
 
@@ -571,9 +573,9 @@ Stop and return to design if:
 - [x] Capability Check
 - [x] Design
 - [x] ExecPlan
-- [ ] Schema migration
-- [ ] Source observation domain
-- [ ] Source Sync DAO
+- [x] Schema migration
+- [x] Source observation domain
+- [x] Source Sync DAO
 - [ ] Source Sync Service
 - [ ] Internal Source Sync API
 - [ ] Search freshness integration
@@ -581,6 +583,30 @@ Stop and return to design if:
 - [ ] End-to-end integration
 - [ ] Documentation
 - [ ] L4 verification
+
+Implementation decisions (keep later steps consistent):
+
+- `source-sync` requires a top-level `source` in {greenhouse, lever, ashby} and
+  every job's `job.source` must equal it.
+- Batch limits: `complete=true` -> `0..200`; `complete=false` -> `1..200`.
+- The 48h grace in section 9 is measured since `last_seen_at` (ADR-0010 section 3
+  wording wins over "observation age"); closure is `missing_count >= 2` OR
+  `secondsSinceLastSeen` strictly greater than 48h.
+- Freshness is computed, never stored: `fresh <= 24h`, `aging <= 7d`, else
+  `stale`; `closed_at` set -> `closed`.
+- Legacy rows without `last_seen_at` have no freshness classification; the
+  public search policy for that case belongs to the search step.
+- `CloseUnseenForScope` takes the `MissingPolicy` as a parameter so the business
+  policy stays in the Service layer; the DAO only runs the mark-missing-then-close
+  SQL for its own `(source, source_scope)`.
+- `ApplyObservation` sets `last_seen_at`/`last_verified_at = observedAt`, resets
+  `missing_count`/`closed_at`, and sets `source_status='ok'` with `status=1`
+  (reopen).
+- `published_at`/`external_id` use `COALESCE(VALUES(...), <existing>)` so a fetch
+  that omits them never erases an already observed fact.
+- `CloseUnseenForScope` is additionally a no-op unless `complete=true` (defense
+  in depth on top of the Service check); already closed rows are not counted
+  again.
 
 ## 19. Rejected Alternatives
 

@@ -53,6 +53,47 @@ namespace
         return value.value();
     }
 
+    std::string OptionalValue(
+        const jobpilot::core::Result::Value &value)
+    {
+        if (!value.has_value())
+        {
+            return std::string();
+        }
+
+        return value.value();
+    }
+
+    struct ColumnContract
+    {
+        std::string nullable;
+        std::string defaultValue;
+    };
+
+    std::map<std::string, ColumnContract> LoadJobColumns(
+        jobpilot::core::ConnectionPool &pool,
+        const std::string &database)
+    {
+        const jobpilot::core::Result result =
+            pool.Query(
+                "SELECT column_name, is_nullable, column_default "
+                "FROM information_schema.columns "
+                "WHERE table_schema = ? AND table_name = 'jobs'",
+                {database});
+
+        std::map<std::string, ColumnContract> columns;
+
+        for (std::size_t row = 0; row < result.rowCount(); ++row)
+        {
+            columns[RequireValue(result.value(row, 0))] =
+                ColumnContract{
+                    RequireValue(result.value(row, 1)),
+                    OptionalValue(result.value(row, 2))};
+        }
+
+        return columns;
+    }
+
     jobpilot::core::ConnectionPool MakePool()
     {
         const char *password = std::getenv("MYSQL_PASSWORD");
@@ -230,5 +271,119 @@ namespace
         EXPECT_NE(
             indexes["applications"].find("uk_user_job"),
             indexes["applications"].end());
+    }
+
+    TEST_F(SchemaTest, CreatesFreshnessObservationColumns)
+    {
+        const std::map<std::string, ColumnContract> columns =
+            LoadJobColumns(pool, database);
+
+        const std::vector<std::string> optionalColumns = {
+            "source_scope",
+            "external_id",
+            "published_at",
+            "last_seen_at",
+            "last_verified_at",
+            "closed_at"};
+
+        for (const std::string &name : optionalColumns)
+        {
+            const auto found = columns.find(name);
+
+            ASSERT_NE(found, columns.end()) << name;
+            EXPECT_EQ(found->second.nullable, "YES") << name;
+        }
+
+        const auto missingCount = columns.find("missing_count");
+
+        ASSERT_NE(missingCount, columns.end());
+        EXPECT_EQ(missingCount->second.nullable, "NO");
+        EXPECT_EQ(missingCount->second.defaultValue, "0");
+
+        const auto sourceStatus = columns.find("source_status");
+
+        ASSERT_NE(sourceStatus, columns.end());
+        EXPECT_EQ(sourceStatus->second.nullable, "NO");
+        EXPECT_EQ(sourceStatus->second.defaultValue, "unknown");
+    }
+
+    TEST_F(SchemaTest, CreatesSourceScopeStatusIndex)
+    {
+        const jobpilot::core::Result result =
+            pool.Query(
+                "SELECT non_unique, seq_in_index, column_name "
+                "FROM information_schema.statistics "
+                "WHERE table_schema = ? AND table_name = 'jobs' "
+                "AND index_name = 'idx_source_scope_status' "
+                "ORDER BY seq_in_index",
+                {database});
+
+        ASSERT_EQ(result.rowCount(), 3U);
+
+        EXPECT_EQ(RequireValue(result.value(0, 0)), "1");
+        EXPECT_EQ(RequireValue(result.value(0, 1)), "1");
+        EXPECT_EQ(RequireValue(result.value(0, 2)), "source");
+        EXPECT_EQ(RequireValue(result.value(1, 1)), "2");
+        EXPECT_EQ(RequireValue(result.value(1, 2)), "source_scope");
+        EXPECT_EQ(RequireValue(result.value(2, 1)), "3");
+        EXPECT_EQ(RequireValue(result.value(2, 2)), "status");
+    }
+
+    TEST_F(SchemaTest, SourceUrlUniquenessIsUnchanged)
+    {
+        const jobpilot::core::Result result =
+            pool.Query(
+                "SELECT non_unique, column_name "
+                "FROM information_schema.statistics "
+                "WHERE table_schema = ? AND table_name = 'jobs' "
+                "AND index_name = 'uk_source_url' "
+                "ORDER BY seq_in_index",
+                {database});
+
+        ASSERT_EQ(result.rowCount(), 1U);
+        EXPECT_EQ(RequireValue(result.value(0, 0)), "0");
+        EXPECT_EQ(RequireValue(result.value(0, 1)), "source_url");
+    }
+
+    TEST_F(SchemaTest, LegacyJobRowReadsWithFreshnessDefaults)
+    {
+        const std::string url =
+            "https://schema-test.invalid/jobs/0012-freshness-defaults";
+
+        pool.Execute(
+            "DELETE FROM jobs WHERE source_url = ?",
+            {url});
+
+        pool.Execute(
+            "INSERT INTO jobs (company, title, source, source_url) "
+            "VALUES (?, ?, ?, ?)",
+            {
+                std::string("schema-test"),
+                std::string("freshness defaults"),
+                std::string("manual"),
+                url,
+            });
+
+        const jobpilot::core::Result result =
+            pool.Query(
+                "SELECT status, missing_count, source_status, "
+                "source_scope, last_seen_at, closed_at "
+                "FROM jobs WHERE source_url = ?",
+                {url});
+
+        ASSERT_EQ(result.rowCount(), 1U);
+        EXPECT_EQ(RequireValue(result.value(0, 0)), "1");
+        EXPECT_EQ(RequireValue(result.value(0, 1)), "0");
+        EXPECT_EQ(RequireValue(result.value(0, 2)), "unknown");
+        EXPECT_FALSE(result.value(0, 3).has_value());
+        EXPECT_FALSE(result.value(0, 4).has_value());
+        EXPECT_FALSE(result.value(0, 5).has_value());
+
+        const jobpilot::core::ExecutionResult cleanup =
+            pool.Execute(
+                "DELETE FROM jobs WHERE source_url = ?",
+                {url});
+
+        EXPECT_EQ(cleanup.affectedRows, 1U);
     }
 }

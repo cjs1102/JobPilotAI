@@ -12,13 +12,22 @@ CREATE TABLE IF NOT EXISTS jobs (
     source           VARCHAR(32)  NOT NULL DEFAULT 'manual' COMMENT 'manual/import/crawler',
     source_url       VARCHAR(255) DEFAULT NULL COMMENT '来源链接(去重键)',
     status           TINYINT      NOT NULL DEFAULT 1 COMMENT '1有效 0下线',
+    source_scope     VARCHAR(128) DEFAULT NULL COMMENT '来源 board/scope 标识(0012)',
+    external_id      VARCHAR(255) DEFAULT NULL COMMENT '来源侧岗位ID(0012)',
+    published_at     DATETIME     DEFAULT NULL COMMENT '来源发布时间(0012)',
+    last_seen_at     DATETIME     DEFAULT NULL COMMENT '最近一次完整观测到的时间(0012)',
+    last_verified_at DATETIME     DEFAULT NULL COMMENT '最近一次存活校验时间(0012)',
+    closed_at        DATETIME     DEFAULT NULL COMMENT '软关闭时间(0012)',
+    missing_count    INT          NOT NULL DEFAULT 0 COMMENT '连续完整观测缺失次数(0012)',
+    source_status    VARCHAR(32)  NOT NULL DEFAULT 'unknown' COMMENT 'unknown/ok/missing/closed(0012)',
     create_time      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_source_url (source_url),
     KEY idx_company (company),
     KEY idx_title (title),
     KEY idx_location (location),
-    KEY idx_status (status)
+    KEY idx_status (status),
+    KEY idx_source_scope_status (source, source_scope, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='岗位';
 
 CREATE TABLE IF NOT EXISTS job_requirements (

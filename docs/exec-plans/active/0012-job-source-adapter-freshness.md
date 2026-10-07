@@ -1,8 +1,8 @@
 # ExecPlan 0012: Job Source Adapter + Freshness
 
-> Status: Research, Design, and Planning complete. Steps 1-3 (Schema migration,
-> Source observation domain, Source Sync DAO) implemented; Step 4 onward not
-> started.
+> Status: Research, Design, and Planning complete. Steps 1-4 (Schema migration,
+> Source observation domain, Source Sync DAO, Source Sync Service) implemented;
+> Step 5 onward not started.
 >
 > Task level: L4.
 
@@ -576,7 +576,7 @@ Stop and return to design if:
 - [x] Schema migration
 - [x] Source observation domain
 - [x] Source Sync DAO
-- [ ] Source Sync Service
+- [x] Source Sync Service
 - [ ] Internal Source Sync API
 - [ ] Search freshness integration
 - [ ] Python source adapters
@@ -607,6 +607,10 @@ Implementation decisions (keep later steps consistent):
 - `CloseUnseenForScope` is additionally a no-op unless `complete=true` (defense
   in depth on top of the Service check); already closed rows are not counted
   again.
+- `SourceSyncService::Sync` validates first, then opens exactly one transaction,
+  always calls `ApplyObservation`, and calls `CloseUnseenForScope` only when
+  `complete=true`. It uses `MissingPolicy{}` defaults until per-source
+  thresholds exist.
 
 ## 19. Rejected Alternatives
 

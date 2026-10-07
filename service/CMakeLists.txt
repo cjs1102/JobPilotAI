@@ -32,6 +32,7 @@ add_library(jobpilot_service_core STATIC
     src/job/job_service.cpp
     src/job/source_observation.cpp
     src/job/source_sync_dao.cpp
+    src/job/source_sync_service.cpp
     src/resume/resume_controller.cpp
     src/resume/resume_dao.cpp
     src/resume/resume_service.cpp
@@ -250,6 +251,18 @@ target_link_libraries(
 )
 
 add_executable(
+    test_source_sync_service
+    tests/test_source_sync_service.cpp
+)
+
+target_link_libraries(
+    test_source_sync_service
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
     test_job_http
     tests/test_job_http.cpp
 )
@@ -417,6 +430,12 @@ gtest_discover_tests(
 
 gtest_discover_tests(
     test_source_sync_dao
+    PROPERTIES
+        LABELS "job;external;integration"
+)
+
+gtest_discover_tests(
+    test_source_sync_service
     PROPERTIES
         LABELS "job;external;integration"
 )

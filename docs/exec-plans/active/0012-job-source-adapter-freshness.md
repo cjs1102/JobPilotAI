@@ -1,9 +1,9 @@
 # ExecPlan 0012: Job Source Adapter + Freshness
 
-> Status: Research, Design, and Planning complete. Steps 1-7 (Schema migration,
+> Status: Research, Design, and Planning complete. Steps 1-8 (Schema migration,
 > Source observation domain, Source Sync DAO, Source Sync Service, Internal
-> Source Sync API, Search freshness integration, Python source adapters)
-> implemented; Step 8 onward not started.
+> Source Sync API, Search freshness integration, Python source adapters,
+> End-to-end integration) implemented; Step 9 onward not started.
 >
 > Task level: L4.
 
@@ -581,7 +581,7 @@ Stop and return to design if:
 - [x] Internal Source Sync API
 - [x] Search freshness integration
 - [x] Python source adapters
-- [ ] End-to-end integration
+- [x] End-to-end integration
 - [ ] Documentation
 - [ ] L4 verification
 
@@ -643,6 +643,14 @@ Implementation decisions (keep later steps consistent):
   expose no structured skills, so `requirements` stays empty (section 6).
 - A guard test asserts the adapter package has no database-driver imports, no
   SQL statements, and no third-party dependency besides PyYAML.
+- `test_source_sync_e2e` covers the whole loop in one test: adapter-shaped
+  payload -> `/internal/jobs/source-sync` -> public search visibility (with the
+  0012 fields and the adapter `published_at`) -> `posted_within_days` filtering
+  -> first complete absence (missing, still visible) -> second absence (closed,
+  hidden) -> reappearance (reopen, visible) -> stale observation hidden by
+  default and visible with `include_stale=true`. All timestamps come from MySQL
+  `NOW()` so the test never depends on the wall clock, and no live ATS API is
+  contacted.
 
 ## 19. Rejected Alternatives
 

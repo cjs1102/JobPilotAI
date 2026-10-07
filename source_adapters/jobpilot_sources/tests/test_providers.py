@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime
 
 from jobpilot_sources.providers import (
     BoardResult,
@@ -241,6 +242,61 @@ class DispatchTest(unittest.TestCase):
     def test_unknown_provider_raises(self) -> None:
         with self.assertRaises(ProviderError):
             provider_module("workday")
+
+
+class AdapterContractTest(unittest.TestCase):
+    """The adapter payload must satisfy the C++ internal API contract."""
+
+    REQUIRED = {"company", "title", "source", "source_url"}
+    ALLOWED = REQUIRED | {
+        "requirements",
+        "location",
+        "description",
+        "external_id",
+        "published_at",
+        "salary_min",
+        "salary_max",
+        "salary_currency",
+    }
+
+    def test_every_provider_job_matches_the_platform_contract(self) -> None:
+        cases = (
+            (greenhouse, "greenhouse_board.json", "gitlab", "GitLab"),
+            (lever, "lever_postings.json", "leverdemo", "Lever Demo"),
+            (ashby, "ashby_board.json", "ramp", "Ramp"),
+        )
+
+        for module, fixture, board_name, company in cases:
+            board = module.parse_board(
+                load_fixture(fixture),
+                board=board_name,
+                company=company,
+            )
+
+            self.assertTrue(board.jobs, module.PROVIDER)
+
+            for job in board.jobs:
+                self.assertTrue(
+                    self.REQUIRED <= set(job),
+                    job,
+                )
+                self.assertTrue(
+                    set(job) <= self.ALLOWED,
+                    job,
+                )
+                self.assertIsInstance(job["requirements"], list)
+                self.assertEqual(job["source"], module.PROVIDER)
+
+                for key in ("company", "title", "source", "source_url"):
+                    self.assertIsInstance(job[key], str)
+                    self.assertTrue(job[key].strip(), job)
+
+                if "published_at" in job:
+                    # The internal API accepts the DB datetime text form only.
+                    datetime.strptime(
+                        job["published_at"],
+                        "%Y-%m-%d %H:%M:%S",
+                    )
 
 
 if __name__ == "__main__":

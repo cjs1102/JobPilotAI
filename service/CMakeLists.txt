@@ -276,6 +276,18 @@ target_link_libraries(
 )
 
 add_executable(
+    test_source_sync_e2e
+    tests/test_source_sync_e2e.cpp
+)
+
+target_link_libraries(
+    test_source_sync_e2e
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
     test_job_http
     tests/test_job_http.cpp
 )
@@ -455,6 +467,12 @@ gtest_discover_tests(
 
 gtest_discover_tests(
     test_source_sync_http
+    PROPERTIES
+        LABELS "job;integration"
+)
+
+gtest_discover_tests(
+    test_source_sync_e2e
     PROPERTIES
         LABELS "job;integration"
 )

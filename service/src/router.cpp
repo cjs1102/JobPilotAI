@@ -60,6 +60,66 @@ namespace jobpilot::service
 
         router.RegisterRoute(
             jobpilot::core::HttpMethod::kGet,
+            "/api/v1/users/profile",
+            [userController](
+                const jobpilot::core::HttpRequest &request,
+                jobpilot::core::HttpResponse &response)
+            {
+                userController->GetProfile(
+                    request,
+                    response);
+            });
+
+        router.RegisterRoute(
+            jobpilot::core::HttpMethod::kPut,
+            "/api/v1/users/profile",
+            [userController](
+                const jobpilot::core::HttpRequest &request,
+                jobpilot::core::HttpResponse &response)
+            {
+                userController->UpdateProfile(
+                    request,
+                    response);
+            });
+
+        router.RegisterRoute(
+            jobpilot::core::HttpMethod::kGet,
+            "/api/v1/users/skills",
+            [userController](
+                const jobpilot::core::HttpRequest &request,
+                jobpilot::core::HttpResponse &response)
+            {
+                userController->ListSkills(
+                    request,
+                    response);
+            });
+
+        router.RegisterRoute(
+            jobpilot::core::HttpMethod::kPost,
+            "/api/v1/users/skills",
+            [userController](
+                const jobpilot::core::HttpRequest &request,
+                jobpilot::core::HttpResponse &response)
+            {
+                userController->CreateSkill(
+                    request,
+                    response);
+            });
+
+        router.RegisterRoute(
+            jobpilot::core::HttpMethod::kDelete,
+            "/api/v1/users/skills/{id}",
+            [userController](
+                const jobpilot::core::HttpRequest &request,
+                jobpilot::core::HttpResponse &response)
+            {
+                userController->DeleteSkill(
+                    request,
+                    response);
+            });
+
+        router.RegisterRoute(
+            jobpilot::core::HttpMethod::kGet,
             "/health",
             [](const jobpilot::core::HttpRequest &request,
                jobpilot::core::HttpResponse &response)

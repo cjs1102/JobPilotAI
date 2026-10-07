@@ -9,8 +9,10 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <netinet/in.h>
@@ -399,6 +401,62 @@ namespace jobpilot::service
             return email;
         }
 
+        std::pair<std::uint64_t, std::string>
+        RegisterAndLogin(
+            const std::string &prefix)
+        {
+            const std::string email =
+                TrackEmail(prefix);
+
+            const nlohmann::json registerBody{
+                {"username", "tom"},
+                {"email", email},
+                {"password", "password"}};
+
+            const std::optional<HttpResponseData> registration =
+                SendRequest(
+                    "POST",
+                    "/api/v1/users/register",
+                    registerBody.dump());
+
+            if (!registration.has_value() ||
+                !registration->hasJson ||
+                registration->statusCode != 200)
+            {
+                throw std::runtime_error(
+                    "registration failed");
+            }
+
+            const nlohmann::json loginBody{
+                {"email", email},
+                {"password", "password"}};
+
+            const std::optional<HttpResponseData> login =
+                SendRequest(
+                    "POST",
+                    "/api/v1/users/login",
+                    loginBody.dump());
+
+            if (!login.has_value() ||
+                !login->hasJson ||
+                login->statusCode != 200)
+            {
+                throw std::runtime_error(
+                    "login failed");
+            }
+
+            const std::string token =
+                login->jsonBody["data"]["token"]
+                    .get<std::string>();
+
+            tokens.push_back(token);
+
+            return {
+                registration->jsonBody["data"]["user_id"]
+                    .get<std::uint64_t>(),
+                token};
+        }
+
         ServerState state;
         std::thread serverThread;
 
@@ -563,5 +621,233 @@ namespace jobpilot::service
 
         ASSERT_TRUE(notFound.has_value());
         EXPECT_EQ(notFound->statusCode, 404);
+    }
+
+    TEST_F(UserHttpTest, ManagesProfileAndSkillsWithOwnership)
+    {
+        const auto firstUser =
+            RegisterAndLogin("http-profile-first");
+
+        const auto secondUser =
+            RegisterAndLogin("http-profile-second");
+
+        const std::string firstAuthorization =
+            "Bearer " + firstUser.second;
+
+        const std::optional<HttpResponseData> emptyProfile =
+            SendRequest(
+                "GET",
+                "/api/v1/users/profile",
+                "",
+                firstAuthorization);
+
+        ASSERT_TRUE(emptyProfile.has_value());
+        ASSERT_TRUE(emptyProfile->hasJson);
+        EXPECT_EQ(emptyProfile->statusCode, 200);
+        EXPECT_TRUE(
+            emptyProfile->jsonBody["data"]["target_position"]
+                .is_null());
+
+        const nlohmann::json profileBody{
+            {"target_position", "C++后端开发"},
+            {"experience", "应届生"},
+            {"location", "深圳"},
+            {"salary_min", 15},
+            {"salary_max", 25},
+            {"summary", "熟悉 Linux"},
+            {"user_id", secondUser.first}};
+
+        const std::optional<HttpResponseData> updatedProfile =
+            SendRequest(
+                "PUT",
+                "/api/v1/users/profile",
+                profileBody.dump(),
+                firstAuthorization);
+
+        ASSERT_TRUE(updatedProfile.has_value());
+        ASSERT_TRUE(updatedProfile->hasJson);
+        EXPECT_EQ(updatedProfile->statusCode, 200);
+        EXPECT_EQ(
+            updatedProfile->jsonBody["data"]["location"],
+            "深圳");
+
+        const std::optional<HttpResponseData> secondProfile =
+            SendRequest(
+                "GET",
+                "/api/v1/users/profile",
+                "",
+                "Bearer " + secondUser.second);
+
+        ASSERT_TRUE(secondProfile.has_value());
+        ASSERT_TRUE(secondProfile->hasJson);
+        EXPECT_TRUE(
+            secondProfile->jsonBody["data"]["target_position"]
+                .is_null());
+
+        const nlohmann::json skillBody{
+            {"name", "C++"},
+            {"level", 1},
+            {"user_id", secondUser.first}};
+
+        const std::optional<HttpResponseData> createdSkill =
+            SendRequest(
+                "POST",
+                "/api/v1/users/skills",
+                skillBody.dump(),
+                firstAuthorization);
+
+        ASSERT_TRUE(createdSkill.has_value());
+        ASSERT_TRUE(createdSkill->hasJson);
+        EXPECT_EQ(createdSkill->statusCode, 200);
+        EXPECT_EQ(
+            createdSkill->jsonBody["data"]["name"],
+            "C++");
+
+        const std::uint64_t skillId =
+            createdSkill->jsonBody["data"]["id"]
+                .get<std::uint64_t>();
+
+        const std::optional<HttpResponseData> secondSkills =
+            SendRequest(
+                "GET",
+                "/api/v1/users/skills",
+                "",
+                "Bearer " + secondUser.second);
+
+        ASSERT_TRUE(secondSkills.has_value());
+        ASSERT_TRUE(secondSkills->hasJson);
+        EXPECT_TRUE(
+            secondSkills->jsonBody["data"]["list"].empty());
+
+        const nlohmann::json updatedSkillBody{
+            {"name", "C++"},
+            {"level", 3}};
+
+        const std::optional<HttpResponseData> updatedSkill =
+            SendRequest(
+                "POST",
+                "/api/v1/users/skills",
+                updatedSkillBody.dump(),
+                firstAuthorization);
+
+        ASSERT_TRUE(updatedSkill.has_value());
+        ASSERT_TRUE(updatedSkill->hasJson);
+        EXPECT_EQ(
+            updatedSkill->jsonBody["data"]["id"],
+            skillId);
+        EXPECT_EQ(
+            updatedSkill->jsonBody["data"]["level"],
+            3);
+
+        const std::optional<HttpResponseData> crossUserDelete =
+            SendRequest(
+                "DELETE",
+                "/api/v1/users/skills/" +
+                    std::to_string(skillId),
+                "",
+                "Bearer " + secondUser.second);
+
+        ASSERT_TRUE(crossUserDelete.has_value());
+        EXPECT_EQ(crossUserDelete->statusCode, 200);
+
+        const std::optional<HttpResponseData> firstSkills =
+            SendRequest(
+                "GET",
+                "/api/v1/users/skills",
+                "",
+                firstAuthorization);
+
+        ASSERT_TRUE(firstSkills.has_value());
+        ASSERT_TRUE(firstSkills->hasJson);
+        ASSERT_EQ(
+            firstSkills->jsonBody["data"]["list"].size(),
+            1U);
+
+        const std::optional<HttpResponseData> deletedSkill =
+            SendRequest(
+                "DELETE",
+                "/api/v1/users/skills/" +
+                    std::to_string(skillId),
+                "",
+                firstAuthorization);
+
+        ASSERT_TRUE(deletedSkill.has_value());
+        EXPECT_EQ(deletedSkill->statusCode, 200);
+
+        const std::optional<HttpResponseData> emptySkills =
+            SendRequest(
+                "GET",
+                "/api/v1/users/skills",
+                "",
+                firstAuthorization);
+
+        ASSERT_TRUE(emptySkills.has_value());
+        ASSERT_TRUE(emptySkills->hasJson);
+        EXPECT_TRUE(
+            emptySkills->jsonBody["data"]["list"].empty());
+    }
+
+    TEST_F(UserHttpTest, RejectsInvalidProfileAndSkillRequests)
+    {
+        const std::optional<HttpResponseData> unauthenticated =
+            SendRequest(
+                "GET",
+                "/api/v1/users/profile");
+
+        ASSERT_TRUE(unauthenticated.has_value());
+        ASSERT_TRUE(unauthenticated->hasJson);
+        EXPECT_EQ(unauthenticated->statusCode, 401);
+        EXPECT_EQ(
+            unauthenticated->jsonBody["code"],
+            20001);
+
+        const std::optional<HttpResponseData> invalidToken =
+            SendRequest(
+                "GET",
+                "/api/v1/users/skills",
+                "",
+                "Bearer invalid-token");
+
+        ASSERT_TRUE(invalidToken.has_value());
+        ASSERT_TRUE(invalidToken->hasJson);
+        EXPECT_EQ(invalidToken->statusCode, 401);
+
+        const auto user =
+            RegisterAndLogin("http-profile-errors");
+
+        const std::string authorization =
+            "Bearer " + user.second;
+
+        const nlohmann::json invalidProfile{
+            {"salary_min", 30},
+            {"salary_max", 10}};
+
+        const std::optional<HttpResponseData> profileResult =
+            SendRequest(
+                "PUT",
+                "/api/v1/users/profile",
+                invalidProfile.dump(),
+                authorization);
+
+        ASSERT_TRUE(profileResult.has_value());
+        ASSERT_TRUE(profileResult->hasJson);
+        EXPECT_EQ(profileResult->statusCode, 400);
+        EXPECT_EQ(profileResult->jsonBody["code"], 10001);
+
+        const nlohmann::json invalidSkill{
+            {"name", "C++"},
+            {"level", 0}};
+
+        const std::optional<HttpResponseData> skillResult =
+            SendRequest(
+                "POST",
+                "/api/v1/users/skills",
+                invalidSkill.dump(),
+                authorization);
+
+        ASSERT_TRUE(skillResult.has_value());
+        ASSERT_TRUE(skillResult->hasJson);
+        EXPECT_EQ(skillResult->statusCode, 400);
+        EXPECT_EQ(skillResult->jsonBody["code"], 10001);
     }
 } // namespace jobpilot::service

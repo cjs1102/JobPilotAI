@@ -2,9 +2,10 @@
 
 > Snapshot: 2026-10-07
 >
-> Baseline HEAD: `e6547b7 docs(state): record completed user vertical slice`
+> Baseline HEAD: `cd55439 refactor(ai): optimize cross-agent context routing`
 >
-> `origin/main` matched the baseline before the context-optimization changes.
+> `origin/main` matches this baseline. The 0006 implementation is present in
+> the working tree and is not committed yet.
 
 This is the concise takeover entry. Detailed evidence and historical sections
 are preserved in
@@ -13,13 +14,17 @@ are preserved in
 ## Current Stage
 
 - P0 config, logging, and schema are complete.
-- P1 network/HTTP is behaviorally frozen after the minimum correctness gate.
+- P1 network/HTTP remains behaviorally frozen after the minimum correctness
+  gate, with one approved working-tree exception for `PUT`/`DELETE` request
+  method parsing and routing.
 - Quality infrastructure is complete: ASan, UBSan, TSan, presets, and baseline
   benchmarks.
 - The first P2 user vertical slice is complete:
   `register -> login -> Redis session -> Authorization -> me`.
-- Work continues in P2. Resume, job, application, profile, and skill domains
-  remain outside the completed slice.
+- The 0006 profile/skill vertical slice is implemented and verified in the
+  working tree: authenticated profile read/update and skill
+  list/create/upsert/delete.
+- Resume, job, and application domains remain outside completed slices.
 
 ## Architecture Summary
 
@@ -42,12 +47,16 @@ HTTP request
 
 ## Verified Snapshot
 
-- Clean `service/` and root CTest: 54/54.
-- ASan full CTest: 54/54.
-- UBSan full CTest: 54/54.
-- TSan concurrency/User subset: 17/17.
+- Pre-0006 clean `service/` and root CTest: 54/54.
+- Full Debug CTest after 0006: 60/60.
+- ASan full CTest after 0006: 60/60.
+- UBSan full CTest after 0006: 60/60.
+- TSan concurrency/User subset after 0006: 21/21.
 - TSan external-service subset: 6/6.
-- Real HTTP register/login/me flow passed; test data was cleaned afterward.
+- Focused Release regression after the `PUT`/`DELETE` method extension: 9/9.
+- Both `service/` and root Release builds completed successfully.
+- Real HTTP register/login/me and profile/skill ownership flows passed; test
+  data was cleaned afterward.
 
 Quality commands and recorded results:
 [../quality/README.md](../quality/README.md).
@@ -63,12 +72,13 @@ Performance baseline:
 | High | Raw `Channel *` in epoll active list | Requires strict channel lifetime discipline |
 | Medium | No graceful shutdown/signal handling | Service cannot stop cleanly on signals |
 | Medium | Expired vs invalid Redis token cannot be distinguished | Both currently return `20001`; `20002` is reserved |
-| Medium | Profile and skill endpoints are not implemented | User domain is auth-only |
+| Medium | P1 HTTP methods remain a minimal subset | Further methods require a new reviewed change |
 | Medium | Live MySQL/Redis required by integration tests | CTest is not self-contained |
 
 ## Next Entry
 
-1. Plan the profile and skill fragment of the user domain.
+1. Review, commit, and push the completed 0006 working tree after user
+   confirmation.
 2. Continue P2 with resume, job, and application modules.
 3. Keep all new business work separate from the frozen P1 network layer.
 

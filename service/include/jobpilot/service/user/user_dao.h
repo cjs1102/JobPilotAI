@@ -32,6 +32,24 @@ public:
     std::optional<UserRecord> FindById(
         std::uint64_t userId) override;
 
+    std::optional<UserProfile> FindProfile(
+        std::uint64_t userId) override;
+
+    bool UpsertProfile(
+        const UserProfile &profile) override;
+
+    std::vector<UserSkill> ListSkills(
+        std::uint64_t userId) override;
+
+    std::optional<UserSkill> UpsertSkill(
+        std::uint64_t userId,
+        const std::string &name,
+        std::int32_t level) override;
+
+    bool DeleteSkill(
+        std::uint64_t userId,
+        std::uint64_t skillId) override;
+
 private:
     jobpilot::core::ConnectionPool &pool_;
 };

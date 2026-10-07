@@ -124,6 +124,36 @@ namespace jobpilot::test
             return;
         }
 
+        const jobpilot::core::Result result =
+            pool->Query(
+                "SELECT id FROM users WHERE email = ? LIMIT 1",
+                {email});
+
+        if (result.rowCount() == 1)
+        {
+            const auto &idValue =
+                result.value(0, 0);
+
+            if (!idValue.has_value())
+            {
+                throw std::runtime_error(
+                    "user id must not be NULL");
+            }
+
+            const std::uint64_t userId =
+                static_cast<std::uint64_t>(
+                    std::stoull(
+                        idValue.value()));
+
+            pool->Execute(
+                "DELETE FROM skills WHERE user_id = ?",
+                {userId});
+
+            pool->Execute(
+                "DELETE FROM profiles WHERE user_id = ?",
+                {userId});
+        }
+
         pool->Execute(
             "DELETE FROM users WHERE email = ?",
             {email});

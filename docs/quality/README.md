@@ -27,7 +27,7 @@ MYSQL_PASSWORD=root \
   ctest --preset asan
 ```
 
-Scope: all 54 current tests, including live MySQL, Redis, schema, and User
+Scope: all 60 current tests, including live MySQL, Redis, schema, and User
 vertical-slice checks.
 
 ## UBSan
@@ -40,7 +40,7 @@ MYSQL_PASSWORD=root \
   ctest --preset ubsan
 ```
 
-Scope: all 54 current tests and `-fno-sanitize-recover=undefined`.
+Scope: all 60 current tests and `-fno-sanitize-recover=undefined`.
 
 ## TSan
 
@@ -73,14 +73,15 @@ the recorded baseline, but are intentionally not part of the default TSan gate.
 
 ## Recorded Baseline
 
-Date: 2026-10-06
+Date: 2026-10-07
 
 | Check | Result |
 |---|---|
-| ASan full CTest | 54/54 passed |
-| UBSan full CTest | 54/54 passed |
-| TSan concurrency/User tests | 17/17 passed |
+| ASan full CTest | 60/60 passed |
+| UBSan full CTest | 60/60 passed |
+| TSan concurrency/User tests | 21/21 passed |
 | TSan external-service tests | 6/6 passed |
+| Focused Release regression | 9/9 passed |
 
 TSan initially found a race in `test_thread_pool.cpp`: the completion counter
 was updated before `condition.notify_one()` while the test could leave scope

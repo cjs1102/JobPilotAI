@@ -73,6 +73,50 @@ namespace jobpilot::service
                password.size() <= 128;
     }
 
+    bool UserService::IsValidOptionalText(
+        const std::optional<std::string> &value,
+        std::size_t maxLength)
+    {
+        return !value.has_value() ||
+               value->size() <= maxLength;
+    }
+
+    bool UserService::IsValidProfile(
+        const UserProfile &profile)
+    {
+        if (profile.userId == 0 ||
+            !IsValidOptionalText(
+                profile.targetPosition,
+                128) ||
+            !IsValidOptionalText(
+                profile.experience,
+                64) ||
+            !IsValidOptionalText(
+                profile.location,
+                64) ||
+            !IsValidOptionalText(
+                profile.summary,
+                65535))
+        {
+            return false;
+        }
+
+        return !profile.salaryMin.has_value() ||
+               !profile.salaryMax.has_value() ||
+               profile.salaryMin.value() <=
+                   profile.salaryMax.value();
+    }
+
+    bool UserService::IsValidSkill(
+        const std::string &name,
+        std::int32_t level)
+    {
+        return !name.empty() &&
+               name.size() <= 64 &&
+               level >= 1 &&
+               level <= 3;
+    }
+
     std::string UserService::HashPassword(
         const std::string &password)
     {
@@ -322,27 +366,20 @@ namespace jobpilot::service
     ServiceResult<UserRecord> UserService::GetCurrentUser(
         const std::string &token)
     {
-        if (token.empty())
+        const ServiceResult<std::uint64_t> authenticated =
+            Authenticate(token);
+
+        if (authenticated.code != ErrorCode::kSuccess)
         {
             return ServiceResult<UserRecord>{
-                ErrorCode::kUnauthorized,
+                authenticated.code,
                 {}};
         }
 
         try
         {
-            const std::optional<std::uint64_t> userId =
-                sessions_.GetUserId(token);
-
-            if (!userId.has_value())
-            {
-                return ServiceResult<UserRecord>{
-                    ErrorCode::kUnauthorized,
-                    {}};
-            }
-
             const std::optional<UserRecord> user =
-                userDao_.FindById(userId.value());
+                userDao_.FindById(authenticated.value);
 
             if (!user.has_value())
             {
@@ -371,6 +408,250 @@ namespace jobpilot::service
             return ServiceResult<UserRecord>{
                 ErrorCode::kInternalError,
                 {}};
+        }
+    }
+
+    ServiceResult<std::uint64_t> UserService::Authenticate(
+        const std::string &token)
+    {
+        if (token.empty())
+        {
+            return ServiceResult<std::uint64_t>{
+                ErrorCode::kUnauthorized,
+                0};
+        }
+
+        try
+        {
+            const std::optional<std::uint64_t> userId =
+                sessions_.GetUserId(token);
+
+            if (!userId.has_value())
+            {
+                return ServiceResult<std::uint64_t>{
+                    ErrorCode::kUnauthorized,
+                    0};
+            }
+
+            return ServiceResult<std::uint64_t>{
+                ErrorCode::kSuccess,
+                userId.value()};
+        }
+        catch (const std::exception &error)
+        {
+            jobpilot::core::Logger::Get()->error(
+                "session authentication failed: {}",
+                error.what());
+
+            return ServiceResult<std::uint64_t>{
+                ErrorCode::kInternalError,
+                0};
+        }
+    }
+
+    ServiceResult<UserProfile> UserService::GetProfile(
+        std::uint64_t userId)
+    {
+        if (userId == 0)
+        {
+            return ServiceResult<UserProfile>{
+                ErrorCode::kUnauthorized,
+                {}};
+        }
+
+        try
+        {
+            const std::optional<UserProfile> profile =
+                userDao_.FindProfile(userId);
+
+            if (!profile.has_value())
+            {
+                UserProfile empty;
+                empty.userId = userId;
+
+                return ServiceResult<UserProfile>{
+                    ErrorCode::kSuccess,
+                    empty};
+            }
+
+            return ServiceResult<UserProfile>{
+                ErrorCode::kSuccess,
+                profile.value()};
+        }
+        catch (const std::exception &error)
+        {
+            jobpilot::core::Logger::Get()->error(
+                "profile lookup failed: {}",
+                error.what());
+
+            return ServiceResult<UserProfile>{
+                ErrorCode::kDatabaseError,
+                {}};
+        }
+    }
+
+    ServiceResult<UserProfile> UserService::UpdateProfile(
+        std::uint64_t userId,
+        const UserProfile &profile)
+    {
+        UserProfile updated = profile;
+        updated.userId = userId;
+
+        if (!IsValidProfile(updated))
+        {
+            return ServiceResult<UserProfile>{
+                ErrorCode::kInvalidParam,
+                {}};
+        }
+
+        try
+        {
+            if (!userDao_.UpsertProfile(updated))
+            {
+                return ServiceResult<UserProfile>{
+                    ErrorCode::kDatabaseError,
+                    {}};
+            }
+
+            const std::optional<UserProfile> stored =
+                userDao_.FindProfile(userId);
+
+            if (!stored.has_value())
+            {
+                return ServiceResult<UserProfile>{
+                    ErrorCode::kDatabaseError,
+                    {}};
+            }
+
+            return ServiceResult<UserProfile>{
+                ErrorCode::kSuccess,
+                stored.value()};
+        }
+        catch (const std::exception &error)
+        {
+            jobpilot::core::Logger::Get()->error(
+                "profile update failed: {}",
+                error.what());
+
+            return ServiceResult<UserProfile>{
+                ErrorCode::kDatabaseError,
+                {}};
+        }
+    }
+
+    ServiceResult<std::vector<UserSkill>>
+    UserService::ListSkills(std::uint64_t userId)
+    {
+        if (userId == 0)
+        {
+            return ServiceResult<std::vector<UserSkill>>{
+                ErrorCode::kUnauthorized,
+                {}};
+        }
+
+        try
+        {
+            return ServiceResult<std::vector<UserSkill>>{
+                ErrorCode::kSuccess,
+                userDao_.ListSkills(userId)};
+        }
+        catch (const std::exception &error)
+        {
+            jobpilot::core::Logger::Get()->error(
+                "skill list failed: {}",
+                error.what());
+
+            return ServiceResult<std::vector<UserSkill>>{
+                ErrorCode::kDatabaseError,
+                {}};
+        }
+    }
+
+    ServiceResult<UserSkill> UserService::UpsertSkill(
+        std::uint64_t userId,
+        const std::string &name,
+        std::int32_t level)
+    {
+        if (userId == 0)
+        {
+            return ServiceResult<UserSkill>{
+                ErrorCode::kUnauthorized,
+                {}};
+        }
+
+        if (!IsValidSkill(name, level))
+        {
+            return ServiceResult<UserSkill>{
+                ErrorCode::kInvalidParam,
+                {}};
+        }
+
+        try
+        {
+            const std::optional<UserSkill> skill =
+                userDao_.UpsertSkill(
+                    userId,
+                    name,
+                    level);
+
+            if (!skill.has_value())
+            {
+                return ServiceResult<UserSkill>{
+                    ErrorCode::kDatabaseError,
+                    {}};
+            }
+
+            return ServiceResult<UserSkill>{
+                ErrorCode::kSuccess,
+                skill.value()};
+        }
+        catch (const std::exception &error)
+        {
+            jobpilot::core::Logger::Get()->error(
+                "skill upsert failed: {}",
+                error.what());
+
+            return ServiceResult<UserSkill>{
+                ErrorCode::kDatabaseError,
+                {}};
+        }
+    }
+
+    ServiceResult<bool> UserService::DeleteSkill(
+        std::uint64_t userId,
+        std::uint64_t skillId)
+    {
+        if (userId == 0)
+        {
+            return ServiceResult<bool>{
+                ErrorCode::kUnauthorized,
+                false};
+        }
+
+        if (skillId == 0)
+        {
+            return ServiceResult<bool>{
+                ErrorCode::kInvalidParam,
+                false};
+        }
+
+        try
+        {
+            return ServiceResult<bool>{
+                ErrorCode::kSuccess,
+                userDao_.DeleteSkill(
+                    userId,
+                    skillId)};
+        }
+        catch (const std::exception &error)
+        {
+            jobpilot::core::Logger::Get()->error(
+                "skill delete failed: {}",
+                error.what());
+
+            return ServiceResult<bool>{
+                ErrorCode::kDatabaseError,
+                false};
         }
     }
 

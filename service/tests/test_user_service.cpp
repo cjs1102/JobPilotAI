@@ -436,4 +436,194 @@ namespace jobpilot::service
 
         EXPECT_FALSE(failed.load());
     }
+
+    TEST_F(UserServiceTest, AuthenticatesAndUpsertsProfile)
+    {
+        const std::string email =
+            TrackEmail("service-profile");
+
+        ASSERT_EQ(
+            service->Register(
+                       "profile-user",
+                       email,
+                       "password")
+                .code,
+            ErrorCode::kSuccess);
+
+        const ServiceResult<LoginData> login =
+            service->Login(
+                email,
+                "password");
+
+        ASSERT_EQ(login.code, ErrorCode::kSuccess);
+        tokens.push_back(login.value.token);
+
+        const ServiceResult<std::uint64_t> authenticated =
+            service->Authenticate(
+                login.value.token);
+
+        ASSERT_EQ(
+            authenticated.code,
+            ErrorCode::kSuccess);
+        EXPECT_EQ(
+            authenticated.value,
+            login.value.userId);
+
+        const ServiceResult<UserProfile> empty =
+            service->GetProfile(
+                authenticated.value);
+
+        ASSERT_EQ(empty.code, ErrorCode::kSuccess);
+        EXPECT_FALSE(
+            empty.value.targetPosition.has_value());
+        EXPECT_FALSE(empty.value.salaryMin.has_value());
+
+        UserProfile profile;
+        profile.targetPosition = "C++后端开发";
+        profile.experience = "应届生";
+        profile.location = "深圳";
+        profile.salaryMin = 15;
+        profile.salaryMax = 25;
+        profile.summary = "熟悉 Linux";
+
+        const ServiceResult<UserProfile> updated =
+            service->UpdateProfile(
+                authenticated.value,
+                profile);
+
+        ASSERT_EQ(updated.code, ErrorCode::kSuccess);
+        EXPECT_EQ(
+            updated.value.targetPosition,
+            "C++后端开发");
+        EXPECT_EQ(updated.value.salaryMax, 25U);
+
+        const ServiceResult<UserProfile> stored =
+            service->GetProfile(
+                authenticated.value);
+
+        ASSERT_EQ(stored.code, ErrorCode::kSuccess);
+        EXPECT_EQ(stored.value.location, "深圳");
+
+        profile.salaryMin = 30;
+        profile.salaryMax = 10;
+
+        EXPECT_EQ(
+            service->UpdateProfile(
+                       authenticated.value,
+                       profile)
+                .code,
+            ErrorCode::kInvalidParam);
+    }
+
+    TEST_F(UserServiceTest, ManagesSkillsWithValidationAndIsolation)
+    {
+        const std::string firstEmail =
+            TrackEmail("service-skill-first");
+
+        const std::string secondEmail =
+            TrackEmail("service-skill-second");
+
+        ASSERT_EQ(
+            service->Register(
+                       "first",
+                       firstEmail,
+                       "password")
+                .code,
+            ErrorCode::kSuccess);
+
+        ASSERT_EQ(
+            service->Register(
+                       "second",
+                       secondEmail,
+                       "password")
+                .code,
+            ErrorCode::kSuccess);
+
+        const ServiceResult<LoginData> firstLogin =
+            service->Login(firstEmail, "password");
+
+        const ServiceResult<LoginData> secondLogin =
+            service->Login(secondEmail, "password");
+
+        ASSERT_EQ(firstLogin.code, ErrorCode::kSuccess);
+        ASSERT_EQ(secondLogin.code, ErrorCode::kSuccess);
+
+        tokens.push_back(firstLogin.value.token);
+        tokens.push_back(secondLogin.value.token);
+
+        EXPECT_EQ(
+            service->UpsertSkill(
+                       firstLogin.value.userId,
+                       "",
+                       1)
+                .code,
+            ErrorCode::kInvalidParam);
+
+        EXPECT_EQ(
+            service->UpsertSkill(
+                       firstLogin.value.userId,
+                       "C++",
+                       0)
+                .code,
+            ErrorCode::kInvalidParam);
+
+        const ServiceResult<UserSkill> created =
+            service->UpsertSkill(
+                firstLogin.value.userId,
+                "C++",
+                1);
+
+        ASSERT_EQ(created.code, ErrorCode::kSuccess);
+
+        const ServiceResult<UserSkill> updated =
+            service->UpsertSkill(
+                firstLogin.value.userId,
+                "C++",
+                3);
+
+        ASSERT_EQ(updated.code, ErrorCode::kSuccess);
+        EXPECT_EQ(updated.value.id, created.value.id);
+        EXPECT_EQ(updated.value.level, 3);
+
+        ASSERT_EQ(
+            service->UpsertSkill(
+                       secondLogin.value.userId,
+                       "Redis",
+                       2)
+                .code,
+            ErrorCode::kSuccess);
+
+        const ServiceResult<std::vector<UserSkill>> firstSkills =
+            service->ListSkills(
+                firstLogin.value.userId);
+
+        ASSERT_EQ(firstSkills.code, ErrorCode::kSuccess);
+        ASSERT_EQ(firstSkills.value.size(), 1U);
+        EXPECT_EQ(firstSkills.value.front().name, "C++");
+
+        EXPECT_EQ(
+            service->DeleteSkill(
+                       secondLogin.value.userId,
+                       created.value.id)
+                .code,
+            ErrorCode::kSuccess);
+
+        EXPECT_EQ(
+            service->ListSkills(
+                       firstLogin.value.userId)
+                .value.size(),
+            1U);
+
+        EXPECT_EQ(
+            service->DeleteSkill(
+                       firstLogin.value.userId,
+                       created.value.id)
+                .code,
+            ErrorCode::kSuccess);
+
+        EXPECT_TRUE(
+            service->ListSkills(
+                        firstLogin.value.userId)
+                .value.empty());
+    }
 } // namespace jobpilot::service

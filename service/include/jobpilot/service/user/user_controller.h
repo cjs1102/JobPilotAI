@@ -24,6 +24,26 @@ namespace jobpilot::service
             const jobpilot::core::HttpRequest &request,
             jobpilot::core::HttpResponse &response);
 
+        void GetProfile(
+            const jobpilot::core::HttpRequest &request,
+            jobpilot::core::HttpResponse &response);
+
+        void UpdateProfile(
+            const jobpilot::core::HttpRequest &request,
+            jobpilot::core::HttpResponse &response);
+
+        void ListSkills(
+            const jobpilot::core::HttpRequest &request,
+            jobpilot::core::HttpResponse &response);
+
+        void CreateSkill(
+            const jobpilot::core::HttpRequest &request,
+            jobpilot::core::HttpResponse &response);
+
+        void DeleteSkill(
+            const jobpilot::core::HttpRequest &request,
+            jobpilot::core::HttpResponse &response);
+
     private:
         UserService &service_;
     };

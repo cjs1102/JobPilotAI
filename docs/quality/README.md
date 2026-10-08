@@ -170,3 +170,34 @@ TSan initially found a race in `test_thread_pool.cpp`: the completion counter
 was updated before `condition.notify_one()` while the test could leave scope
 and destroy the condition variable. The fix updates completion state and
 signals while holding the same mutex. No P1 production code was changed.
+
+## 0013 AI Task Tests
+
+The 0013 gate in this document requires worker tests to verify atomic claim,
+lease timeout, retry, stale recovery, provider failure, and rule-only fallback.
+Mapping to executed tests (release preset, HEAD 3b326a3):
+
+| Gate item | Proof |
+|---|---|
+| atomic claim | `AiTaskDaoTest.NeverHandsTheSameTaskToTwoWorkers` — three threads over four tasks, every task claimed exactly once |
+| lease timeout | `AiTaskDaoTest.CompletionRequiresOwnerAndLiveLease`, `AiTaskHttpTest.RefusesInputWithoutALiveLease` |
+| retry | `AiTaskDaoTest.RequeuesRetryableFailureBelowTheCap`, `AiTaskDaoTest.FailsPermanentFailureImmediately`, `AiTaskHttpTest.RetryableFailRequeuesAndPermanentFailTerminates` |
+| stale recovery | `AiTaskDaoTest.ReclaimsExpiredLeaseForAnotherWorker`, `AiTaskDaoTest.FailsExpiredLeaseBeyondAttemptCap` |
+| provider failure | `ai_worker` provider tests (timeout / 429 / 5xx / invalid JSON / missing key) plus the live cross-language E2E failure path (stub returns 500 -> worker calls `fail(retryable=true)` -> the task returns to pending with `error_msg` set) |
+| rule-only fallback | `MatchRuleTest` (determinism, recency excluded), the service degradation tests, the `ai_worker` merge tests (the score can never be overwritten) and the live E2E (`status=2` with `ai.degraded=true`) |
+
+Commands:
+
+```bash
+cd service && ctest --test-dir build/presets/release -L ai                     # 32 tests
+MYSQL_PASSWORD=<pwd> ./build/presets/release/test_ai_task_dao                  # 15 tests
+./build/presets/release/test_match_rule                                        # 6 tests
+cd ../ai_worker && python3 -m unittest discover -s jobpilot_ai/tests -t .      # 190 tests
+cd ../source_adapters && python3 -m unittest discover -s jobpilot_sources/tests -t .  # 85 tests
+```
+
+The cross-language contract is additionally proven by a live run of the worker
+against the real service binary (`claim -> input -> complete`, `rule_result`
+byte-identical, score preserved, `ai.degraded` marked). That run is reproducible
+scratch, not a committed test; the permanent proof is the HTTP lifecycle test in
+`test_ai_http.cpp` plus the worker's own stub-driven tests.

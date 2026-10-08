@@ -489,3 +489,38 @@ Stop and return to design if:
 - Evidence: `MatchRuleTest` 6/6; `test_job_ranking_service` 3/3 and
   `test_job_service` 7/7 unchanged; `-Wall -Wextra -Werror` clean for
   `src/ai/match_rule.cpp`, `src/job/job_ranking.cpp`, `tests/test_match_rule.cpp`.
+
+## 17. Competitive Review Amendments (proposed, pending review)
+
+Source: [`docs/research/2026-10-08-open-source-job-search-agents.md`](../../research/2026-10-08-open-source-job-search-agents.md)
+(a study of [career-ops-hq/career-ops](https://github.com/career-ops-hq/career-ops)
+and [MadsLorentzen/ai-job-search](https://github.com/MadsLorentzen/ai-job-search)).
+
+Four changes are proposed. They are **not yet applied**; each stays optional and
+independent of the current Step 3-5 work.
+
+1. **Per-requirement weight with provenance** (extends section 5.5 and the Step 2
+   result schema). Each requirement carries a deterministic `weight` and a
+   `weight_source` of `jd_explicit` | `structure` | `estimate`; an `estimate`
+   alone cannot produce a top-band score. Rationale: our current weights are
+   global constants and cannot express "Kubernetes is mandatory here, Redis is
+   nice-to-have", which career-ops handles explicitly per posting.
+2. **Untrusted-input and provider-endpoint guards** (Step 6). The job
+   description is untrusted data; the worker prompt must state that embedded
+   instructions are never followed and that links inside the posting body are
+   never fetched; the configured provider `base_url` is validated to reject
+   loopback, private and metadata addresses unless explicitly opted in. Both
+   rules get tests.
+3. **Golden evaluation set** (Step 6). Recorded provider responses plus asserted
+   properties — schema validity, no fabricated facts, degradation path — so the
+   AI stage has quality evidence and not just plumbing tests.
+4. **Evidence-bound worker output** (Step 6). `explanation`/`suggestions` may
+   only reference facts present in the input bundle; unreferenced claims are
+   dropped rather than persisted.
+
+Downstream requirements recorded by the same review (not 0013 scope):
+fact-provenance gating, ATS text-layer checks, relevance-weighted cutting,
+submission archiving with follow-up cadence and outcome calibration for 0014;
+`SECURITY.md`/`CONTRIBUTING.md`, a shipped-file vs user-data boundary, a
+no-telemetry guarantee, adapter-contract validation and a zero-cost local-model
+path for 0015.

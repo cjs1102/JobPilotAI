@@ -236,6 +236,8 @@ Do not start a new P2 module without its own approved plan.
   [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md)
 - Active ExecPlan:
   [../exec-plans/active/0013-ai-matching.md](../exec-plans/active/0013-ai-matching.md)
+- Competitive research note:
+  [../research/2026-10-08-open-source-job-search-agents.md](../research/2026-10-08-open-source-job-search-agents.md)
 - Latest completed ExecPlan:
   [../exec-plans/completed/0012-job-source-adapter-freshness.md](../exec-plans/completed/0012-job-source-adapter-freshness.md)
 - Current ADR decisions: [../adr/README.md](../adr/README.md)

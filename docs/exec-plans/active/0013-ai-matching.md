@@ -420,7 +420,7 @@ Stop and return to design if:
 - [x] Capability Check
 - [x] Design
 - [x] ExecPlan
-- [ ] Schema migration
+- [x] Schema migration
 - [ ] Match rule domain
 - [ ] AI Task DAO
 - [ ] AI Task Service

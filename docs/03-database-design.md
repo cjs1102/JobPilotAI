@@ -170,11 +170,15 @@ CREATE TABLE ai_tasks (
     result      JSON DEFAULT NULL COMMENT '结果JSON',
     error_msg   VARCHAR(512) DEFAULT NULL COMMENT '失败原因',
     retry_count INT NOT NULL DEFAULT 0 COMMENT '重试次数',
+    locked_by       VARCHAR(64) DEFAULT NULL COMMENT '当前worker标识(0013)',
+    lease_expire_at DATETIME    DEFAULT NULL COMMENT '租约到期时间(0013)',
+    rule_result     JSON        DEFAULT NULL COMMENT '确定性规则基线结果(0013)',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_user_status (user_id, status),
     KEY idx_status (status),
-    KEY idx_type_status (task_type, status)
+    KEY idx_type_status (task_type, status),
+    KEY idx_status_lease (status, lease_expire_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI异步任务';
 
 CREATE TABLE interview_records (
@@ -223,7 +227,7 @@ CREATE TABLE notifications (
 | profiles | 按 user 查画像 | `uk_user_id` |
 | applications | 按用户×状态列表 | `idx_user_status` |
 | jobs | 按公司/地点/状态过滤；按来源 scope 观测 | `idx_company` `idx_location` `idx_status` `idx_source_scope_status` |
-| ai_tasks | 用户查任务 + Worker 捞待办 | `idx_user_status` `idx_status` |
+| ai_tasks | 用户查任务 + Worker 捞待办 + 租约扫描 | `idx_user_status` `idx_status` `idx_type_status` `idx_status_lease` |
 | notifications | 用户查未读 | `idx_user_status` |
 
 > 岗位搜索初期用 `LIKE '%kw%'`，数据量大后引入全文索引或 ES（见架构文档 §12 演进路径）。
@@ -304,3 +308,51 @@ ALTER TABLE jobs
 2. 再实现 Source Observation 领域模型与 Source Sync DAO / Service / API
    （写入路径 `POST /internal/jobs/source-sync`，见 `docs/04` §5.5）。
 3. 迁移落地后，`docs/04` §10.2 的 freshness 公开响应字段才生效。
+
+## 8. 0013 Additive AI Task Migration Contract（增量契约）
+
+本节登记 0013 AI Matching 对 `ai_tasks` 的**增量字段契约**。契约已作为 0013
+Step 1 落地：列与索引已写入 §3 建表 DDL 与 `database/schema/05_ai.sql`。
+
+对齐来源：
+[`exec-plans/active/0013-ai-matching.md`](exec-plans/active/0013-ai-matching.md) §5.1
+与 [`adr/0009-ai-pipeline-and-provider-strategy.md`](adr/0009-ai-pipeline-and-provider-strategy.md)。
+
+### 8.1 `ai_tasks` 新增列（已落地）
+
+```sql
+locked_by        VARCHAR(64) NULL   -- 当前 worker 标识
+lease_expire_at  DATETIME    NULL   -- 租约到期时间
+rule_result      JSON        NULL   -- 确定性规则基线结果（match_rule_v1）
+```
+
+已建索引：`KEY idx_status_lease (status, lease_expire_at)`（租约扫描）。
+
+### 8.2 不变量
+
+- `status`（0 pending / 1 processing / 2 success / 3 failed）语义不变。
+- `result` 始终是**最终**结果；`rule_result` 是创建时写入的确定性基线，只增不改
+  （worker 只能追加字段，不得覆盖 `score`/`breakdown`/`matched_skills`）。
+- `retry_count` 表示已尝试次数；尝试上限默认 3，租约默认 120s。
+- `locked_by` / `lease_expire_at` 只表示当前租约；`status` 回到 0 时二者清空。
+- 不新增表、不改既有列类型、不加唯一约束；既有行保持可读（新列为 NULL）。
+
+### 8.3 既有库升级
+
+`database/schema/*.sql` 使用 `CREATE TABLE IF NOT EXISTS`，对已存在的库不会自动
+加列。既有自建库按下述**增量 ALTER** 升级；重复执行会报 duplicate column，属预期：
+
+```sql
+ALTER TABLE ai_tasks
+    ADD COLUMN locked_by       VARCHAR(64) DEFAULT NULL COMMENT '当前worker标识(0013)',
+    ADD COLUMN lease_expire_at DATETIME    DEFAULT NULL COMMENT '租约到期时间(0013)',
+    ADD COLUMN rule_result     JSON        DEFAULT NULL COMMENT '确定性规则基线结果(0013)',
+    ADD KEY idx_status_lease (status, lease_expire_at);
+```
+
+既有行无需回填。
+
+### 8.4 实施顺序
+
+1. [x] 0013 Step 1：列与索引已写入 §3 DDL 与 `database/schema/05_ai.sql`。
+2. 再实现 `match_rule_v1` 领域、AI Task DAO / Service / 内部 API 与 worker。

@@ -10,11 +10,15 @@ CREATE TABLE IF NOT EXISTS ai_tasks (
     result      JSON DEFAULT NULL COMMENT '结果JSON',
     error_msg   VARCHAR(512) DEFAULT NULL COMMENT '失败原因',
     retry_count INT NOT NULL DEFAULT 0 COMMENT '重试次数',
+    locked_by        VARCHAR(64) DEFAULT NULL COMMENT '当前worker标识(0013)',
+    lease_expire_at  DATETIME    DEFAULT NULL COMMENT '租约到期时间(0013)',
+    rule_result      JSON        DEFAULT NULL COMMENT '确定性规则基线结果(0013)',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_user_status (user_id, status),
     KEY idx_status (status),
-    KEY idx_type_status (task_type, status)
+    KEY idx_type_status (task_type, status),
+    KEY idx_status_lease (status, lease_expire_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='AI异步任务';
 
 CREATE TABLE IF NOT EXISTS interview_records (

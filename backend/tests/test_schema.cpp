@@ -386,4 +386,76 @@ namespace
 
         EXPECT_EQ(cleanup.affectedRows, 1U);
     }
+
+    TEST_F(SchemaTest, CreatesAiTaskLeaseColumnsAndIndex)
+    {
+        const jobpilot::core::Result columns =
+            pool.Query(
+                "SELECT column_name, is_nullable, column_default "
+                "FROM information_schema.columns "
+                "WHERE table_schema = ? AND table_name = 'ai_tasks'",
+                {database});
+
+        std::map<std::string, ColumnContract> contract;
+
+        for (std::size_t row = 0;
+             row < columns.rowCount();
+             ++row)
+        {
+            contract[RequireValue(columns.value(row, 0))] =
+                ColumnContract{
+                    RequireValue(columns.value(row, 1)),
+                    OptionalValue(columns.value(row, 2))};
+        }
+
+        for (const char *name :
+             {"locked_by", "lease_expire_at", "rule_result"})
+        {
+            const auto found = contract.find(name);
+
+            ASSERT_NE(found, contract.end()) << name;
+            EXPECT_EQ(found->second.nullable, "YES") << name;
+        }
+
+        const auto attempts = contract.find("retry_count");
+
+        ASSERT_NE(attempts, contract.end());
+        EXPECT_EQ(attempts->second.nullable, "NO");
+        EXPECT_EQ(attempts->second.defaultValue, "0");
+
+        const jobpilot::core::Result index =
+            pool.Query(
+                "SELECT non_unique, seq_in_index, column_name "
+                "FROM information_schema.statistics "
+                "WHERE table_schema = ? AND table_name = 'ai_tasks' "
+                "AND index_name = 'idx_status_lease' "
+                "ORDER BY seq_in_index",
+                {database});
+
+        ASSERT_EQ(index.rowCount(), 2U);
+        EXPECT_EQ(RequireValue(index.value(0, 0)), "1");
+        EXPECT_EQ(RequireValue(index.value(0, 2)), "status");
+        EXPECT_EQ(RequireValue(index.value(1, 2)), "lease_expire_at");
+
+        const jobpilot::core::Result existing =
+            pool.Query(
+                "SELECT DISTINCT index_name "
+                "FROM information_schema.statistics "
+                "WHERE table_schema = ? AND table_name = 'ai_tasks'",
+                {database});
+
+        std::set<std::string> names;
+
+        for (std::size_t row = 0;
+             row < existing.rowCount();
+             ++row)
+        {
+            names.insert(
+                RequireValue(existing.value(row, 0)));
+        }
+
+        EXPECT_NE(names.find("idx_user_status"), names.end());
+        EXPECT_NE(names.find("idx_status"), names.end());
+        EXPECT_NE(names.find("idx_type_status"), names.end());
+    }
 }

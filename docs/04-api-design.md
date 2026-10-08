@@ -708,6 +708,32 @@ AI Provider 采用 BYOK：
 
 ---
 
+### 7.4 0013 任务模型、结果字段与降级
+
+`ai_tasks` 的 `status` 沿用 §1.5：`0 pending / 1 processing / 2 success / 3 failed`。
+0013 起响应额外携带两个字段：
+
+- `rule_result`：创建时写入的**确定性基线**（`match_rule_v1`，见 §5.3 的分量口径），
+  永远不会被 AI 覆盖；客户端可先展示它。
+- `result`：最终结果；任务进入终态时才有值。
+
+降级规则（核心不得依赖 AI）：
+
+- `ai.enhancement_enabled=false`（默认）：发起即完成（`status=2`，`result == rule_result`），
+  **不需要 Python worker**。
+- `ai.enhancement_enabled=true`：创建为 `pending`，由 worker 认领并增强。
+- provider 未配置、超时、限流、返回非法 JSON 时：worker 以基线完成并标记
+  `ai.degraded=true` 与固定 `ai.reason`；越权载荷（试图改写分数）整体拒绝并同样降级。
+- **权威分数**：AI 只能追加 `explanation` / `suggestions` / `ai.*`，不得覆盖
+  `score`、`breakdown`、`matched_skills`、`missing_skills`。
+
+幂等：同一 `(user_id, job_id, resume_id)` 已有非终态任务时直接返回既有 `task_id`。
+
+错误码：岗位不存在/未启用 `40001`；简历不存在或不属于当前用户 `40002`；
+任务不存在或不属于当前用户 `50001`（两种情况同码，避免泄露存在性）。
+
+---
+
 ## 8. 健康检查
 
 ```
@@ -812,4 +838,29 @@ POST /internal/ai/tasks/{id}/fail
 GET  /internal/ai/tasks/{id}/input
 ```
 
-这些接口在 0013 正式定义，不属于 0011。
+0013 起正式定义如下（与 `/internal/jobs/source-sync` 同一信任边界：
+`X-Internal-Token`，缺失或错误返回 `401`）：
+
+```text
+POST /internal/ai/tasks/claim         {"worker_id","lease_seconds"?}
+  -> {"task":{"task_id","task_type","job_id","resume_id","retry_count"}|null,
+      "requeued_stale":N,"expired_failed":N}
+POST /internal/ai/tasks/{id}/complete {"worker_id","result":{...}}  -> {"status":2}
+POST /internal/ai/tasks/{id}/fail     {"worker_id","error_msg","retryable":bool} -> {"status":N}
+GET  /internal/ai/tasks/{id}/input?worker_id=...
+  -> {"task":{...},"job":{...含 requirements...},"profile":{...},
+      "skills":[...],"resume":{"resume_id","version","content"},"rule_result":{...}}
+```
+
+规则：
+
+- `claim` 在**一个事务**内完成：先回收租约过期且未达尝试上限的任务，再把已达上限的
+  过期任务置为 `failed`，然后原子取最旧的 `pending` 任务（`status=0` 中 `id` 最小），
+  置为 `processing` 并写 `locked_by`、`lease_expire_at`、`retry_count+1`。
+  两个并发 worker 不可能拿到同一任务。
+- `complete` / `fail` / `input` 必须 owner 匹配且租约有效，否则 `50001`。
+- `fail` 且 `retryable=true` 且未达 `ai.max_attempts` 时回到 `pending`；否则终态
+  `failed` 并记录 `error_msg`。
+- worker **不得直接访问业务表**（ADR-0009）：其输入全部来自 `/input`。
+- 默认 `lease_seconds=120`、`max_attempts=3`，由 `ai.lease_seconds` /
+  `ai.max_attempts` 配置。

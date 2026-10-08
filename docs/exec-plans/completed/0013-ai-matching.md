@@ -1,6 +1,12 @@
 # ExecPlan 0013: AI Matching (job_match)
 
-> Status: Research, Design, and Planning complete. Implementation not started.
+> Status: Completed and verified on 2026-10-08 (Steps 1-10).
+>
+> L4 evidence (HEAD f81b0cd): Debug / ASan / UBSan / Release full CTest
+> 230/230 each with zero failures and no sanitizer diagnostics; service and
+> root Release builds pass; Python suites 85/85 and 190/190; the cross-language
+> E2E (worker against the real service) passed with `rule_result` preserved.
+> Verification rules: `docs/ai/agent-workflow.md`.
 >
 > Task level: L4.
 >
@@ -426,8 +432,8 @@ Stop and return to design if:
 - [x] AI Task Service
 - [x] Public + internal HTTP
 - [x] Python worker
-- [ ] E2E + documentation
-- [ ] L4 verification
+- [x] E2E + documentation
+- [x] L4 verification
 
 ## 14. Known Issues and Follow-up Work
 

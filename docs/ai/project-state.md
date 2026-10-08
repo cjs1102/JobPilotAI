@@ -91,15 +91,15 @@ Key decisions:
 | Architecture Re-Research | `../architecture/open-source-mvp.md`, `../adr/README.md` | ADR-0007 through ADR-0010 | `635fc31` |
 | Job Search / Ranking | `completed/0011-job-search-ranking.md` | Job ranking/search modules and tests | `214dc9e` |
 
-## Active Plan
+## Latest Completed Plan
 
-[0013-ai-matching.md](../exec-plans/active/0013-ai-matching.md)
+[0013-ai-matching.md](../exec-plans/completed/0013-ai-matching.md)
 
-Current step:
+Progress:
 
 ```text
-Research / Capability Check / Design / Plan complete
-Implementation not started
+Steps 1-10 complete
+L4: Debug / ASan / UBSan / Release 230/230 each; Python 85 and 190
 ```
 
 0013 scope: `job_match` end to end — additive owner/lease/rule-baseline columns
@@ -109,7 +109,7 @@ on `ai_tasks`, deterministic `match_rule_v1` scoring in C++, public
 `ai_worker/` that adds embedding/LLM explanation without ever replacing the
 deterministic score. `resume_optimize` / `interview_gen` stay reserved for 0014.
 
-## Latest Completed Plan
+## Previous Completed Plan
 
 [../exec-plans/completed/0012-job-source-adapter-freshness.md](../exec-plans/completed/0012-job-source-adapter-freshness.md)
 
@@ -203,9 +203,8 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review and execute `active/0013-ai-matching.md` (Steps 1-6 complete; the
-   ATS-style E2E test and documentation are Step 7 and L4 verification is
-   Step 8).
+1. Review the archived 0013 plan and its L4 evidence
+   (`completed/0013-ai-matching.md`); no plan is active.
 2. After 0013, plan the China-first source layer decided in
    `adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
    manual capture import, campus focus, company career pages); the three
@@ -238,8 +237,8 @@ Do not start a new P2 module without its own approved plan.
   [references/project-state-full.md](references/project-state-full.md)
 - Current architecture:
   [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md)
-- Active ExecPlan:
-  [../exec-plans/active/0013-ai-matching.md](../exec-plans/active/0013-ai-matching.md)
+- Latest completed ExecPlan:
+  [../exec-plans/completed/0013-ai-matching.md](../exec-plans/completed/0013-ai-matching.md)
 - Competitive research note:
   [../research/2026-10-08-open-source-job-search-agents.md](../research/2026-10-08-open-source-job-search-agents.md)
 - Product direction decision:

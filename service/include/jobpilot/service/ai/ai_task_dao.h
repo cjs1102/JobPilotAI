@@ -55,6 +55,29 @@ namespace jobpilot::service
             std::uint64_t taskId,
             const std::string &workerId) override;
 
+        std::optional<AiTaskRecord> CreateJobMatchTaskIfAbsent(
+            std::uint64_t userId,
+            std::uint64_t jobId,
+            std::uint64_t resumeId,
+            const std::optional<std::string> &ruleResult,
+            bool resolveNow) override;
+
+        AiTaskClaimOutcome ClaimNextTask(
+            const std::string &workerId,
+            const AiTaskLeasePolicy &policy) override;
+
+        std::optional<AiTaskRecord> CompleteOwnedTask(
+            std::uint64_t taskId,
+            const std::string &workerId,
+            const std::string &result) override;
+
+        std::optional<AiTaskRecord> FailOwnedTask(
+            std::uint64_t taskId,
+            const std::string &workerId,
+            const std::string &errorMsg,
+            bool retryable,
+            const AiTaskLeasePolicy &policy) override;
+
     private:
         jobpilot::core::ConnectionPool &pool_;
     };

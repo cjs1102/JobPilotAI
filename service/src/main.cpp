@@ -6,6 +6,10 @@
 #include "jobpilot/http/http_server.h"
 #include "jobpilot/network/event_loop.h"
 #include "jobpilot/storage/file_storage.h"
+#include "jobpilot/service/ai/ai_controller.h"
+#include "jobpilot/service/ai/ai_internal_controller.h"
+#include "jobpilot/service/ai/ai_task_dao.h"
+#include "jobpilot/service/ai/ai_task_service.h"
 #include "jobpilot/service/application/application_controller.h"
 #include "jobpilot/service/application/application_dao.h"
 #include "jobpilot/service/application/application_service.h"
@@ -28,6 +32,8 @@
 #include "jobpilot/service/user/user_dao.h"
 #include "jobpilot/service/user/user_service.h"
 
+#include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <memory>
 #include <stdexcept>
@@ -66,6 +72,72 @@ namespace
         }
 
         return path;
+    }
+
+    // 0013 Step 5 deviation: jobpilot/core/config.h has no typed ai section
+    // yet, so the three AI settings are read from the environment here with
+    // the documented defaults (enhancement disabled, lease 120s, 3 attempts).
+    // When the config module gains ai.enhancement_enabled / ai.lease_seconds /
+    // ai.max_attempts this helper becomes a one-line switch to config.ai.
+    jobpilot::service::AiTaskConfig LoadAiTaskConfig()
+    {
+        jobpilot::service::AiTaskConfig config;
+
+        const char *enabled =
+            std::getenv("AI_ENHANCEMENT_ENABLED");
+
+        if (enabled != nullptr && *enabled != '\0')
+        {
+            const std::string value = enabled;
+
+            config.enhancementEnabled =
+                value == "1" ||
+                value == "true" ||
+                value == "TRUE" ||
+                value == "yes";
+        }
+
+        const char *lease = std::getenv("AI_LEASE_SECONDS");
+
+        if (lease != nullptr && *lease != '\0')
+        {
+            try
+            {
+                const long parsed = std::stol(lease);
+
+                if (parsed > 0)
+                {
+                    config.leaseSeconds =
+                        static_cast<std::int32_t>(parsed);
+                }
+            }
+            catch (const std::exception &)
+            {
+                // Keep the documented default.
+            }
+        }
+
+        const char *attempts = std::getenv("AI_MAX_ATTEMPTS");
+
+        if (attempts != nullptr && *attempts != '\0')
+        {
+            try
+            {
+                const long parsed = std::stol(attempts);
+
+                if (parsed > 0)
+                {
+                    config.maxAttempts =
+                        static_cast<std::int32_t>(parsed);
+                }
+            }
+            catch (const std::exception &)
+            {
+                // Keep the documented default.
+            }
+        }
+
+        return config;
     }
 } // namespace
 
@@ -201,6 +273,25 @@ int main(int argc, char *argv[])
         jobpilot::service::ApplicationController applicationController(
             applicationService);
 
+        jobpilot::service::AiTaskDao aiTaskDao(
+            mysqlPool);
+
+        jobpilot::service::AiTaskService aiTaskService(
+            aiTaskDao,
+            jobDao,
+            resumeDao,
+            userDao,
+            LoadAiTaskConfig());
+
+        jobpilot::service::AiController aiController(
+            aiTaskService,
+            authenticator);
+
+        jobpilot::service::AiInternalController
+            aiInternalController(
+                aiTaskService,
+                config.internalApi.token);
+
         jobpilot::core::EventLoop loop;
 
         jobpilot::core::HttpServer server(
@@ -219,7 +310,11 @@ int main(int argc, char *argv[])
                 : &internalJobImportController,
             config.internalApi.token.empty()
                 ? nullptr
-                : &internalSourceSyncController);
+                : &internalSourceSyncController,
+            &aiController,
+            config.internalApi.token.empty()
+                ? nullptr
+                : &aiInternalController);
 
         server.Start();
 

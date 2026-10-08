@@ -4,6 +4,8 @@
 
 namespace jobpilot::service
 {
+    class AiController;
+    class AiInternalController;
     class ApplicationController;
     class InternalJobImportController;
     class InternalSourceSyncController;
@@ -18,6 +20,8 @@ namespace jobpilot::service
         JobController *jobController = nullptr,
         ApplicationController *applicationController = nullptr,
         InternalJobImportController *internalJobImportController = nullptr,
-        InternalSourceSyncController *internalSourceSyncController = nullptr);
+        InternalSourceSyncController *internalSourceSyncController = nullptr,
+        AiController *aiController = nullptr,
+        AiInternalController *aiInternalController = nullptr);
 
 } // namespace jobpilot::service

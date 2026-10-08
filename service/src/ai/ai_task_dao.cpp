@@ -362,4 +362,116 @@ namespace jobpilot::service
         return FirstRecord(result);
     }
 
+    std::optional<AiTaskRecord> AiTaskDao::CreateJobMatchTaskIfAbsent(
+        std::uint64_t userId,
+        std::uint64_t jobId,
+        std::uint64_t resumeId,
+        const std::optional<std::string> &ruleResult,
+        bool resolveNow)
+    {
+        // Idempotency first: an existing non-terminal task for the same triple
+        // is returned untouched, so a retry never creates a duplicate
+        // (ExecPlan 0013 section 5.2).
+        const std::optional<AiTaskRecord> existing =
+            FindOpenJobMatchTask(userId, jobId, resumeId);
+
+        if (existing.has_value())
+        {
+            return existing;
+        }
+
+        jobpilot::core::ConnectionPool::Transaction transaction =
+            pool_.BeginTransaction();
+
+        const std::optional<std::uint64_t> created =
+            CreateTask(
+                transaction,
+                userId,
+                std::string(kJobMatchTaskType),
+                jobId,
+                resumeId,
+                ruleResult,
+                resolveNow);
+
+        if (!created.has_value())
+        {
+            transaction.Rollback();
+            return std::nullopt;
+        }
+
+        transaction.Commit();
+
+        return FindTaskById(created.value());
+    }
+
+    AiTaskClaimOutcome AiTaskDao::ClaimNextTask(
+        const std::string &workerId,
+        const AiTaskLeasePolicy &policy)
+    {
+        jobpilot::core::ConnectionPool::Transaction transaction =
+            pool_.BeginTransaction();
+
+        const AiTaskClaimOutcome outcome =
+            ClaimTask(transaction, workerId, policy);
+
+        // Commit even when nothing was claimed: the same transaction requeues
+        // expired leases and fails the rows at the attempt cap.
+        transaction.Commit();
+
+        return outcome;
+    }
+
+    std::optional<AiTaskRecord> AiTaskDao::CompleteOwnedTask(
+        std::uint64_t taskId,
+        const std::string &workerId,
+        const std::string &result)
+    {
+        jobpilot::core::ConnectionPool::Transaction transaction =
+            pool_.BeginTransaction();
+
+        if (!CompleteTask(
+                transaction,
+                taskId,
+                workerId,
+                result))
+        {
+            transaction.Rollback();
+            return std::nullopt;
+        }
+
+        transaction.Commit();
+
+        return FindTaskById(taskId);
+    }
+
+    std::optional<AiTaskRecord> AiTaskDao::FailOwnedTask(
+        std::uint64_t taskId,
+        const std::string &workerId,
+        const std::string &errorMsg,
+        bool retryable,
+        const AiTaskLeasePolicy &policy)
+    {
+        jobpilot::core::ConnectionPool::Transaction transaction =
+            pool_.BeginTransaction();
+
+        const std::optional<AiTaskRecord> failed =
+            FailTask(
+                transaction,
+                taskId,
+                workerId,
+                errorMsg,
+                retryable,
+                policy);
+
+        if (!failed.has_value())
+        {
+            transaction.Rollback();
+            return std::nullopt;
+        }
+
+        transaction.Commit();
+
+        return failed;
+    }
+
 } // namespace jobpilot::service

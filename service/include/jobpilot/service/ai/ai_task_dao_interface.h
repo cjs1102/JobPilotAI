@@ -67,6 +67,37 @@ namespace jobpilot::service
         virtual std::optional<AiTaskRecord> FindClaimedTask(
             std::uint64_t taskId,
             const std::string &workerId) = 0;
+
+        // Pool-owning conveniences consumed by AiTaskService: they run the
+        // matching transaction-taking method above inside one transaction, so
+        // the service needs no database handle of its own (ExecPlan 0013
+        // section 8: service tests use fake DAOs). No SQL is duplicated.
+
+        // Idempotent creation: the existing non-terminal job_match task for
+        // the same (user, job, resume) is returned, otherwise a new one is
+        // inserted (ExecPlan 0013 section 5.2).
+        virtual std::optional<AiTaskRecord> CreateJobMatchTaskIfAbsent(
+            std::uint64_t userId,
+            std::uint64_t jobId,
+            std::uint64_t resumeId,
+            const std::optional<std::string> &ruleResult,
+            bool resolveNow) = 0;
+
+        virtual AiTaskClaimOutcome ClaimNextTask(
+            const std::string &workerId,
+            const AiTaskLeasePolicy &policy) = 0;
+
+        virtual std::optional<AiTaskRecord> CompleteOwnedTask(
+            std::uint64_t taskId,
+            const std::string &workerId,
+            const std::string &result) = 0;
+
+        virtual std::optional<AiTaskRecord> FailOwnedTask(
+            std::uint64_t taskId,
+            const std::string &workerId,
+            const std::string &errorMsg,
+            bool retryable,
+            const AiTaskLeasePolicy &policy) = 0;
     };
 
 } // namespace jobpilot::service

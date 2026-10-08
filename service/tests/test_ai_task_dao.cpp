@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 #include <unistd.h>
 
 #include "jobpilot/database/mysql_pool.h"
@@ -53,6 +54,27 @@ namespace jobpilot::service
             pool->Execute(
                 "DELETE FROM ai_tasks WHERE user_id = ?",
                 {userId});
+        }
+
+        // MySQL normalizes JSON column text, so compare parsed values.
+        static bool JsonEquals(
+            const std::optional<std::string> &actual,
+            const std::string &expected)
+        {
+            if (!actual.has_value())
+            {
+                return false;
+            }
+
+            try
+            {
+                return nlohmann::json::parse(actual.value()) ==
+                       nlohmann::json::parse(expected);
+            }
+            catch (const std::exception &)
+            {
+                return false;
+            }
         }
 
         static std::uint64_t UniqueNumber()
@@ -535,6 +557,220 @@ namespace jobpilot::service
         ASSERT_TRUE(completed->result.has_value());
         EXPECT_EQ(completed->result.value(), "{\"score\": 90}");
         EXPECT_FALSE(completed->errorMsg.has_value());
+    }
+
+    // 0013 Step 5 additions (task-3): durable coverage for the four
+    // pool-owning wrappers consumed by AiTaskService.
+
+    TEST_F(AiTaskDaoTest, CreateJobMatchTaskIfAbsentIsIdempotent)
+    {
+        const std::uint64_t jobId = UniqueNumber();
+        const std::uint64_t resumeId = UniqueNumber();
+
+        const std::optional<AiTaskRecord> first =
+            dao->CreateJobMatchTaskIfAbsent(
+                userId,
+                jobId,
+                resumeId,
+                std::string("{\"score\":1}"),
+                false);
+
+        ASSERT_TRUE(first.has_value());
+        EXPECT_EQ(first->status, AiTaskStatus::kPending);
+        EXPECT_FALSE(first->result.has_value());
+        EXPECT_TRUE(JsonEquals(first->ruleResult, "{\"score\":1}"));
+        EXPECT_EQ(first->retryCount, 0);
+        EXPECT_EQ(first->jobId.value(), jobId);
+        EXPECT_EQ(first->resumeId.value(), resumeId);
+
+        const std::optional<AiTaskRecord> reused =
+            dao->CreateJobMatchTaskIfAbsent(
+                userId,
+                jobId,
+                resumeId,
+                std::string("{\"score\":999}"),
+                false);
+
+        ASSERT_TRUE(reused.has_value());
+        EXPECT_EQ(reused->id, first->id);
+        EXPECT_TRUE(JsonEquals(reused->ruleResult, "{\"score\":1}"));
+
+        const jobpilot::core::Result count =
+            pool->Query(
+                "SELECT COUNT(*) FROM ai_tasks "
+                "WHERE user_id = ? AND job_id = ? AND resume_id = ?",
+                {userId, jobId, resumeId});
+
+        ASSERT_EQ(count.rowCount(), 1U);
+        EXPECT_EQ(count.value(0, 0).value(), "1");
+    }
+
+    TEST_F(AiTaskDaoTest, CreateJobMatchTaskIfAbsentResolvesNow)
+    {
+        const std::uint64_t jobId = UniqueNumber();
+        const std::uint64_t resumeId = UniqueNumber();
+
+        const std::optional<AiTaskRecord> resolved =
+            dao->CreateJobMatchTaskIfAbsent(
+                userId,
+                jobId,
+                resumeId,
+                std::string("{\"score\":9}"),
+                true);
+
+        ASSERT_TRUE(resolved.has_value());
+        EXPECT_EQ(resolved->status, AiTaskStatus::kSuccess);
+        EXPECT_TRUE(JsonEquals(resolved->result, "{\"score\":9}"));
+        EXPECT_TRUE(
+            JsonEquals(resolved->ruleResult, "{\"score\":9}"));
+
+        const std::optional<AiTaskRecord> reread =
+            dao->FindOwnedTask(userId, resolved->id);
+
+        ASSERT_TRUE(reread.has_value());
+        EXPECT_EQ(reread->status, AiTaskStatus::kSuccess);
+        EXPECT_TRUE(JsonEquals(reread->result, "{\"score\":9}"));
+    }
+
+    TEST_F(AiTaskDaoTest, ClaimNextTaskOwnsItsTransaction)
+    {
+        const std::optional<std::uint64_t> first = CreateTask(false);
+        const std::optional<std::uint64_t> second = CreateTask(false);
+
+        ASSERT_TRUE(first.has_value());
+        ASSERT_TRUE(second.has_value());
+
+        const AiTaskClaimOutcome claimed =
+            dao->ClaimNextTask("wrap-worker-a", AiTaskLeasePolicy{});
+
+        ASSERT_TRUE(claimed.task.has_value());
+        EXPECT_EQ(claimed.task->id, first.value());
+        EXPECT_EQ(claimed.task->retryCount, 1);
+        EXPECT_EQ(claimed.requeuedStale, 0U);
+        EXPECT_EQ(claimed.expiredFailed, 0U);
+
+        const AiTaskClaimOutcome next =
+            dao->ClaimNextTask("wrap-worker-b", AiTaskLeasePolicy{});
+
+        ASSERT_TRUE(next.task.has_value());
+        EXPECT_EQ(next.task->id, second.value());
+
+        EXPECT_FALSE(
+            dao->ClaimNextTask("wrap-worker-c", AiTaskLeasePolicy{})
+                .task
+                .has_value());
+
+        // The claim was committed: the lease is visible outside the call.
+        EXPECT_TRUE(
+            dao->FindClaimedTask(first.value(), "wrap-worker-a")
+                .has_value());
+        EXPECT_FALSE(
+            dao->FindClaimedTask(first.value(), "wrap-worker-b")
+                .has_value());
+    }
+
+    TEST_F(AiTaskDaoTest, CompleteOwnedTaskEnforcesOwnerAndKeepsRuleResult)
+    {
+        const std::optional<std::uint64_t> taskId =
+            CreateTask(false, "{\"score\":1}");
+
+        ASSERT_TRUE(taskId.has_value());
+        ASSERT_TRUE(
+            Claim("wrap-worker-a").task.has_value());
+
+        EXPECT_FALSE(
+            dao->CompleteOwnedTask(
+                 taskId.value(),
+                 "wrap-worker-b",
+                 std::string("{\"score\":90}"))
+                .has_value());
+
+        const std::optional<AiTaskRecord> completed =
+            dao->CompleteOwnedTask(
+                taskId.value(),
+                "wrap-worker-a",
+                std::string(
+                    "{\"score\":90,\"ai\":{\"degraded\":true}}"));
+
+        ASSERT_TRUE(completed.has_value());
+        EXPECT_EQ(completed->status, AiTaskStatus::kSuccess);
+        EXPECT_TRUE(
+            JsonEquals(
+                completed->result,
+                "{\"score\":90,\"ai\":{\"degraded\":true}}"));
+        EXPECT_TRUE(JsonEquals(completed->ruleResult, "{\"score\":1}"));
+        EXPECT_FALSE(completed->errorMsg.has_value());
+
+        const std::optional<AiTaskRecord> reread =
+            dao->FindOwnedTask(userId, taskId.value());
+
+        ASSERT_TRUE(reread.has_value());
+        EXPECT_EQ(reread->status, AiTaskStatus::kSuccess);
+        EXPECT_TRUE(JsonEquals(reread->ruleResult, "{\"score\":1}"));
+    }
+
+    TEST_F(AiTaskDaoTest, FailOwnedTaskRequeuesTerminatesAndRefusesOwner)
+    {
+        const std::optional<std::uint64_t> taskId =
+            CreateTask(false, "{\"score\":3}");
+
+        ASSERT_TRUE(taskId.has_value());
+        ASSERT_TRUE(
+            Claim("wrap-worker-a").task.has_value());
+
+        EXPECT_FALSE(
+            dao->FailOwnedTask(
+                 taskId.value(),
+                 "wrap-worker-b",
+                 std::string("nope"),
+                 true,
+                 AiTaskLeasePolicy{})
+                .has_value());
+
+        const std::optional<AiTaskRecord> requeued =
+            dao->FailOwnedTask(
+                taskId.value(),
+                "wrap-worker-a",
+                std::string("provider timeout"),
+                true,
+                AiTaskLeasePolicy{});
+
+        ASSERT_TRUE(requeued.has_value());
+        EXPECT_EQ(requeued->status, AiTaskStatus::kPending);
+        ASSERT_TRUE(requeued->errorMsg.has_value());
+        EXPECT_EQ(requeued->errorMsg.value(), "provider timeout");
+        EXPECT_TRUE(JsonEquals(requeued->ruleResult, "{\"score\":3}"));
+
+        const AiTaskClaimOutcome reclaimed =
+            dao->ClaimNextTask("wrap-worker-a", AiTaskLeasePolicy{});
+
+        ASSERT_TRUE(reclaimed.task.has_value());
+        EXPECT_EQ(reclaimed.task->id, taskId.value());
+        EXPECT_EQ(reclaimed.task->retryCount, 2);
+
+        const std::optional<AiTaskRecord> terminated =
+            dao->FailOwnedTask(
+                taskId.value(),
+                "wrap-worker-a",
+                std::string("invalid provider response"),
+                false,
+                AiTaskLeasePolicy{});
+
+        ASSERT_TRUE(terminated.has_value());
+        EXPECT_EQ(terminated->status, AiTaskStatus::kFailed);
+        ASSERT_TRUE(terminated->errorMsg.has_value());
+        EXPECT_EQ(
+            terminated->errorMsg.value(),
+            "invalid provider response");
+        EXPECT_FALSE(terminated->result.has_value());
+        EXPECT_TRUE(JsonEquals(terminated->ruleResult, "{\"score\":3}"));
+
+        const std::optional<AiTaskRecord> reread =
+            dao->FindOwnedTask(userId, taskId.value());
+
+        ASSERT_TRUE(reread.has_value());
+        EXPECT_EQ(reread->status, AiTaskStatus::kFailed);
+        EXPECT_TRUE(JsonEquals(reread->ruleResult, "{\"score\":3}"));
     }
 
 } // namespace jobpilot::service

@@ -4,6 +4,8 @@
 
 #include "jobpilot/http/http_request.h"
 #include "jobpilot/http/http_response.h"
+#include "jobpilot/service/ai/ai_controller.h"
+#include "jobpilot/service/ai/ai_internal_controller.h"
 #include "jobpilot/service/application/application_controller.h"
 #include "jobpilot/service/job/job_controller.h"
 #include "jobpilot/service/job/internal_job_import_controller.h"
@@ -21,7 +23,9 @@ namespace jobpilot::service
         JobController *jobController,
         ApplicationController *applicationController,
         InternalJobImportController *internalJobImportController,
-        InternalSourceSyncController *internalSourceSyncController)
+        InternalSourceSyncController *internalSourceSyncController,
+        AiController *aiController,
+        AiInternalController *aiInternalController)
     {
         if (server == nullptr ||
             userController == nullptr)
@@ -314,6 +318,84 @@ namespace jobpilot::service
                     jobpilot::core::HttpResponse &response)
                 {
                     internalSourceSyncController->Sync(
+                        request,
+                        response);
+                });
+        }
+
+        if (aiController != nullptr)
+        {
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/api/v1/ai/match",
+                [aiController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    aiController->CreateMatch(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
+                "/api/v1/ai/tasks/{id}",
+                [aiController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    aiController->GetTask(
+                        request,
+                        response);
+                });
+        }
+
+        if (aiInternalController != nullptr)
+        {
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/internal/ai/tasks/claim",
+                [aiInternalController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    aiInternalController->Claim(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/internal/ai/tasks/{id}/complete",
+                [aiInternalController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    aiInternalController->Complete(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/internal/ai/tasks/{id}/fail",
+                [aiInternalController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    aiInternalController->Fail(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
+                "/internal/ai/tasks/{id}/input",
+                [aiInternalController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    aiInternalController->Input(
                         request,
                         response);
                 });

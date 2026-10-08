@@ -1,0 +1,46 @@
+# JobPilotAI AI worker configuration (ExecPlan 0013 sections 6.2-6.5).
+#
+# Copy to config.yaml and edit. Secrets never live here: the file only names the
+# environment variable that holds the internal API token and the environment
+# variable that holds the provider key.
+#
+# The deterministic match_rule_v1 score is computed and stored by the C++ side;
+# this worker may only add explanation/suggestions/ai.* fields.
+
+jobpilot:
+  # Base URL of the C++ service (the internal API lives under /internal/ai).
+  base_url: http://127.0.0.1:8080
+  internal_token_env: INTERNAL_API_TOKEN
+  # Stable identity of this worker; echoed on claim/input/complete/fail.
+  worker_id: jobpilot-ai-worker-1
+  # Lease requested on claim (must be >= the time one task takes).
+  lease_seconds: 120
+  # How long to back off when the queue is empty.
+  interval_seconds: 5
+  # Must match the service ai.max_attempts. Only used to decide when to stop
+  # retrying and complete with the rule baseline instead.
+  max_attempts: 3
+  # Claim only these task types.
+  task_types:
+    - job_match
+  # Timeout and bounded retries for internal API calls (429/5xx/transport only).
+  request_timeout_seconds: 15
+  max_retries: 1
+
+# Optional section: omit it entirely to always complete with the rule baseline.
+provider:
+  # Any OpenAI-compatible endpoint: DeepSeek, Qwen, OpenAI, vLLM, Ollama, ...
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat
+  # NAME of the environment variable holding the key. Never the key itself.
+  # Use `key_env: null` for a local server that needs no Authorization header.
+  key_env: DEEPSEEK_API_KEY
+  # Optional; used best-effort for ai.embedding_score. null disables embeddings.
+  embedding_model: null
+  timeout_seconds: 30
+  # One bounded retry by default (ExecPlan 0013 section 6.4).
+  max_retries: 1
+  # Loopback/private/link-local/metadata endpoints are rejected unless this is
+  # true. Set it to true only to reach a provider you run yourself, e.g.
+  # `base_url: http://127.0.0.1:11434/v1` for Ollama.
+  allow_private_endpoint: false

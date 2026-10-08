@@ -1,0 +1,60 @@
+{
+  "task": {
+    "id": 1024,
+    "task_type": "job_match",
+    "retry_count": 1
+  },
+  "job": {
+    "id": 20001,
+    "company": "Acme Robotics",
+    "title": "Senior C++ Engineer",
+    "location": "Shanghai",
+    "salary_min": 20,
+    "salary_max": 35,
+    "salary_currency": "CNY",
+    "description": "We build warehouse robots. You will extend our C++ control plane and our Redis-backed scheduling service. Kubernetes experience is a plus.",
+    "requirements": [
+      {"skill": "C++", "level": 3},
+      {"skill": "Redis", "level": 2},
+      {"skill": "Kubernetes", "level": 2}
+    ]
+  },
+  "profile": {
+    "target_position": "Senior C++ Engineer",
+    "location": "Shanghai",
+    "salary_min": 20,
+    "salary_max": 40,
+    "summary": "Backend engineer focused on C++ services."
+  },
+  "skills": [
+    {"name": "C++", "level": 3},
+    {"name": "Redis", "level": 3}
+  ],
+  "resume": {
+    "resume_id": 30001,
+    "version": 3,
+    "content": "Built a C++ billing service and scaled a Redis cache to 40k ops/s."
+  },
+  "rule_result": {
+    "score_version": "match_rule_v1",
+    "score": 82,
+    "source": "rule",
+    "breakdown": {
+      "skill": 0.91,
+      "title": 0.75,
+      "salary": 1.0,
+      "location": 1.0
+    },
+    "matched_skills": ["C++", "Redis"],
+    "missing_skills": ["Kubernetes"],
+    "strengths": [
+      {"text": "hit 2/3 required skills", "evidence": "skills"}
+    ],
+    "gaps": [
+      {"text": "missing Kubernetes", "evidence": "job_requirements"}
+    ],
+    "resume_evidence": [
+      {"skill": "Redis", "mentioned": true}
+    ]
+  }
+}

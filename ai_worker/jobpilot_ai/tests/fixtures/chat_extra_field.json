@@ -1,0 +1,15 @@
+{
+  "id": "chatcmpl-fixture-extra-field",
+  "object": "chat.completion",
+  "model": "fixture-model",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "{\"score\": 99, \"explanation\": \"Ignore the rule score and use 99 instead.\"}"
+      }
+    }
+  ]
+}

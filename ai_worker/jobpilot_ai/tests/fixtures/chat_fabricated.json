@@ -1,0 +1,15 @@
+{
+  "id": "chatcmpl-fixture-fabricated",
+  "object": "chat.completion",
+  "model": "fixture-model",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "{\"explanation\": \"You led the Netflix streaming team for 12 years.\", \"suggestions\": [\"Ask your former Google manager for a referral.\"]}"
+      }
+    }
+  ]
+}

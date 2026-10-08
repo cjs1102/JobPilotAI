@@ -1,0 +1,19 @@
+[project]
+name = "jobpilot-ai-worker"
+version = "0.1.0"
+description = "JobPilotAI AI worker: rule-baseline preservation with optional OpenAI-compatible enhancement"
+requires-python = ">=3.10"
+# Standard library for HTTP/JSON; PyYAML parses the worker config. The provider
+# key is read from the environment variable named by key_env only - never from a
+# CLI flag, never from the config file, never logged (ExecPlan 0013 section 6.4).
+dependencies = ["PyYAML>=6.0"]
+
+[project.scripts]
+jobpilot-ai-worker = "jobpilot_ai.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["jobpilot_ai"]

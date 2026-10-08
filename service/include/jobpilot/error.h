@@ -17,6 +17,9 @@ enum class ErrorCode : int {
     kApplicationNotFound = 40003,
     kDuplicateApplication = 40004,
     kInvalidStatusTransition = 40005,
+    kAiTaskNotFound = 50001,
+    kAiServiceBusy = 50002,
+    kAiAnalysisFailed = 50003,
     kInternalError = 60001,
     kDatabaseError = 60002
 };
@@ -53,6 +56,12 @@ inline const char *ErrorMessage(ErrorCode code)
         return "duplicate application";
     case ErrorCode::kInvalidStatusTransition:
         return "invalid status transition";
+    case ErrorCode::kAiTaskNotFound:
+        return "ai task not found";
+    case ErrorCode::kAiServiceBusy:
+        return "ai service busy";
+    case ErrorCode::kAiAnalysisFailed:
+        return "ai analysis failed";
     case ErrorCode::kInternalError:
         return "internal error";
     case ErrorCode::kDatabaseError:

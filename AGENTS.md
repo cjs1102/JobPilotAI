@@ -5,10 +5,10 @@
 C++17 Linux backend for an AI-assisted job application platform. `service/` is
 the canonical runnable entry; root CMake is the unified developer entry.
 
-Current phase: 0012 Job Source Adapter + Freshness is complete (Steps 1-10) and
-archived under `docs/exec-plans/completed/`; no plan is active. 0013 AI Matching
-is the next stage and must not start until 0012 is reviewed. P1 network/HTTP
-remains behaviorally frozen.
+Current phase: 0013 AI Matching is the active plan (`job_match` end to end).
+Research / Capability Check / Design / Planning are complete and implementation
+has not started. 0012 is complete and archived under
+`docs/exec-plans/completed/`. P1 network/HTTP remains behaviorally frozen.
 
 ## Agent Takeover
 

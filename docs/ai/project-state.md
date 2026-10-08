@@ -91,6 +91,24 @@ Key decisions:
 | Architecture Re-Research | `../architecture/open-source-mvp.md`, `../adr/README.md` | ADR-0007 through ADR-0010 | `635fc31` |
 | Job Search / Ranking | `completed/0011-job-search-ranking.md` | Job ranking/search modules and tests | `214dc9e` |
 
+## Active Plan
+
+[0013-ai-matching.md](../exec-plans/active/0013-ai-matching.md)
+
+Current step:
+
+```text
+Research / Capability Check / Design / Plan complete
+Implementation not started
+```
+
+0013 scope: `job_match` end to end — additive owner/lease/rule-baseline columns
+on `ai_tasks`, deterministic `match_rule_v1` scoring in C++, public
+`POST /api/v1/ai/match` plus `GET /api/v1/ai/tasks/{id}`, token-protected
+`/internal/ai/tasks/{claim,complete,fail,input}`, and an optional Python
+`ai_worker/` that adds embedding/LLM explanation without ever replacing the
+deterministic score. `resume_optimize` / `interview_gen` stay reserved for 0014.
+
 ## Latest Completed Plan
 
 [../exec-plans/completed/0012-job-source-adapter-freshness.md](../exec-plans/completed/0012-job-source-adapter-freshness.md)
@@ -100,7 +118,6 @@ Progress:
 ```text
 Steps 1-10 complete
 L4 verified: Debug / ASan / UBSan 172/172 each, Release builds passed
-No plan is active; 0013 AI Matching is next after 0012 is reviewed
 ```
 
 0012 scope:
@@ -186,10 +203,11 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review the completed 0012 plan and its L4 evidence
-   (`completed/0012-job-source-adapter-freshness.md`).
-2. No plan is active; 0013 AI Matching must not start until 0012 is reviewed.
-3. Follow 0013 AI Matching, 0014 Resume Tailoring, and 0015 Open-source
+1. Review and execute `active/0013-ai-matching.md` (Research / Design / Plan are
+   complete; implementation has not started).
+2. `resume_optimize` and `interview_gen` remain contract-only and belong to 0014
+   Resume Tailoring.
+3. Follow 0014 Resume Tailoring and 0015 Open-source
    Packaging.
 4. Keep AutoApply, RabbitMQ, general Crawler, Gateway, and SaaS RBAC out of
    the MVP unless a separate ADR changes the decision.
@@ -216,6 +234,8 @@ Do not start a new P2 module without its own approved plan.
   [references/project-state-full.md](references/project-state-full.md)
 - Current architecture:
   [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md)
+- Active ExecPlan:
+  [../exec-plans/active/0013-ai-matching.md](../exec-plans/active/0013-ai-matching.md)
 - Latest completed ExecPlan:
   [../exec-plans/completed/0012-job-source-adapter-freshness.md](../exec-plans/completed/0012-job-source-adapter-freshness.md)
 - Current ADR decisions: [../adr/README.md](../adr/README.md)

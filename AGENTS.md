@@ -5,10 +5,13 @@
 C++17 Linux backend for an AI-assisted job application platform. `service/` is
 the canonical runnable entry; root CMake is the unified developer entry.
 
-Current phase: 0013 AI Matching is the active plan (`job_match` end to end).
-Research / Capability Check / Design / Planning are complete and implementation
-has not started. 0012 is complete and archived under
-`docs/exec-plans/completed/`. P1 network/HTTP remains behaviorally frozen.
+Current phase: 0013 AI Matching is the active plan (`job_match` end to end);
+Steps 1-3 (schema migration, `match_rule_v1`, AI Task DAO) are implemented and
+verified, and Step 4 (AI Task Service) is next. 0012 is complete and archived
+under `docs/exec-plans/completed/`. Product direction is China-first per
+`docs/adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
+manual capture import, campus focus, company career pages, never auto-submit).
+P1 network/HTTP remains behaviorally frozen.
 
 ## Agent Takeover
 

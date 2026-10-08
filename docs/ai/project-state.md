@@ -203,12 +203,15 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review and execute `active/0013-ai-matching.md` (Research / Design / Plan are
-   complete; implementation has not started).
-2. `resume_optimize` and `interview_gen` remain contract-only and belong to 0014
-   Resume Tailoring.
-3. Follow 0014 Resume Tailoring and 0015 Open-source
-   Packaging.
+1. Review and execute `active/0013-ai-matching.md` (Steps 1-3 complete;
+   implementation continues at Step 4, the AI Task Service).
+2. After 0013, plan the China-first source layer decided in
+   `adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
+   manual capture import, campus focus, company career pages); the three
+   overseas adapters from 0012 become optional sources.
+3. `resume_optimize` and `interview_gen` remain contract-only; the Chinese
+   resume/ATS tailoring work belongs to the resume-tailoring stage.
+4. Follow the remaining roadmap stages after that.
 4. Keep AutoApply, RabbitMQ, general Crawler, Gateway, and SaaS RBAC out of
    the MVP unless a separate ADR changes the decision.
 
@@ -238,6 +241,8 @@ Do not start a new P2 module without its own approved plan.
   [../exec-plans/active/0013-ai-matching.md](../exec-plans/active/0013-ai-matching.md)
 - Competitive research note:
   [../research/2026-10-08-open-source-job-search-agents.md](../research/2026-10-08-open-source-job-search-agents.md)
+- Product direction decision:
+  [../adr/0011-china-first-sourcing-and-compliance.md](../adr/0011-china-first-sourcing-and-compliance.md)
 - Latest completed ExecPlan:
   [../exec-plans/completed/0012-job-source-adapter-freshness.md](../exec-plans/completed/0012-job-source-adapter-freshness.md)
 - Current ADR decisions: [../adr/README.md](../adr/README.md)

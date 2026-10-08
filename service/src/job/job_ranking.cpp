@@ -21,12 +21,14 @@ namespace jobpilot::service
 {
     namespace
     {
-        constexpr double kSkillWeight = 0.55;
-        constexpr double kTitleWeight = 0.15;
-        constexpr double kSalaryWeight = 0.15;
-        constexpr double kLocationWeight = 0.10;
-        constexpr double kFirstSeenWeight = 0.05;
-        constexpr double kFirstSeenWindowDays = 30.0;
+        // rule_v1 weights live in job_ranking.h so 0013 can reuse them.
+        constexpr double kSkillWeight = kRuleV1SkillWeight;
+        constexpr double kTitleWeight = kRuleV1TitleWeight;
+        constexpr double kSalaryWeight = kRuleV1SalaryWeight;
+        constexpr double kLocationWeight = kRuleV1LocationWeight;
+        constexpr double kFirstSeenWeight = kRuleV1FirstSeenWeight;
+        constexpr double kFirstSeenWindowDays =
+            kRuleV1FirstSeenWindowDays;
 
         std::string FoldAsciiCase(
             const std::string &value)
@@ -155,7 +157,12 @@ namespace jobpilot::service
                 return std::nullopt;
             }
 
-            return weightedMatch / totalWeight;
+            // Over-qualification must not push a component above 1.0: rule_v1
+            // documents a 0-100 score (0011 ExecPlan section on ranking), and
+            // 0013 match_rule_v1 reuses this component.
+            return std::min(
+                1.0,
+                weightedMatch / totalWeight);
         }
 
         std::optional<double> TitleFit(

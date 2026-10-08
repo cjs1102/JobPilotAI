@@ -21,6 +21,16 @@ namespace jobpilot::service
         std::optional<double> firstSeen;
     };
 
+    // rule_v1 component weights. Exported so 0013 match scoring can reuse the
+    // same primitives instead of duplicating the numbers; match_rule_v1 drops
+    // the ranking-only recency component and renormalizes.
+    inline constexpr double kRuleV1SkillWeight = 0.55;
+    inline constexpr double kRuleV1TitleWeight = 0.15;
+    inline constexpr double kRuleV1SalaryWeight = 0.15;
+    inline constexpr double kRuleV1LocationWeight = 0.10;
+    inline constexpr double kRuleV1FirstSeenWeight = 0.05;
+    inline constexpr double kRuleV1FirstSeenWindowDays = 30.0;
+
     struct RankedJob
     {
         JobSummary job;

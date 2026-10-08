@@ -18,6 +18,7 @@ find_package(GTest CONFIG REQUIRED)
 add_library(jobpilot_service_core STATIC
     src/router.cpp
     src/auth/session_authenticator.cpp
+    src/ai/match_rule.cpp
     src/application/application_controller.cpp
     src/application/application_dao.cpp
     src/application/application_service.cpp
@@ -288,6 +289,18 @@ target_link_libraries(
 )
 
 add_executable(
+    test_match_rule
+    tests/test_match_rule.cpp
+)
+
+target_link_libraries(
+    test_match_rule
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
     test_job_http
     tests/test_job_http.cpp
 )
@@ -475,6 +488,11 @@ gtest_discover_tests(
     test_source_sync_e2e
     PROPERTIES
         LABELS "job;integration"
+)
+
+gtest_discover_tests(
+    test_match_rule
+    LABELS "ai"
 )
 
 gtest_discover_tests(

@@ -422,6 +422,9 @@ Authorization: Bearer <token>
 - Soft Ranking 只对已通过 Hard Filter 的岗位计分。
 - 已被 Hard Filter 使用的属性会从评分中移除并重新归一化权重，避免重复惩罚。
 - `rule_v1` 权重：skill 55%、title 15%、salary 15%、location 10%、first_seen 5%。
+- `score` 取值 `0-100`：每个分量被限制在 `0..1`，技能等级高于要求不会把总分推过
+  100（该上界由 0013 修复并加回归断言）。0013 的 `match_rule_v1`（见 §7）复用同一
+  分量集但去掉 `first_seen` 后重新归一化，且分数取整为 `0-100` 整数。
 - 最多加载 2000 个候选岗位；超出时返回 `truncated=true`。
 - 不调用 LLM 或 Embedding。
 - 可见性规则与 5.1 相同：默认排除 `closed` 与 `stale`，支持 `include_stale` /

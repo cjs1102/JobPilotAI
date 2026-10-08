@@ -421,7 +421,7 @@ Stop and return to design if:
 - [x] Design
 - [x] ExecPlan
 - [x] Schema migration
-- [ ] Match rule domain
+- [x] Match rule domain
 - [ ] AI Task DAO
 - [ ] AI Task Service
 - [ ] Public + internal HTTP
@@ -458,3 +458,34 @@ Stop and return to design if:
 - **RabbitMQ**: ADR-0009 defers it; a single-user local worker does not need it.
 - **Storing results in a new table**: `ai_tasks.result` JSON was explicitly
   chosen in `docs/03` to avoid schema churn per feature.
+
+## 16. Implementation Decisions
+
+### Step 1 — schema migration (committed `127acfd`)
+
+- `locked_by`, `lease_expire_at`, `rule_result` and `idx_status_lease` are
+  additive; `docs/03` section 3 DDL, section 5 index table, and new section 8
+  record the contract and the existing-database ALTER.
+- Evidence: `SchemaTest` 9/9 against the migrated dev database and 9/9 against a
+  freshly initialized `jobpilot_0013_check` database (init scripts and the ALTER
+  produce the same contract).
+
+### Step 2 — match_rule_v1 domain
+
+- `ScoreMatch` reuses `ScoreJob` and renormalizes over the present components
+  after dropping the ranking-only recency component; the `rule_v1` weights are
+  now exported from `job_ranking.h` so there is a single source of truth.
+- **Defect found and fixed (0011 scope)**: `SkillFit` could exceed `1.0` for
+  over-qualified skills (`min(userLevel, requiredLevel) * requiredLevel`
+  summed over requirements), which let `rule_v1` return scores above the
+  documented 0-100 range. It is now clamped at `1.0` and covered by a
+  regression assertion in `MatchRuleTest.IgnoresRecencyUnlikeRuleV1`.
+- `ScoreMatch` additionally clamps every component to `[0, 1]` and the final
+  score to `[0, 100]` so the 0013 contract cannot be violated by upstream
+  changes.
+- Resume matching is word-boundary aware (`Redis` does not match
+  `RedisCluster`), case-insensitive, and treated as evidence rather than proof.
+- `score` is integer-valued in `[0, 100]`; `breakdown` keeps full precision.
+- Evidence: `MatchRuleTest` 6/6; `test_job_ranking_service` 3/3 and
+  `test_job_service` 7/7 unchanged; `-Wall -Wextra -Werror` clean for
+  `src/ai/match_rule.cpp`, `src/job/job_ranking.cpp`, `tests/test_match_rule.cpp`.

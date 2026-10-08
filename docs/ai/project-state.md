@@ -203,8 +203,9 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review and execute `active/0013-ai-matching.md` (Steps 1-3 complete;
-   implementation continues at Step 4, the AI Task Service).
+1. Review and execute `active/0013-ai-matching.md` (Steps 1-3 and the Python
+   worker are complete and pushed; Step 4 AI Task Service and Step 5 HTTP
+   wiring remain).
 2. After 0013, plan the China-first source layer decided in
    `adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
    manual capture import, campus focus, company career pages); the three
@@ -212,7 +213,7 @@ Performance baseline:
 3. `resume_optimize` and `interview_gen` remain contract-only; the Chinese
    resume/ATS tailoring work belongs to the resume-tailoring stage.
 4. Follow the remaining roadmap stages after that.
-4. Keep AutoApply, RabbitMQ, general Crawler, Gateway, and SaaS RBAC out of
+5. Keep AutoApply, RabbitMQ, general Crawler, Gateway, and SaaS RBAC out of
    the MVP unless a separate ADR changes the decision.
 
 0011 must remain:

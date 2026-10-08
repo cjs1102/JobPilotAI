@@ -425,7 +425,7 @@ Stop and return to design if:
 - [x] AI Task DAO
 - [ ] AI Task Service
 - [ ] Public + internal HTTP
-- [ ] Python worker
+- [x] Python worker
 - [ ] E2E + documentation
 - [ ] L4 verification
 
@@ -540,3 +540,31 @@ path for 0015.
   into `failed`, retryable failure requeueing below the cap, permanent failure
   terminating immediately, and completion being rejected for the wrong owner or
   an expired lease. `-Wall -Wextra -Werror` clean for both new files.
+
+### Step 6 — Python worker
+
+- `ai_worker/` is a stdlib-only package (PyYAML the single third-party runtime
+  dependency) implementing the loop, the internal-API client and a
+  provider-neutral OpenAI-compatible client (chat + embeddings). Keys come only
+  from the environment variable named by `key_env`, never from a CLI flag.
+- The merge layer may only append `explanation` / `suggestions` / `ai.*`; a
+  provider reply that names `score`, `breakdown`, `matched_skills`,
+  `missing_skills`, `score_version` or `source` is rejected wholesale and the
+  task is completed with the intact rule baseline plus a degradation reason.
+- Untrusted input is enforced: the posting text is passed as data, the system
+  prompt states that embedded instructions are never followed and that links in
+  the posting are never fetched, and the provider `base_url` guard rejects
+  loopback, private, link-local and metadata addresses unless explicitly opted
+  in.
+- Evidence: 190 offline unittest cases pass (`python3 -m unittest discover -s
+  jobpilot_ai/tests -t .`), including a 9-case architecture guard (no database
+  driver, no SQL text, no vendor SDK, no secret CLI flags, key material confined
+  to the provider module). `--help` exits 0, an unreachable service exits 1 with
+  a single-line error and no traceback, and a missing token exits 2.
+- Deliberate, documented deviations: the internal client tolerates both a
+  compact success body and a `{code,message,data}` envelope (to be re-checked
+  against the landed Step 5 controller), the evidence gate is term presence
+  rather than entailment (full provenance belongs to the resume-tailoring
+  stage), the URL guard matches hostnames literally without DNS resolution, and
+  the golden evaluation set ships as a test module rather than a separate
+  runner.

@@ -422,7 +422,7 @@ Stop and return to design if:
 - [x] ExecPlan
 - [x] Schema migration
 - [x] Match rule domain
-- [ ] AI Task DAO
+- [x] AI Task DAO
 - [ ] AI Task Service
 - [ ] Public + internal HTTP
 - [ ] Python worker
@@ -524,3 +524,19 @@ submission archiving with follow-up cadence and outcome calibration for 0014;
 `SECURITY.md`/`CONTRIBUTING.md`, a shipped-file vs user-data boundary, a
 no-telemetry guarantee, adapter-contract validation and a zero-cost local-model
 path for 0015.
+
+### Step 3 — AI Task DAO
+
+- `IAiTaskDao` / `AiTaskDao` implement the whole lifecycle in SQL: create (pending
+  or resolved-now), ownership lookup, idempotent open-task lookup, atomic claim,
+  complete, fail, and an owner+lease-checked read for the input endpoint.
+- Claim is one `UPDATE ... WHERE status = 0 ORDER BY id LIMIT 1` claim inside the
+  same transaction that requeues expired leases below the attempt cap and fails
+  the expired ones at or above it, so no explicit `SELECT ... FOR UPDATE` race
+  window exists on the claim itself.
+- Evidence: `AiTaskDaoTest` 10/10, including a three-thread concurrent claim over
+  four tasks that asserts every task is claimed exactly once, lease reclaim
+  (`requeuedStale=1`, `retry_count` 1→2), expiry beyond the cap turning the task
+  into `failed`, retryable failure requeueing below the cap, permanent failure
+  terminating immediately, and completion being rejected for the wrong owner or
+  an expired lease. `-Wall -Wextra -Werror` clean for both new files.

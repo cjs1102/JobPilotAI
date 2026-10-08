@@ -19,6 +19,7 @@ add_library(jobpilot_service_core STATIC
     src/router.cpp
     src/auth/session_authenticator.cpp
     src/ai/match_rule.cpp
+    src/ai/ai_task_dao.cpp
     src/application/application_controller.cpp
     src/application/application_dao.cpp
     src/application/application_service.cpp
@@ -289,6 +290,18 @@ target_link_libraries(
 )
 
 add_executable(
+    test_ai_task_dao
+    tests/test_ai_task_dao.cpp
+)
+
+target_link_libraries(
+    test_ai_task_dao
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
     test_match_rule
     tests/test_match_rule.cpp
 )
@@ -488,6 +501,11 @@ gtest_discover_tests(
     test_source_sync_e2e
     PROPERTIES
         LABELS "job;integration"
+)
+
+gtest_discover_tests(
+    test_ai_task_dao
+    LABELS "ai;integration"
 )
 
 gtest_discover_tests(

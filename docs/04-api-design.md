@@ -861,6 +861,8 @@ GET  /internal/ai/tasks/{id}/input?worker_id=...
 - `complete` / `fail` / `input` 必须 owner 匹配且租约有效，否则 `50001`。
 - `fail` 且 `retryable=true` 且未达 `ai.max_attempts` 时回到 `pending`；否则终态
   `failed` 并记录 `error_msg`。
+- `retry_count` 表示**已尝试次数**，由 `claim` 递增；`fail` 只更新状态与
+  `error_msg`，不再递增计数。
 - worker **不得直接访问业务表**（ADR-0009）：其输入全部来自 `/input`。
 - 默认 `lease_seconds=120`、`max_attempts=3`，由 `ai.lease_seconds` /
   `ai.max_attempts` 配置。

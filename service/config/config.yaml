@@ -3,7 +3,9 @@ server:
   port: 8080
 
 mysql:
-  host: localhost
+  # 127.0.0.1 avoids libmysqlclient's unix-socket default when MySQL
+  # runs in a container on the same host; override with MYSQL_HOST.
+  host: 127.0.0.1
   port: 3306
   database: jobpilot
   user: jobpilot

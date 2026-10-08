@@ -76,3 +76,30 @@ not access business tables directly. RabbitMQ is deferred.
 - **AI direct access to business tables**: weakens module boundaries and
   secret/privacy isolation.
 - **Fabricating resume claims**: unacceptable; missing evidence remains a gap.
+
+## Amendment (2026-10-08, ExecPlan 0013)
+
+The bullet "Executes deterministic scoring" under **The Python AI worker** is
+revised for the MVP: the deterministic `match_rule_v1` stage now lives in C++,
+where the existing, tested rule primitives already are (`ScoreJob` exposes the
+skill/title/salary/location components plus matched/missing skills), and the
+Python worker owns only the optional embedding and LLM stages.
+
+Reasons:
+
+- Re-implementing the scoring formula in Python would create two divergent
+  formulas for the same number.
+- A complete, explainable result must exist with **no worker running and no
+  provider key**: when enhancement is disabled (the default) the C++ side
+  resolves the task immediately with the rule result.
+- The worker becomes a pure enhancement layer, so a provider outage can only
+  degrade quality, never remove capability.
+
+"The Python AI worker ... Fails gracefully to rule-only results when AI is
+unavailable" still holds: the worker validates provider output strictly, may
+only append `explanation`/`suggestions`/`ai.*`, and completes with the baseline
+it received through `/internal/ai/tasks/{id}/input` whenever AI is unavailable.
+
+Everything else in this ADR is unchanged: provider-neutral OpenAI-compatible
+execution, BYOK keys from the environment only, no RabbitMQ, and no AI access to
+business tables.

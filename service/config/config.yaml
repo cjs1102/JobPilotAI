@@ -21,3 +21,14 @@ log:
 storage:
   root: storage
   max_file_bytes: 10485760
+
+# 0013 AI matching. `enhancement_enabled: false` means a match completes
+# deterministically in C++ the moment it is created (rule_result becomes the
+# final result) with no worker required; when true the task stays pending for
+# the optional Python worker, which may only add fields. `lease_seconds` is the
+# worker lease, clamped to [1, 3600] at claim time; `max_attempts` caps
+# stale-lease reclaims before a task is failed.
+ai:
+  enhancement_enabled: false
+  lease_seconds: 120
+  max_attempts: 3

@@ -62,6 +62,16 @@ namespace jobpilot::core
         std::string token;
     };
 
+    // 0013 AI matching. The literal defaults match the service
+    // kDefaultAiLeaseSeconds / kDefaultAiMaxAttempts contract; backend/ must
+    // not depend on service headers.
+    struct AiConfig
+    {
+        bool enhancementEnabled{false};
+        std::int32_t leaseSeconds{120};
+        std::int32_t maxAttempts{3};
+    };
+
     struct Config
     {
         ServerConfig server;
@@ -70,6 +80,7 @@ namespace jobpilot::core
         LoggingConfig log;
         StorageConfig storage;
         InternalApiConfig internalApi;
+        AiConfig ai;
 
         static Config LoadFromFile(
             const std::string &path,

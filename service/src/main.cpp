@@ -32,8 +32,6 @@
 #include "jobpilot/service/user/user_dao.h"
 #include "jobpilot/service/user/user_service.h"
 
-#include <cstdint>
-#include <cstdlib>
 #include <exception>
 #include <memory>
 #include <stdexcept>
@@ -72,72 +70,6 @@ namespace
         }
 
         return path;
-    }
-
-    // 0013 Step 5 deviation: jobpilot/core/config.h has no typed ai section
-    // yet, so the three AI settings are read from the environment here with
-    // the documented defaults (enhancement disabled, lease 120s, 3 attempts).
-    // When the config module gains ai.enhancement_enabled / ai.lease_seconds /
-    // ai.max_attempts this helper becomes a one-line switch to config.ai.
-    jobpilot::service::AiTaskConfig LoadAiTaskConfig()
-    {
-        jobpilot::service::AiTaskConfig config;
-
-        const char *enabled =
-            std::getenv("AI_ENHANCEMENT_ENABLED");
-
-        if (enabled != nullptr && *enabled != '\0')
-        {
-            const std::string value = enabled;
-
-            config.enhancementEnabled =
-                value == "1" ||
-                value == "true" ||
-                value == "TRUE" ||
-                value == "yes";
-        }
-
-        const char *lease = std::getenv("AI_LEASE_SECONDS");
-
-        if (lease != nullptr && *lease != '\0')
-        {
-            try
-            {
-                const long parsed = std::stol(lease);
-
-                if (parsed > 0)
-                {
-                    config.leaseSeconds =
-                        static_cast<std::int32_t>(parsed);
-                }
-            }
-            catch (const std::exception &)
-            {
-                // Keep the documented default.
-            }
-        }
-
-        const char *attempts = std::getenv("AI_MAX_ATTEMPTS");
-
-        if (attempts != nullptr && *attempts != '\0')
-        {
-            try
-            {
-                const long parsed = std::stol(attempts);
-
-                if (parsed > 0)
-                {
-                    config.maxAttempts =
-                        static_cast<std::int32_t>(parsed);
-                }
-            }
-            catch (const std::exception &)
-            {
-                // Keep the documented default.
-            }
-        }
-
-        return config;
     }
 } // namespace
 
@@ -276,12 +208,18 @@ int main(int argc, char *argv[])
         jobpilot::service::AiTaskDao aiTaskDao(
             mysqlPool);
 
+        jobpilot::service::AiTaskConfig aiTaskConfig;
+        aiTaskConfig.enhancementEnabled =
+            config.ai.enhancementEnabled;
+        aiTaskConfig.leaseSeconds = config.ai.leaseSeconds;
+        aiTaskConfig.maxAttempts = config.ai.maxAttempts;
+
         jobpilot::service::AiTaskService aiTaskService(
             aiTaskDao,
             jobDao,
             resumeDao,
             userDao,
-            LoadAiTaskConfig());
+            aiTaskConfig);
 
         jobpilot::service::AiController aiController(
             aiTaskService,

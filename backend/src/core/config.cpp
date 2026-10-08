@@ -32,6 +32,12 @@ namespace jobpilot::core
             "STORAGE_MAX_FILE_BYTES";
         constexpr const char *kInternalApiTokenEnv =
             "INTERNAL_API_TOKEN";
+        constexpr const char *kAiEnhancementEnabledEnv =
+            "AI_ENHANCEMENT_ENABLED";
+        constexpr const char *kAiLeaseSecondsEnv =
+            "AI_LEASE_SECONDS";
+        constexpr const char *kAiMaxAttemptsEnv =
+            "AI_MAX_ATTEMPTS";
 
         std::string ToLower(std::string value)
         {
@@ -179,6 +185,32 @@ namespace jobpilot::core
                 throw ConfigError(
                     field + " must be a positive integer");
             }
+        }
+
+        bool ParseBool(
+            const std::string &value,
+            const std::string &field)
+        {
+            const std::string folded = ToLower(value);
+
+            if (folded == "true" ||
+                folded == "1" ||
+                folded == "yes" ||
+                folded == "on")
+            {
+                return true;
+            }
+
+            if (folded == "false" ||
+                folded == "0" ||
+                folded == "no" ||
+                folded == "off")
+            {
+                return false;
+            }
+
+            throw ConfigError(
+                field + " must be a boolean");
         }
 
         void ApplyYaml(Config *config, const YAML::Node &root)
@@ -372,6 +404,49 @@ namespace jobpilot::core
                             "storage.max_file_bytes");
                 }
             }
+
+            if (const YAML::Node ai = root["ai"])
+            {
+                if (!ai.IsMap())
+                {
+                    throw ConfigError(
+                        "ai must be a mapping");
+                }
+
+                if (const YAML::Node enabled =
+                        ai["enhancement_enabled"])
+                {
+                    config->ai.enhancementEnabled =
+                        ParseBool(
+                            ParseYamlScalar<std::string>(
+                                enabled,
+                                "ai.enhancement_enabled"),
+                            "ai.enhancement_enabled");
+                }
+
+                if (const YAML::Node lease = ai["lease_seconds"])
+                {
+                    config->ai.leaseSeconds =
+                        static_cast<std::int32_t>(
+                            ParsePositiveInt(
+                                ParseYamlScalar<std::string>(
+                                    lease,
+                                    "ai.lease_seconds"),
+                                "ai.lease_seconds"));
+                }
+
+                if (const YAML::Node attempts =
+                        ai["max_attempts"])
+                {
+                    config->ai.maxAttempts =
+                        static_cast<std::int32_t>(
+                            ParsePositiveInt(
+                                ParseYamlScalar<std::string>(
+                                    attempts,
+                                    "ai.max_attempts"),
+                                "ai.max_attempts"));
+                }
+            }
         }
 
         void ApplyEnvironment(
@@ -520,6 +595,41 @@ namespace jobpilot::core
             {
                 config->internalApi.token = *value;
             }
+
+            if (const std::string *value =
+                    FindEnvironment(
+                        environment,
+                        kAiEnhancementEnabledEnv))
+            {
+                config->ai.enhancementEnabled =
+                    ParseBool(
+                        *value,
+                        kAiEnhancementEnabledEnv);
+            }
+
+            if (const std::string *value =
+                    FindEnvironment(
+                        environment,
+                        kAiLeaseSecondsEnv))
+            {
+                config->ai.leaseSeconds =
+                    static_cast<std::int32_t>(
+                        ParsePositiveInt(
+                            *value,
+                            kAiLeaseSecondsEnv));
+            }
+
+            if (const std::string *value =
+                    FindEnvironment(
+                        environment,
+                        kAiMaxAttemptsEnv))
+            {
+                config->ai.maxAttempts =
+                    static_cast<std::int32_t>(
+                        ParsePositiveInt(
+                            *value,
+                            kAiMaxAttemptsEnv));
+            }
         }
 
         void Validate(const Config &config)
@@ -642,7 +752,10 @@ namespace jobpilot::core
             kLogLevelEnv,
             kStorageRootEnv,
             kStorageMaxFileBytesEnv,
-            kInternalApiTokenEnv};
+            kInternalApiTokenEnv,
+            kAiEnhancementEnabledEnv,
+            kAiLeaseSecondsEnv,
+            kAiMaxAttemptsEnv};
 
         Environment environment;
 

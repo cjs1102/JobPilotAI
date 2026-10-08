@@ -243,4 +243,104 @@ namespace jobpilot::core
             ConfigError);
     }
 
+    TEST(ConfigTest, LoadsAiDefaults)
+    {
+        const Config config =
+            Config::LoadFromString("", BaseEnvironment());
+
+        EXPECT_FALSE(config.ai.enhancementEnabled);
+        EXPECT_EQ(config.ai.leaseSeconds, 120);
+        EXPECT_EQ(config.ai.maxAttempts, 3);
+    }
+
+    TEST(ConfigTest, LoadsAiYaml)
+    {
+        const Config config =
+            Config::LoadFromString(
+                "ai:\n"
+                "  enhancement_enabled: true\n"
+                "  lease_seconds: 300\n"
+                "  max_attempts: 5\n",
+                BaseEnvironment());
+
+        EXPECT_TRUE(config.ai.enhancementEnabled);
+        EXPECT_EQ(config.ai.leaseSeconds, 300);
+        EXPECT_EQ(config.ai.maxAttempts, 5);
+    }
+
+    TEST(ConfigTest, AiEnvironmentOverridesYaml)
+    {
+        Environment environment = BaseEnvironment();
+        environment.emplace(
+            "AI_ENHANCEMENT_ENABLED",
+            "yes");
+        environment.emplace("AI_LEASE_SECONDS", "45");
+        environment.emplace("AI_MAX_ATTEMPTS", "7");
+
+        const Config config =
+            Config::LoadFromString(
+                "ai:\n"
+                "  enhancement_enabled: false\n"
+                "  lease_seconds: 300\n"
+                "  max_attempts: 5\n",
+                environment);
+
+        EXPECT_TRUE(config.ai.enhancementEnabled);
+        EXPECT_EQ(config.ai.leaseSeconds, 45);
+        EXPECT_EQ(config.ai.maxAttempts, 7);
+    }
+
+    TEST(ConfigTest, RejectsInvalidAiConfiguration)
+    {
+        EXPECT_THROW(
+            Config::LoadFromString(
+                "ai:\n"
+                "  lease_seconds: 0\n",
+                BaseEnvironment()),
+            ConfigError);
+
+        EXPECT_THROW(
+            Config::LoadFromString(
+                "ai:\n"
+                "  max_attempts: -1\n",
+                BaseEnvironment()),
+            ConfigError);
+
+        EXPECT_THROW(
+            Config::LoadFromString(
+                "ai:\n"
+                "  enhancement_enabled: maybe\n",
+                BaseEnvironment()),
+            ConfigError);
+
+        EXPECT_THROW(
+            Config::LoadFromString(
+                "ai:\n"
+                "  lease_seconds: soon\n",
+                BaseEnvironment()),
+            ConfigError);
+
+        EXPECT_THROW(
+            Config::LoadFromString(
+                "ai: []\n",
+                BaseEnvironment()),
+            ConfigError);
+
+        Environment badAttempts = BaseEnvironment();
+        badAttempts.emplace("AI_MAX_ATTEMPTS", "many");
+
+        EXPECT_THROW(
+            Config::LoadFromString("", badAttempts),
+            ConfigError);
+
+        Environment badFlag = BaseEnvironment();
+        badFlag.emplace(
+            "AI_ENHANCEMENT_ENABLED",
+            "sometimes");
+
+        EXPECT_THROW(
+            Config::LoadFromString("", badFlag),
+            ConfigError);
+    }
+
 } // namespace jobpilot::core

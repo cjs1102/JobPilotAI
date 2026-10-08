@@ -149,14 +149,18 @@ the recorded baseline, but are intentionally not part of the default TSan gate.
 
 Date: 2026-10-08
 
-0012 L4 results, 172 discovered tests per preset:
+0013 L4 results, 230 discovered tests per preset, run once at stage close
+against HEAD `f81b0cd` (see `docs/ai/agent-workflow.md` section 2 for when a
+level may run):
 
 | Check | Result |
 |---|---|
-| Debug full CTest | 172/172 passed |
-| ASan full CTest | 172/172 passed |
-| UBSan full CTest | 172/172 passed |
+| Debug full CTest | 230/230 passed |
+| ASan full CTest | 230/230 passed (no sanitizer diagnostics) |
+| UBSan full CTest | 230/230 passed (no sanitizer diagnostics) |
+| Release full CTest | 230/230 passed |
 | Python source adapter suite | 85/85 passed |
+| Python ai_worker suite | 190/190 passed |
 | TSan default gate | 42/42 passed (last concurrency baseline, after 0010) |
 | TSan external-service tests | 6/6 passed (same baseline) |
 | Service and root Release builds | passed |

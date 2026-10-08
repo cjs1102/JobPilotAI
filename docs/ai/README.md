@@ -92,3 +92,5 @@ Read only the sections needed for the current task.
 - JobPilotAI-specific Skills: `.agents/skills/`
 
 Do not duplicate rules across these layers; link to the authoritative file.
+
+- Agent workflow and verification rules: [`agent-workflow.md`](agent-workflow.md)

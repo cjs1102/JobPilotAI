@@ -203,9 +203,9 @@ Performance baseline:
 
 ## Next Entry
 
-1. Review and execute `active/0013-ai-matching.md` (Steps 1-3 and the Python
-   worker are complete and pushed; Step 4 AI Task Service and Step 5 HTTP
-   wiring remain).
+1. Review and execute `active/0013-ai-matching.md` (Steps 1-6 complete; the
+   ATS-style E2E test and documentation are Step 7 and L4 verification is
+   Step 8).
 2. After 0013, plan the China-first source layer decided in
    `adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
    manual capture import, campus focus, company career pages); the three

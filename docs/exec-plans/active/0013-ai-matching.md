@@ -423,8 +423,8 @@ Stop and return to design if:
 - [x] Schema migration
 - [x] Match rule domain
 - [x] AI Task DAO
-- [ ] AI Task Service
-- [ ] Public + internal HTTP
+- [x] AI Task Service
+- [x] Public + internal HTTP
 - [x] Python worker
 - [ ] E2E + documentation
 - [ ] L4 verification
@@ -568,3 +568,26 @@ path for 0015.
   stage), the URL guard matches hostnames literally without DNS resolution, and
   the golden evaluation set ships as a test module rather than a separate
   runner.
+
+### Steps 4-5 — service layer and HTTP
+
+- `AiTaskService` holds DAO interfaces only (no pool, no globals, no env reads) and
+  exposes CreateJobMatch / GetOwnedTask / ClaimTask / CompleteTask / FailTask /
+  BuildTaskInput with ServiceResult + ErrorCode; validation maps to
+  `kJobNotFound` (40001), `kResumeNotFound` (40002) and `kInvalidParam` (empty
+  resume text), and every ownership/lease refusal is `kAiTaskNotFound` (50001).
+- The four pool-owning DAO wrappers keep the service pool-free while reusing the
+  Step-3 transaction-taking methods; the Step-3 methods and their tests are
+  untouched.
+- Public HTTP: `POST /api/v1/ai/match`, `GET /api/v1/ai/tasks/{id}` (bearer auth,
+  raw JSON `rule_result`/`result`). Internal HTTP: claim / complete / fail /
+  input behind `X-Internal-Token`. Router parameters are trailing and defaulted
+  to `nullptr`, so existing call sites are source-compatible.
+- Claim honours the documented optional `lease_seconds`, clamped to [1, 3600].
+- Evidence: `test_ai_http` 12/12, `test_ai_task_service` 13/13,
+  `test_match_result_json` 7/7, `test_ai_task_dao` 15/15 (10 original intact),
+  `test_match_rule` 6/6, `ctest -L ai` 32/32, `ctest -L job` 84/84, strict
+  `-Wall -Wextra -Werror` clean on every new/modified file.
+- Known issue recorded, not fixed here: the pre-existing `test_ai_task_dao` and
+  `test_match_rule` target blocks use a bare `LABELS` keyword that CTest ignores,
+  so those tests are not selected by `ctest -L ai`.

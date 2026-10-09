@@ -40,6 +40,17 @@ change crosses into a higher-risk boundary.
   and do not repeat the full matrix. If relevant files changed afterward,
   rerun the affected checks and repeat the invalidated L4 gates.
 
+L4 is exclusive and runs once per stage. Preconditions: the stage's production
+code, configuration and required cross-language E2E are complete; the affected
+L1/L2/L3 tests pass; the verified code is frozen for the duration; the
+environment probe (MySQL credentials and connectivity) passes; and the build
+directories match the current source configuration. While an L4 run is in
+progress no other agent may build the same targets or run an E2E against the
+same database, and on this 4-core/7.7 GB dev host the phases run serially.
+Slowness is not a hang: inspect the process, resource use and log growth first.
+Change-type minimums and the invalidation rules after a change are normative in
+[`../ai/agent-workflow.md`](../ai/agent-workflow.md) sections 2.1-2.4.
+
 Documentation-only changes do not require a rebuild unless generated or
 runtime behavior depends on the documentation.
 
@@ -144,6 +155,23 @@ environment workaround, not a test suppression.
 MySQL, Redis, and schema tests are kept in the separate `tsan-external` preset
 because they cross uninstrumented client-library boundaries. They passed in
 the recorded baseline, but are intentionally not part of the default TSan gate.
+
+### 0013 TSan decision (recorded 2026-10-08)
+
+0013 introduces **no new in-process shared mutable state**, so it does not enter
+the TSan gate. `AiTaskDao` holds only a `ConnectionPool&` (no statics, no mutable
+members); every claim runs on a per-thread `Transaction` (its own connection),
+and claim atomicity is enforced server-side by MySQL row locks — a correctness
+property TSan cannot observe. The one shared in-process object exercised by
+`AiTaskDaoTest.NeverHandsTheSameTaskToTwoWorkers` is `ConnectionPool`, which is
+`std::mutex`-protected and already covered by the default TSan gate.
+
+If direct evidence for this path is ever wanted, the concrete follow-up is to
+add the `AiTaskDaoTest` binary to the **`tsan-external`** preset (MySQL and
+schema tests live there because they cross uninstrumented client-library
+boundaries) and run that one target — not the full TSan matrix. That matches the
+class of concurrency already covered there (job-ingestion transaction rollback,
+application duplicate-create). Do not start it as part of 0013.
 
 ## Recorded Baseline
 

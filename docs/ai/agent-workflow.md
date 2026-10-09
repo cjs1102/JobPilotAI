@@ -49,6 +49,51 @@ Binding rules:
 5. **Python suites are cheap** (seconds) but still follow rule 2: run the suite
    for the package you touched.
 
+### 2.1 Change-type minimums
+
+| Change | Minimum verification |
+|---|---|
+| Documentation only (production code untouched) | L0 |
+| Tests only | Run the new or affected tests; do not launch full sanitizers |
+| Configuration only | Run the tests whose behaviour that configuration actually affects |
+| Production code | L1/L2/L3 by blast radius (see the table above) |
+| Stage close | L4, once |
+| New or changed concurrency that must be verified | L5 evaluation only |
+
+### 2.2 L4 preconditions (all required)
+
+1. The stage's production code, configuration, and any required cross-language
+   E2E are finished.
+2. The affected L1/L2/L3 tests already pass.
+3. The verified code is frozen: nobody may edit it while the run is in progress.
+4. The environment probe passes — MySQL credentials and connectivity first.
+5. The build directories correspond to the current source configuration.
+
+### 2.3 During an L4 run (exclusive)
+
+- No other agent may build the same targets concurrently.
+- No other agent may run an E2E that competes for the same database or test
+  resources.
+- On this dev host (4 cores, ~7.7 GB) the build and full-test phases run
+  **serially** by default.
+- Every phase writes its complete log to a file; the summary keeps the exit
+  code, discovered test count, failure count, and the raw pass line.
+- Long runtime is not evidence of a hang: check the process, resource use, and
+  whether the log is still growing before concluding anything.
+
+### 2.4 Invalidation after the code or configuration changes
+
+- Diff the change and decide which earlier evidence it invalidates; re-run the
+  smallest invalidated set first.
+- Re-run a full gate only when the change affects the verification baseline as a
+  whole.
+- A new HEAD hash alone invalidates nothing.
+- A documentation-only commit never invalidates code tests.
+- A configuration change invalidates only the tests whose behaviour depends on
+  that configuration.
+- Record the conclusion for TSan entries in `docs/quality/README.md` (the TSan
+  authority), not here.
+
 ## 3. Test environment prerequisites (harness correctness)
 
 A failure caused by the harness is **not** a product failure; both must be
@@ -74,6 +119,11 @@ labelled explicitly in the report.
 7. **Expect long warm/cold build times.** A cold sanitizer or root Release build
    is minutes to hours on the dev host; poll detached logs rather than assuming
    a hang, and never kill a running phase.
+8. **Mass failure triage.** When many tests fail at once, classify the *first
+   causal error* before anything else, and separate a product defect from an
+   environment, credential or configuration fault. Fix the environment first,
+   then re-run only the affected tests. Indiscriminate re-runs are forbidden, and
+   "retry until green" is never a fix.
 
 ## 4. Evidence and honesty
 

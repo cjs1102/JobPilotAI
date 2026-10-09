@@ -16,6 +16,8 @@ Verification and agent workflow rules: `docs/ai/agent-workflow.md`. Read it
 before running any test suite — it defines the levels, when a suite may run, and
 the harness prerequisites (credentials probe, full ctest capture, no re-runs of
 already-green suites).
+An L4 run is exclusive: while one is in progress, no other agent may build the
+same targets or run an E2E against the same database.
 
 ## Agent Takeover
 

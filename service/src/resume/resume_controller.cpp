@@ -40,6 +40,7 @@ namespace jobpilot::service
             case ErrorCode::kJobNotFound:
             case ErrorCode::kResumeNotFound:
             case ErrorCode::kApplicationNotFound:
+            case ErrorCode::kAiTaskNotFound:
                 return 404;
             case ErrorCode::kEmailExists:
             case ErrorCode::kDuplicateApplication:
@@ -47,8 +48,16 @@ namespace jobpilot::service
             case ErrorCode::kUserNotFound:
             case ErrorCode::kInvalidPassword:
                 return 401;
+            // Same mapping as the AI and internal controllers; kept exhaustive
+            // with a fallback so future enumerators cannot reintroduce the
+            // -Wswitch warning.
+            case ErrorCode::kAiServiceBusy:
+                return 503;
+            case ErrorCode::kAiAnalysisFailed:
             case ErrorCode::kInternalError:
             case ErrorCode::kDatabaseError:
+                return 500;
+            default:
                 return 500;
             }
 
@@ -71,6 +80,8 @@ namespace jobpilot::service
                 return "Not Found";
             case 409:
                 return "Conflict";
+            case 503:
+                return "Service Unavailable";
             default:
                 return "Internal Server Error";
             }
@@ -516,7 +527,12 @@ namespace jobpilot::service
             ErrorCode::kSuccess,
             Json{
                 {"resume_id", result.value.resumeId},
-                {"version", result.value.version}});
+                {"version", result.value.version},
+                // 0015 A3 (option b): never a silent "no text".
+                {"text_extracted",
+                 TextExtracted(result.value.textStatus)},
+                {"text_status",
+                 ToString(result.value.textStatus)}});
     }
 
     void ResumeController::List(
@@ -670,7 +686,11 @@ namespace jobpilot::service
             ErrorCode::kSuccess,
             Json{
                 {"version_id", result.value.versionId},
-                {"version", result.value.version}});
+                {"version", result.value.version},
+                {"text_extracted",
+                 TextExtracted(result.value.textStatus)},
+                {"text_status",
+                 ToString(result.value.textStatus)}});
     }
 
     void ResumeController::ListVersions(
@@ -724,11 +744,21 @@ namespace jobpilot::service
         for (const ResumeVersionRecord &version :
              result.value)
         {
+            const ResumeTextStatus textStatus =
+                ClassifyResumeText(
+                    version.content,
+                    version.filePath.has_value()
+                        ? version.filePath.value()
+                        : std::string());
+
             list.push_back(
                 Json{
                     {"id", version.id},
                     {"version", version.version},
-                    {"created_at", version.createTime}});
+                    {"created_at", version.createTime},
+                    {"text_extracted",
+                     TextExtracted(textStatus)},
+                    {"text_status", ToString(textStatus)}});
         }
 
         WriteResponse(

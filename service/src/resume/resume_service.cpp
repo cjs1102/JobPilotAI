@@ -220,7 +220,10 @@ namespace jobpilot::service
                 ErrorCode::kSuccess,
                 ResumeUploadResult{
                     resumeId.value(),
-                    version}};
+                    version,
+                    ClassifyResumeText(
+                        content,
+                        relativePath)}};
         }
         catch (const std::exception &error)
         {
@@ -371,7 +374,10 @@ namespace jobpilot::service
                 ErrorCode::kSuccess,
                 ResumeVersionResult{
                     versionId.value(),
-                    version}};
+                    version,
+                    ClassifyResumeText(
+                        content,
+                        std::string())}};
         }
         catch (const std::exception &error)
         {

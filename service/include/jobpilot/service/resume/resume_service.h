@@ -9,6 +9,7 @@
 
 #include "jobpilot/service/auth/session_authenticator.h"
 #include "jobpilot/service/resume/resume_dao_interface.h"
+#include "jobpilot/service/resume/resume_text_status.h"
 #include "jobpilot/service/result.h"
 
 namespace jobpilot::core
@@ -31,12 +32,18 @@ namespace jobpilot::service
     {
         std::uint64_t resumeId = 0;
         std::int32_t version = 0;
+
+        // 0015 A3 (option b): explicit text state of the version just created.
+        ResumeTextStatus textStatus =
+            ResumeTextStatus::kUnavailable;
     };
 
     struct ResumeVersionResult
     {
         std::uint64_t versionId = 0;
         std::int32_t version = 0;
+        ResumeTextStatus textStatus =
+            ResumeTextStatus::kUnavailable;
     };
 
     struct ResumePage

@@ -565,6 +565,14 @@ namespace jobpilot::service
         ASSERT_TRUE(upload->hasJson);
         EXPECT_EQ(upload->statusCode, 200);
         EXPECT_EQ(upload->jsonBody["data"]["version"], 1);
+        // 0015 A3 (option b): the response never leaves text availability
+        // implicit.
+        EXPECT_EQ(
+            upload->jsonBody["data"]["text_extracted"],
+            true);
+        EXPECT_EQ(
+            upload->jsonBody["data"]["text_status"],
+            "ok");
 
         const std::uint64_t resumeId =
             upload->jsonBody["data"]["resume_id"]
@@ -604,6 +612,12 @@ namespace jobpilot::service
         ASSERT_TRUE(version->hasJson);
         EXPECT_EQ(version->statusCode, 200);
         EXPECT_EQ(version->jsonBody["data"]["version"], 2);
+        EXPECT_EQ(
+            version->jsonBody["data"]["text_extracted"],
+            true);
+        EXPECT_EQ(
+            version->jsonBody["data"]["text_status"],
+            "ok");
 
         const std::optional<HttpResponseData> versions =
             SendRequest(
@@ -620,6 +634,78 @@ namespace jobpilot::service
         ASSERT_EQ(
             versions->jsonBody["data"]["list"].size(),
             2U);
+
+        for (const auto &listed :
+             versions->jsonBody["data"]["list"])
+        {
+            ASSERT_TRUE(listed.contains("text_status"));
+            ASSERT_TRUE(listed.contains("text_extracted"));
+            EXPECT_EQ(listed["text_status"], "ok");
+            EXPECT_EQ(listed["text_extracted"], true);
+        }
+    }
+
+    // 0015 A3 option (b): a PDF resume must never contribute nothing silently.
+    TEST_F(ResumeHttpTest, ReportsExplicitPdfTextStatus)
+    {
+        const auto user =
+            RegisterAndLogin("resume-http-pdf-status");
+        const std::string authorization =
+            "Bearer " + user.second;
+
+        const std::string pdfBody =
+            MakeMultipart(
+                "PDF resume",
+                "resume.pdf",
+                "application/pdf",
+                "%PDF-1.4\npdf");
+
+        const std::optional<HttpResponseData> upload =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/upload",
+                pdfBody,
+                authorization,
+                "multipart/form-data; boundary=" +
+                    std::string(kBoundary));
+
+        ASSERT_TRUE(upload.has_value());
+        ASSERT_TRUE(upload->hasJson);
+        EXPECT_EQ(upload->statusCode, 200);
+        EXPECT_EQ(
+            upload->jsonBody["data"]["text_extracted"],
+            false);
+        EXPECT_EQ(
+            upload->jsonBody["data"]["text_status"],
+            "pdf_no_text");
+
+        const std::uint64_t resumeId =
+            upload->jsonBody["data"]["resume_id"]
+                .get<std::uint64_t>();
+
+        const std::optional<HttpResponseData> versions =
+            SendRequest(
+                "GET",
+                "/api/v1/resumes/" +
+                    std::to_string(resumeId) +
+                    "/versions",
+                "",
+                authorization);
+
+        ASSERT_TRUE(versions.has_value());
+        ASSERT_TRUE(versions->hasJson);
+        EXPECT_EQ(versions->statusCode, 200);
+        ASSERT_EQ(
+            versions->jsonBody["data"]["list"].size(),
+            1U);
+
+        const auto &listed =
+            versions->jsonBody["data"]["list"][0];
+
+        EXPECT_EQ(listed["text_extracted"], false);
+        EXPECT_EQ(listed["text_status"], "pdf_no_text");
+        // The version response never dumps the stored text either way.
+        EXPECT_FALSE(listed.contains("content"));
     }
 
     TEST_F(ResumeHttpTest, RejectsAuthenticationAndMalformedInput)

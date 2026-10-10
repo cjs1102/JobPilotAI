@@ -253,6 +253,12 @@ namespace jobpilot::service
         ASSERT_EQ(pdf.code, ErrorCode::kSuccess);
         EXPECT_EQ(pdf.value.version, 1);
 
+        // 0015 A3 option (b): the upload response states the text state
+        // explicitly instead of leaving a silent content = NULL.
+        EXPECT_EQ(text.value.textStatus, ResumeTextStatus::kExtracted);
+        EXPECT_EQ(version.value.textStatus, ResumeTextStatus::kExtracted);
+        EXPECT_EQ(pdf.value.textStatus, ResumeTextStatus::kPdfNoText);
+
         const ServiceResult<
             std::vector<ResumeVersionRecord>> pdfVersions =
                 service->ListVersions(
@@ -265,6 +271,109 @@ namespace jobpilot::service
             pdfVersions.value.front().content.has_value());
         EXPECT_TRUE(
             pdfVersions.value.front().filePath.has_value());
+
+        // No silent NULL path: every listed version classifies explicitly.
+        EXPECT_EQ(
+            ClassifyResumeText(
+                pdfVersions.value.front().content,
+                pdfVersions.value.front().filePath.value()),
+            ResumeTextStatus::kPdfNoText);
+        EXPECT_FALSE(
+            TextExtracted(
+                ClassifyResumeText(
+                    pdfVersions.value.front().content,
+                    pdfVersions.value.front().filePath.value())));
+    }
+
+    // 0015 A3: the explicit text-status contract, including the boundary that
+    // separates "no text extracted" from "text extracted and empty".
+    TEST_F(ResumeServiceTest, ClassifiesResumeTextStatusExplicitly)
+    {
+        // The state vocabulary is machine-readable and stable.
+        EXPECT_STREQ(ToString(ResumeTextStatus::kExtracted), "ok");
+        EXPECT_STREQ(ToString(ResumeTextStatus::kTextEmpty), "text_empty");
+        EXPECT_STREQ(ToString(ResumeTextStatus::kPdfNoText), "pdf_no_text");
+        EXPECT_STREQ(
+            ToString(ResumeTextStatus::kUnavailable),
+            "text_unavailable");
+
+        EXPECT_TRUE(TextExtracted(ResumeTextStatus::kExtracted));
+        EXPECT_FALSE(TextExtracted(ResumeTextStatus::kTextEmpty));
+        EXPECT_FALSE(TextExtracted(ResumeTextStatus::kPdfNoText));
+        EXPECT_FALSE(TextExtracted(ResumeTextStatus::kUnavailable));
+
+        // Text present, text present but blank, PDF without extraction, and a
+        // NULL we cannot attribute (never silent).
+        EXPECT_EQ(
+            ClassifyResumeText(
+                std::optional<std::string>("hello"),
+                "1/resumes/1/v1.txt"),
+            ResumeTextStatus::kExtracted);
+        EXPECT_EQ(
+            ClassifyResumeText(
+                std::optional<std::string>("\n\t "),
+                "1/resumes/1/v2.txt"),
+            ResumeTextStatus::kTextEmpty);
+        EXPECT_EQ(
+            ClassifyResumeText(
+                std::nullopt,
+                "1/resumes/1/v1.PDF"),
+            ResumeTextStatus::kPdfNoText);
+        EXPECT_EQ(
+            ClassifyResumeText(
+                std::nullopt,
+                "1/resumes/1/v1"),
+            ResumeTextStatus::kUnavailable);
+        EXPECT_EQ(
+            ClassifyResumeText(
+                std::nullopt,
+                std::string()),
+            ResumeTextStatus::kUnavailable);
+
+        // A whitespace-only upload is accepted and reported as empty text
+        // (never as missing text, and never as no marker at all).
+        ResumeUpload blankText;
+        blankText.title = "blank";
+        blankText.filename = "blank.txt";
+        blankText.bytes = "\n   \n";
+
+        const ServiceResult<ResumeUploadResult> blank =
+            service->Upload(
+                userId,
+                blankText);
+
+        ASSERT_EQ(blank.code, ErrorCode::kSuccess);
+        EXPECT_EQ(blank.value.textStatus, ResumeTextStatus::kTextEmpty);
+        EXPECT_FALSE(TextExtracted(blank.value.textStatus));
+
+        // The PDF is stored without content and with the explicit marker.
+        ResumeUpload pdfUpload;
+        pdfUpload.title = "explicit pdf";
+        pdfUpload.filename = "explicit.pdf";
+        pdfUpload.bytes = "%PDF-1.4\nexplicit";
+
+        const ServiceResult<ResumeUploadResult> pdf =
+            service->Upload(
+                userId,
+                pdfUpload);
+
+        ASSERT_EQ(pdf.code, ErrorCode::kSuccess);
+        EXPECT_EQ(pdf.value.textStatus, ResumeTextStatus::kPdfNoText);
+
+        const ServiceResult<
+            std::vector<ResumeVersionRecord>> versions =
+                service->ListVersions(
+                    userId,
+                    pdf.value.resumeId);
+
+        ASSERT_EQ(versions.code, ErrorCode::kSuccess);
+        ASSERT_EQ(versions.value.size(), 1U);
+        EXPECT_FALSE(versions.value.front().content.has_value());
+        EXPECT_EQ(
+            ClassifyResumeText(
+                versions.value.front().content,
+                versions.value.front().filePath.value()),
+            ResumeTextStatus::kPdfNoText);
     }
 
     TEST_F(ResumeServiceTest, RejectsInvalidFileInput)

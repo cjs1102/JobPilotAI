@@ -674,7 +674,16 @@ Stop and report to the Lead (do not widen scope) if:
   - [x] A1 + A2 (minus PDF): `docs/03` §10 + §3 DDL + §5 note, `docs/04` §3.4 keys,
         `database/schema/01_user.sql`, `UserProfile`/DAO/`UpdateProfile`/`ProfileToJson`,
         `test_user_*` + `test_schema` (fresh + migrated); NULL = unknown, no backfill.
-  - [ ] A3 (PDF text contract) — separate unit, awaiting the §5.1 a/b owner decision.
+  - [x] A3 (PDF text contract) — owner decision 4 = **option (b)**, explicit degraded contract,
+        zero new dependencies, no extraction tool: a PDF is accepted as before and
+        `resume_versions.content` stays `NULL`, but the upload/version responses and
+        `GET /api/v1/resumes/{id}/versions` always carry `text_extracted` + `text_status`
+        (`ok` / `text_empty` / `pdf_no_text` / `text_unavailable`). The state is **derived**
+        from `content` + `file_path`, so no column, no migration, no backfill
+        (`docs/03` unchanged). The classification seam `ClassifyResumeText` is exported for
+        phase B's match input bundle (B1), which is where "resume text unavailable" becomes a
+        match-input/reason statement.
+  - [x] Phase A complete (A1+A2 profile candidate data, A3 explicit PDF text contract).
 - [ ] Phase B: contract (B0) → candidate components (B1) → reasons (B2) →
       deal-breakers/urgency (B3) → writers + docs (B4)
 - [ ] Phase C: decision 2 (C1) → implement (C2) → docs (C3)

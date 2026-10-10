@@ -228,9 +228,28 @@ POST /api/v1/resumes/upload
 {
   "code": 0,
   "message": "success",
-  "data": { "resume_id": 30001, "version": 1 }
+  "data": {
+    "resume_id": 30001,
+    "version": 1,
+    "text_extracted": false,
+    "text_status": "pdf_no_text"
+  }
 }
 ```
+
+**0015 A3 文本状态契约（决策 4 = 方案 b，零新依赖的显式降级）**：PDF 简历**不做文本抽取**
+（`resume_versions.content` 保持 `NULL`），但**绝不静默**——每个版本响应都带机器可读状态：
+
+| `text_status` | `text_extracted` | 含义 |
+|---|---|---|
+| `ok` | `true` | 文本可用（`.txt`/`.md` 上传路径，或 `POST .../versions` 传入的非空白文本） |
+| `text_empty` | `false` | 文本路径执行了，但结果是空白（能区分「没抽取」与「抽取了但为空」） |
+| `pdf_no_text` | `false` | PDF 原样接收，本单元不抽取（`content = NULL`，契约明确） |
+| `text_unavailable` | `false` | `content` 为 `NULL` 且不属于上述情况——兜底值，保证**没有静默 NULL 路径** |
+
+`text_extracted` 是 `text_status == "ok"` 的派生布尔，仅为调用方便。该状态是**派生字段**：
+`resume_versions` 不新增列、不做回填（`content` 与 `file_path` 足以判定），因此
+`docs/03` 无对应迁移。同一组键出现在 §4.3（新建版本）与 §4.4（版本列表）的响应中。
 
 ### 4.2 简历列表
 
@@ -267,9 +286,17 @@ POST /api/v1/resumes/{id}/versions
 {
   "code": 0,
   "message": "success",
-  "data": { "version_id": 30012, "version": 4 }
+  "data": {
+    "version_id": 30012,
+    "version": 4,
+    "text_extracted": true,
+    "text_status": "ok"
+  }
 }
 ```
+
+`content` 为空或全空白 → `400`（`content` 为空串）／`text_status = "text_empty"`（全空白）；
+不带 `content` 键 → `400`。语义见 §4.1 的状态表。
 
 ### 4.4 简历版本列表
 
@@ -283,11 +310,21 @@ GET /api/v1/resumes/{id}/versions
   "message": "success",
   "data": {
     "list": [
-      { "id": 30012, "version": 4, "created_at": "..." }
+      {
+        "id": 30012,
+        "version": 4,
+        "created_at": "...",
+        "text_extracted": true,
+        "text_status": "ok"
+      }
     ]
   }
 }
 ```
+
+列表**每一项**都必须带 `text_status`/`text_extracted`（PDF 版本为 `pdf_no_text`）：
+「`content = NULL` 且无标记」是被禁止的失败模式（0015 §5.1 A.degraded）。
+响应不返回存储的文本正文本身。
 
 ---
 

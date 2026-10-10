@@ -153,6 +153,14 @@ namespace jobpilot::service
             result.sql =
                 " WHERE j.status = 1 AND j.closed_at IS NULL";
 
+            // 0015A: only clean rows are public. The predicate is the stage's
+            // single behavioural change and is switchable (ExecPlan 0015A
+            // sections 5.1/6.4).
+            if (!filter.includeNeedsReview)
+            {
+                result.sql += " AND j.review_status = 0";
+            }
+
             if (!filter.includeStale)
             {
                 // Legacy rows without an observation stay visible (ADR-0010
@@ -235,13 +243,68 @@ namespace jobpilot::service
                         filter.salaryMax.value()));
             }
 
+            // 0015A focus fields. Unknown (NULL) education stays visible; a NULL
+            // deadline satisfies neither range bound but stays visible under
+            // openOnly (docs/04 section 5.1).
+            if (filter.educationMax.has_value())
+            {
+                result.sql +=
+                    " AND (j.education_required IS NULL "
+                    "OR j.education_required <= ?)";
+                result.params.emplace_back(
+                    static_cast<std::uint64_t>(
+                        filter.educationMax.value()));
+            }
+
+            if (filter.jobNature.has_value())
+            {
+                result.sql += " AND j.job_nature = ?";
+                result.params.emplace_back(
+                    static_cast<std::uint64_t>(
+                        filter.jobNature.value()));
+            }
+
+            if (filter.deadlineAfter.has_value())
+            {
+                result.sql +=
+                    " AND j.deadline IS NOT NULL "
+                    "AND j.deadline > ?";
+                result.params.emplace_back(
+                    filter.deadlineAfter.value());
+            }
+
+            if (filter.deadlineBefore.has_value())
+            {
+                result.sql +=
+                    " AND j.deadline IS NOT NULL "
+                    "AND j.deadline < ?";
+                result.params.emplace_back(
+                    filter.deadlineBefore.value());
+            }
+
+            if (filter.openOnly)
+            {
+                // Deadline is display/urgency only: this predicate never closes
+                // a job, changes status, or writes freshness (F13).
+                result.sql +=
+                    " AND (j.deadline IS NULL "
+                    "OR j.deadline >= NOW())";
+            }
+
             return result;
         }
 
+        constexpr std::size_t kNoSourceUrlColumn =
+            static_cast<std::size_t>(-1);
+
         JobSummary MakeJobSummary(
-            const jobpilot::core::Result::Row &row)
+            const jobpilot::core::Result::Row &row,
+            std::size_t sourceUrlColumn = kNoSourceUrlColumn)
         {
-            if (row.size() != 22)
+            const std::size_t expectedColumns =
+                sourceUrlColumn == kNoSourceUrlColumn ? 22U : 23U;
+
+            if (row.size() != expectedColumns)
             {
                 throw std::runtime_error(
                     "job query returned an unexpected column count");
@@ -368,6 +431,12 @@ namespace jobpilot::service
             summary.freshness =
                 ClassifyFreshness(closed, ageSeconds);
 
+            if (sourceUrlColumn != kNoSourceUrlColumn &&
+                row[sourceUrlColumn].has_value())
+            {
+                summary.sourceUrl = row[sourceUrlColumn].value();
+            }
+
             return summary;
         }
     } // namespace
@@ -386,6 +455,21 @@ namespace jobpilot::service
         const JobFilter sqlFilter =
             BuildJobFilter(filter);
 
+        // 0015A: whitelisted sort orders only; never string-interpolated from
+        // the request. kDeadlineAsc is index-backed (docs/03 section 9.2) and
+        // therefore uses the consistent "ASC, ASC" direction (NULLs first).
+        std::string orderBy =
+            " ORDER BY j.create_time DESC, j.id DESC ";
+
+        if (filter.sort == JobSort::kDeadlineAsc)
+        {
+            orderBy = " ORDER BY j.deadline ASC, j.id ASC ";
+        }
+        else if (filter.sort == JobSort::kEducationAsc)
+        {
+            orderBy = " ORDER BY j.education_required ASC, j.id ASC ";
+        }
+
         std::vector<jobpilot::core::SqlParam> params =
             sqlFilter.params;
         params.emplace_back(
@@ -403,12 +487,14 @@ namespace jobpilot::service
                 "j.education_required, j.experience_years_min, "
                 "j.experience_years_max, j.job_nature, j.deadline, "
                 "j.deadline_date_only, "
-                "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()) "
+                "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()), "
+                "j.source_url "
                 "FROM jobs j" +
                     sqlFilter.sql +
-                    " ORDER BY j.create_time DESC, j.id DESC "
+                    orderBy +
                     "LIMIT ? OFFSET ?",
                 params);
+
 
         std::vector<JobSummary> jobs;
         jobs.reserve(result.rowCount());
@@ -418,7 +504,7 @@ namespace jobpilot::service
              ++row)
         {
             jobs.push_back(
-                MakeJobSummary(result.row(row)));
+                MakeJobSummary(result.row(row), 22));
         }
 
         return jobs;
@@ -470,7 +556,8 @@ namespace jobpilot::service
                 "j.education_required, j.experience_years_min, "
                 "j.experience_years_max, j.job_nature, j.deadline, "
                 "j.deadline_date_only, "
-                "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()) "
+                "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()), "
+                "j.source_url "
                 "FROM jobs j" +
                     sqlFilter.sql +
                     " ORDER BY j.create_time DESC, j.id DESC "
@@ -485,7 +572,7 @@ namespace jobpilot::service
              ++row)
         {
             jobs.push_back(
-                MakeJobSummary(result.row(row)));
+                MakeJobSummary(result.row(row), 22));
         }
 
         return jobs;
@@ -649,6 +736,10 @@ namespace jobpilot::service
         {
             detail.sourceUrl = row[23].value();
         }
+
+        // 0015A: the summary embedded in the detail must expose the same
+        // source_url as the list projection (acceptance: identical value).
+        detail.summary.sourceUrl = detail.sourceUrl;
 
         detail.status =
             ParseInt32(row[24], "jobs.status");

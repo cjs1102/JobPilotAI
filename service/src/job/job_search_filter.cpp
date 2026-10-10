@@ -13,6 +13,45 @@ namespace jobpilot::service
         constexpr std::size_t kMaxLocationBytes = 64;
         constexpr std::size_t kMaxSkillBytes = 64;
         constexpr std::uint32_t kMaxPostedWithinDays = 3650;
+        constexpr std::uint32_t kMaxEducation = 5;
+        constexpr std::uint32_t kMaxJobNature = 3;
+
+        // 0015A: deadline range bounds arrive as "YYYY-MM-DD HH:MM:SS" (the
+        // format the database contract uses, docs/03 section 9.1).
+        bool IsDbTimestamp(
+            const std::string &value)
+        {
+            if (value.size() != 19 ||
+                value[4] != '-' ||
+                value[7] != '-' ||
+                value[10] != ' ' ||
+                value[13] != ':' ||
+                value[16] != ':')
+            {
+                return false;
+            }
+
+            for (std::size_t index = 0;
+                 index < value.size();
+                 ++index)
+            {
+                if (index == 4 || index == 7 ||
+                    index == 10 || index == 13 ||
+                    index == 16)
+                {
+                    continue;
+                }
+
+                if (!std::isdigit(
+                        static_cast<unsigned char>(
+                            value[index])))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         std::string Trim(
             const std::string &value)
@@ -110,6 +149,37 @@ namespace jobpilot::service
             result.salaryMax.has_value() &&
             result.salaryMax.value() <
                 result.salaryMin.value())
+        {
+            return false;
+        }
+
+        // 0015A focus-field validation (docs/04 section 5.1).
+        if ((result.educationMax.has_value() &&
+             (result.educationMax.value() < 1 ||
+              result.educationMax.value() > kMaxEducation)) ||
+            (result.jobNature.has_value() &&
+             (result.jobNature.value() < 1 ||
+              result.jobNature.value() > kMaxJobNature)))
+        {
+            return false;
+        }
+
+        if (result.deadlineBefore.has_value() &&
+            !IsDbTimestamp(result.deadlineBefore.value()))
+        {
+            return false;
+        }
+
+        if (result.deadlineAfter.has_value() &&
+            !IsDbTimestamp(result.deadlineAfter.value()))
+        {
+            return false;
+        }
+
+        if (result.deadlineBefore.has_value() &&
+            result.deadlineAfter.has_value() &&
+            result.deadlineBefore.value() <
+                result.deadlineAfter.value())
         {
             return false;
         }

@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <optional>
 #include <string>
@@ -266,6 +267,12 @@ namespace jobpilot::service
             bool hasPageSize = false;
             bool hasIncludeStale = false;
             bool hasPostedWithinDays = false;
+            bool hasEducationMax = false;
+            bool hasJobNature = false;
+            bool hasDeadlineBefore = false;
+            bool hasDeadlineAfter = false;
+            bool hasOpenOnly = false;
+            bool hasSort = false;
 
             std::size_t position = queryPosition + 1;
 
@@ -362,6 +369,98 @@ namespace jobpilot::service
 
                         hasSkill = true;
                         query->filter.skill = value;
+                    }
+                    else if (key == "education_max")
+                    {
+                        std::uint32_t education = 0;
+
+                        if (hasEducationMax ||
+                            !ParseUnsigned32(
+                                value,
+                                &education))
+                        {
+                            return false;
+                        }
+
+                        hasEducationMax = true;
+                        query->filter.educationMax = education;
+                    }
+                    else if (key == "job_nature")
+                    {
+                        std::uint32_t nature = 0;
+
+                        if (hasJobNature ||
+                            !ParseUnsigned32(
+                                value,
+                                &nature))
+                        {
+                            return false;
+                        }
+
+                        hasJobNature = true;
+                        query->filter.jobNature = nature;
+                    }
+                    else if (key == "deadline_before")
+                    {
+                        if (hasDeadlineBefore)
+                        {
+                            return false;
+                        }
+
+                        hasDeadlineBefore = true;
+                        query->filter.deadlineBefore = value;
+                    }
+                    else if (key == "deadline_after")
+                    {
+                        if (hasDeadlineAfter)
+                        {
+                            return false;
+                        }
+
+                        hasDeadlineAfter = true;
+                        query->filter.deadlineAfter = value;
+                    }
+                    else if (key == "open_only")
+                    {
+                        if (hasOpenOnly ||
+                            (value != "true" &&
+                             value != "false"))
+                        {
+                            return false;
+                        }
+
+                        hasOpenOnly = true;
+                        query->filter.openOnly =
+                            (value == "true");
+                    }
+                    else if (key == "sort")
+                    {
+                        if (hasSort)
+                        {
+                            return false;
+                        }
+
+                        hasSort = true;
+
+                        if (value == "created_desc")
+                        {
+                            query->filter.sort =
+                                JobSort::kCreatedDesc;
+                        }
+                        else if (value == "deadline_asc")
+                        {
+                            query->filter.sort =
+                                JobSort::kDeadlineAsc;
+                        }
+                        else if (value == "education_asc")
+                        {
+                            query->filter.sort =
+                                JobSort::kEducationAsc;
+                        }
+                        else
+                        {
+                            return false;
+                        }
                     }
                     else if (key == "include_stale")
                     {
@@ -596,6 +695,8 @@ namespace jobpilot::service
                      : Json(nullptr)},
                 {"source_status",
                  NullableString(summary.sourceStatus)},
+                {"source_url",
+                 NullableString(summary.sourceUrl)},
                 {"education_required",
                  NullableUnsigned(summary.educationRequired)},
                 {"experience_years_min",
@@ -650,6 +751,22 @@ namespace jobpilot::service
         : service_(service),
           rankingService_(rankingService)
     {
+        // 0015A compatibility rollback switch. The predicate is on by default;
+        // the environment variable restores the pre-0015A visibility without
+        // touching stored data (ExecPlan 0015A section 10).
+        const char *value =
+            std::getenv("JOB_PUBLIC_INCLUDE_NEEDS_REVIEW");
+
+        if (value != nullptr)
+        {
+            const std::string text = value;
+
+            includeNeedsReview_ =
+                text == "1" ||
+                text == "true" ||
+                text == "TRUE" ||
+                text == "yes";
+        }
     }
 
     void JobController::Search(
@@ -657,6 +774,7 @@ namespace jobpilot::service
         jobpilot::core::HttpResponse &response)
     {
         JobSearchQuery query;
+        query.filter.includeNeedsReview = includeNeedsReview_;
 
         if (!ParseSearchQuery(
                 request.Path(),
@@ -794,6 +912,7 @@ namespace jobpilot::service
         }
 
         JobSearchQuery query;
+        query.filter.includeNeedsReview = includeNeedsReview_;
 
         if (!ParseSearchQuery(
                 request.Path(),

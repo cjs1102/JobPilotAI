@@ -746,6 +746,10 @@ namespace jobpilot::service
             jobpilot::test::UniqueJobToken(
                 "job-http-freshness");
 
+        const std::string freshUrl =
+            jobpilot::test::UniqueJobToken(
+                "job-http-url");
+
         const std::uint64_t freshId =
             jobpilot::test::InsertJob(
                 pool.get(),
@@ -753,8 +757,7 @@ namespace jobpilot::service
                 token + " fresh",
                 std::nullopt,
                 std::nullopt,
-                jobpilot::test::UniqueJobToken(
-                    "job-http-url"),
+                freshUrl,
                 1,
                 "2026-10-01 10:00:00");
         const std::uint64_t staleId =
@@ -823,6 +826,74 @@ namespace jobpilot::service
         EXPECT_FALSE(item["first_seen_at"].is_null());
         EXPECT_FALSE(item["last_seen_at"].is_null());
         EXPECT_FALSE(item["last_verified_at"].is_null());
+
+        // 0015A Step 1: the LIST projection carries the original posting URL so
+        // a caller need not fetch every detail row.
+        EXPECT_EQ(item["source_url"], freshUrl);
+
+        // A legacy row whose source_url is NULL must project as JSON null (not
+        // as an empty string) rather than dropping the key.
+        pool->Execute(
+            "UPDATE jobs SET source_url = NULL WHERE id = ?",
+            {freshId});
+
+        const std::optional<HttpResponseData> nullUrlSearch =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token);
+
+        ASSERT_TRUE(nullUrlSearch.has_value());
+        ASSERT_TRUE(nullUrlSearch->hasJson);
+        ASSERT_EQ(
+            nullUrlSearch->jsonBody["data"]["list"].size(),
+            1U);
+        EXPECT_TRUE(
+            nullUrlSearch->jsonBody["data"]["list"][0]
+                             ["source_url"]
+                .is_null());
+
+        // 0015A item 3: the new focus-field parameters are accepted, invalid
+        // values are rejected with the existing 400 envelope.
+        const std::optional<HttpResponseData> focusSearch =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token +
+                "&education_max=3&sort=deadline_asc");
+
+        ASSERT_TRUE(focusSearch.has_value());
+        ASSERT_TRUE(focusSearch->hasJson);
+        EXPECT_EQ(focusSearch->statusCode, 200);
+
+        const std::optional<HttpResponseData> badEducation =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token +
+                "&education_max=9");
+
+        ASSERT_TRUE(badEducation.has_value());
+        ASSERT_TRUE(badEducation->hasJson);
+        EXPECT_EQ(badEducation->statusCode, 400);
+
+        const std::optional<HttpResponseData> badNature =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token +
+                "&job_nature=9");
+
+        ASSERT_TRUE(badNature.has_value());
+        EXPECT_EQ(badNature->statusCode, 400);
+
+        const std::optional<HttpResponseData> badSort =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token +
+                "&sort=score_desc");
+
+        ASSERT_TRUE(badSort.has_value());
+        EXPECT_EQ(badSort->statusCode, 400);
+
+        const std::optional<HttpResponseData> badDeadline =
+            SendRequest(
+                "/api/v1/jobs?keyword=" + token +
+                "&deadline_before=tomorrow");
+
+        ASSERT_TRUE(badDeadline.has_value());
+        EXPECT_EQ(badDeadline->statusCode, 400);
 
         const std::optional<HttpResponseData> withStale =
             SendRequest(

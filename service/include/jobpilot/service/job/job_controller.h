@@ -30,6 +30,11 @@ namespace jobpilot::service
     private:
         JobService &service_;
         JobRankingService *rankingService_;
+
+        // 0015A: public-visibility switch (JOB_PUBLIC_INCLUDE_NEEDS_REVIEW).
+        // Enabled only for the compatibility rollback path; it never changes
+        // stored data.
+        bool includeNeedsReview_ = false;
     };
 
 } // namespace jobpilot::service

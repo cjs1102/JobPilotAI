@@ -31,6 +31,10 @@ namespace jobpilot::service
         std::optional<std::string> lastSeenAt;
         std::optional<std::string> lastVerifiedAt;
         std::optional<std::string> sourceStatus;
+        // 0015A: the original posting URL is part of the LIST projection too, so
+        // a caller need not fetch every detail row to open the posting. The
+        // detail path copies its own value here so both agree byte for byte.
+        std::optional<std::string> sourceUrl;
         std::optional<FreshnessState> freshness;
 
         // 0014 incremental projection (docs/03 section 9). deadline is the

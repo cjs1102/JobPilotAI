@@ -160,6 +160,184 @@ namespace jobpilot::service
         EXPECT_EQ(byLocation.front().id, older);
     }
 
+    // 0015A Step 1: the list projection exposes source_url, the embedded detail
+    // summary exposes the identical value, and a NULL column projects as
+    // nullopt rather than an empty string.
+    TEST_F(JobDaoTest, ProjectsSourceUrlInListAndMatchesTheDetail)
+    {
+        const std::string token =
+            jobpilot::test::UniqueJobToken("url-token");
+        const std::string url =
+            "https://example.invalid/jobs/" + token;
+
+        const std::uint64_t id =
+            UpsertExtraJob(
+                MakeExtraJob(
+                    token + " C++ url job",
+                    url));
+
+        const JobSearchFilter filter{
+            token,
+            std::nullopt,
+            std::nullopt,
+            std::nullopt,
+            std::nullopt};
+
+        const std::vector<JobSummary> rows =
+            dao->SearchJobs(filter, 20, 0);
+
+        ASSERT_EQ(rows.size(), 1U);
+        ASSERT_TRUE(rows.front().sourceUrl.has_value());
+        EXPECT_EQ(rows.front().sourceUrl.value(), url);
+
+        const std::optional<JobDetail> detail =
+            dao->FindActiveJobById(id);
+
+        ASSERT_TRUE(detail.has_value());
+        ASSERT_TRUE(detail->sourceUrl.has_value());
+        EXPECT_EQ(detail->sourceUrl.value(), url);
+        ASSERT_TRUE(detail->summary.sourceUrl.has_value());
+        EXPECT_EQ(
+            detail->summary.sourceUrl.value(),
+            detail->sourceUrl.value());
+
+        pool->Execute(
+            "UPDATE jobs SET source_url = NULL WHERE id = ?",
+            {id});
+
+        const std::vector<JobSummary> afterNull =
+            dao->SearchJobs(filter, 20, 0);
+
+        ASSERT_EQ(afterNull.size(), 1U);
+        EXPECT_FALSE(afterNull.front().sourceUrl.has_value());
+    }
+
+    // 0015A item 3: education / job_nature / deadline enter the filter and sort
+    // path, and CountJobs applies the identical predicate set (parity).
+    TEST_F(JobDaoTest, FiltersAndSortsByThe0015AFocusFields)
+    {
+        const std::string token =
+            jobpilot::test::UniqueJobToken("focus-token");
+
+        JobImportData campusSoon =
+            MakeExtraJob(
+                token + " campus soon",
+                token + "-campus-soon");
+        campusSoon.educationRequired = 3;
+        campusSoon.jobNature = 1;
+        campusSoon.deadline = "2026-11-01 04:00:00";
+        campusSoon.deadlineDateOnly = true;
+
+        const std::uint64_t soonId =
+            UpsertExtraJob(campusSoon);
+
+        JobImportData campusLater =
+            MakeExtraJob(
+                token + " campus later",
+                token + "-campus-later");
+        campusLater.educationRequired = 5;
+        campusLater.jobNature = 1;
+        campusLater.deadline = "2026-12-01 04:00:00";
+        campusLater.deadlineDateOnly = true;
+
+        const std::uint64_t laterId =
+            UpsertExtraJob(campusLater);
+
+        // Unknown education and an unknown deadline must stay visible.
+        JobImportData socialUnknown =
+            MakeExtraJob(
+                token + " social unknown",
+                token + "-social-unknown");
+        socialUnknown.jobNature = 2;
+
+        const std::uint64_t socialId =
+            UpsertExtraJob(socialUnknown);
+
+        const auto searchWith =
+            [this, &token](JobSearchFilter filter) {
+                filter.keyword = token;
+                return dao->SearchJobs(filter, 20, 0);
+            };
+
+        const auto countWith =
+            [this, &token](JobSearchFilter filter) {
+                filter.keyword = token;
+                return dao->CountJobs(filter);
+            };
+
+        // education_max=3 keeps the NULL-education row and drops 5-master row.
+        JobSearchFilter byEducation;
+        byEducation.educationMax = 3;
+
+        const std::vector<JobSummary> educationRows =
+            searchWith(byEducation);
+
+        ASSERT_EQ(educationRows.size(), 2U);
+        EXPECT_EQ(countWith(byEducation), 2U);
+
+        // job_nature=2 is an exact match.
+        JobSearchFilter byNature;
+        byNature.jobNature = 2;
+
+        const std::vector<JobSummary> natureRows =
+            searchWith(byNature);
+
+        ASSERT_EQ(natureRows.size(), 1U);
+        EXPECT_EQ(natureRows.front().id, socialId);
+        EXPECT_EQ(countWith(byNature), 1U);
+
+        // A deadline range excludes rows without a deadline.
+        JobSearchFilter before;
+        before.deadlineBefore = "2026-11-15 00:00:00";
+
+        const std::vector<JobSummary> beforeRows =
+            searchWith(before);
+
+        ASSERT_EQ(beforeRows.size(), 1U);
+        EXPECT_EQ(beforeRows.front().id, soonId);
+        EXPECT_EQ(countWith(before), 1U);
+
+        JobSearchFilter after;
+        after.deadlineAfter = "2026-11-15 00:00:00";
+
+        const std::vector<JobSummary> afterRows =
+            searchWith(after);
+
+        ASSERT_EQ(afterRows.size(), 1U);
+        EXPECT_EQ(afterRows.front().id, laterId);
+
+        // open_only keeps the known-future deadlines and the NULL deadline.
+        JobSearchFilter open;
+        open.openOnly = true;
+
+        EXPECT_EQ(searchWith(open).size(), 3U);
+        EXPECT_EQ(countWith(open), 3U);
+
+        // deadline_asc is NULL-first (index-backed direction, docs/03 9.2).
+        JobSearchFilter sorted;
+        sorted.sort = JobSort::kDeadlineAsc;
+
+        const std::vector<JobSummary> sortedRows =
+            searchWith(sorted);
+
+        ASSERT_EQ(sortedRows.size(), 3U);
+        EXPECT_EQ(sortedRows[0].id, socialId);
+        EXPECT_EQ(sortedRows[1].id, soonId);
+        EXPECT_EQ(sortedRows[2].id, laterId);
+
+        // education_asc is NULL-first as well.
+        JobSearchFilter byEducationAsc;
+        byEducationAsc.sort = JobSort::kEducationAsc;
+
+        const std::vector<JobSummary> educationAscRows =
+            searchWith(byEducationAsc);
+
+        ASSERT_EQ(educationAscRows.size(), 3U);
+        EXPECT_EQ(educationAscRows[0].id, socialId);
+        EXPECT_EQ(educationAscRows[1].id, soonId);
+        EXPECT_EQ(educationAscRows[2].id, laterId);
+    }
+
     TEST_F(JobDaoTest, TreatsLikeWildcardsAsLiteralCharacters)
     {
         const std::string prefix =
@@ -637,5 +815,62 @@ namespace jobpilot::service
         }
 
         EXPECT_TRUE(sawDateOnly);
+    }
+
+    // 0015A item 4: the public predicate is the stage's single behavioural
+    // change and only clean rows are returned unless the switch is enabled.
+    TEST_F(JobDaoTest, PublicVisibilityExcludesNeedsReviewJobs)
+    {
+        const std::string token =
+            jobpilot::test::UniqueJobToken("review-visibility");
+
+        const std::uint64_t cleanId = AddJob(
+            "Review Co",
+            token + " clean",
+            std::nullopt,
+            std::nullopt,
+            1,
+            "2026-10-01 10:00:00");
+        const std::uint64_t hiddenId = AddJob(
+            "Review Co",
+            token + " hidden",
+            std::nullopt,
+            std::nullopt,
+            1,
+            "2026-10-01 10:00:00");
+
+        pool->Execute(
+            "UPDATE jobs SET review_status = 1 WHERE id = ?",
+            {hiddenId});
+
+        JobSearchFilter filter;
+        filter.keyword = token;
+
+        const std::vector<JobSummary> visible =
+            dao->SearchJobs(filter, 20, 0);
+
+        ASSERT_EQ(visible.size(), 1U);
+        EXPECT_EQ(visible[0].id, cleanId);
+        EXPECT_EQ(dao->CountJobs(filter), 1U);
+
+        const std::vector<JobSummary> rankedVisible =
+            dao->SearchRankingCandidates(filter, 20);
+
+        ASSERT_EQ(rankedVisible.size(), 1U);
+        EXPECT_EQ(rankedVisible[0].id, cleanId);
+
+        JobSearchFilter withHidden = filter;
+        withHidden.includeNeedsReview = true;
+
+        const std::vector<JobSummary> all =
+            dao->SearchJobs(withHidden, 20, 0);
+
+        ASSERT_EQ(all.size(), 2U);
+        EXPECT_EQ(dao->CountJobs(withHidden), 2U);
+
+        const std::vector<JobSummary> rankedAll =
+            dao->SearchRankingCandidates(withHidden, 20);
+
+        ASSERT_EQ(rankedAll.size(), 2U);
     }
 } // namespace jobpilot::service

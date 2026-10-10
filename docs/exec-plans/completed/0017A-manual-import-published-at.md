@@ -1,13 +1,12 @@
 # ExecPlan 0017A: 手工导入 `published_at` 契约缺口（最小向后兼容修复）
 
-> Status: **ACTIVE — owner 已授权自主执行**（2026-10-10）。授权要点：调查该缺口、选择最小的
-> 向后兼容修复、补齐测试与文档；按项目阶段门禁处理，不擅自开启 0018（本地看板）。
-> 因此本阶段只做这一处修复，不引入任何新功能面。
->
+> Status: **Completed**（2026-10-10）。D1 决策（方案 a：把 `published_at` 纳入手工导入契约）
+> 已实施并验证：代码提交 `35563da`，发布安全检查提交 `67197fa`（同一阶段顺带完成）。
+> 本阶段只做这一处修复，未开启 0018。
 > Task level: **L2/L3**（跨 Controller / DAO / API 契约 / 测试；不改 schema、不改
 > `backend/{include,src}/jobpilot/{network,http}/`）。
 > 依据：`docs/ai/agent-workflow.md` §2.1；`AGENTS.md`（API 契约变更必须同时更新 `docs/04`）。
-> 基线 HEAD：`2055e05`（0017 已归档，active/ 只有本文件）。
+> 基线 HEAD：`2055e05`（0017 已归档）。
 
 ## 1. 问题（0017-C 已记录的缺陷证据）
 
@@ -87,3 +86,67 @@ L2/L3：`cmake --build build/presets/debug -j4` 后直接运行上列 6 个二�
 
 纯增量改动：`git revert` 本阶段的提交即可回到"忽略该字段"的行为；数据库列本就存在，
 无需数据迁移，也不需要在 revert 时清理已有 `published_at` 值。
+
+## 8. 实测证据（原始行）
+
+**实现**：`service/include/jobpilot/service/job/job_ingestion_dao_interface.h`（`publishedAt`）、
+`service/src/job/internal_job_import_controller.cpp` `ParseJob`（可选 `published_at`）、
+`service/src/job/job_ingestion_dao.cpp` `UpsertJob`（列 + 占位符 + `COALESCE(VALUES(...))` 更新）；
+`docs/04-api-design.md` §5.2 记录字段与写语义；`docs/03` 未改（列已存在，无 schema 变更）。
+
+**定向测试**（阶段自有隔离栈 `jobpilot-0017a`，MySQL `:13409` / Redis `:16409`，用后即拆；
+开发库 `jobpilot` 与 `jobpilot_review_scratch` 未被触碰）：
+
+```text
+$ cmake --build build/presets/debug -j4          # rc=0
+$ MYSQL_PORT=13409 REDIS_PORT=16409 ./build/presets/debug/service/<binary>
+test_job_ingestion_dao   rc=0  [  PASSED  ] 5 tests.    （含 插入写入 / 省略保留 / 覆盖 三段断言）
+test_job_ingestion_http  rc=0  [  PASSED  ] 5 tests.    （含 入库列与公开 posted_at 断言）
+test_job_ingestion_service rc=0 [  PASSED  ] 7 tests.
+test_source_sync_dao     rc=0  [  PASSED  ] 14 tests.   （F14 语义未受影响）
+test_job_dao             rc=0  [  PASSED  ] 9 tests.
+test_job_http            rc=0  [  PASSED  ] 9 tests.
+```
+
+**README/契约守卫**：`ctest -N` 仍为 309（只在既有用例内加断言），
+`python3 tools/checks/test_coverage_map.py --test-dir build/presets/release --map docs/quality/test-merge-map.json`
+→ `PASS (309 -> 309)`；`python3 tools/checks/release_preflight.py` → `8 pass / 0 fail / 0 skip`。
+
+**负控制（证明新断言真的会失败）**：用**修复前**的 `jobpilot-backend:verify` 镜像跑
+`tools/dev/capture-acceptance.sh`：
+
+```text
+dry run: clean=1 payload_fields=...,published_at,...
+=== detail read-back ===
+published_at round-trips: got "None == '2026-09-20 00:00:00'"
+FAIL: the public detail does not match the published payload
+```
+
+**CI（runner 上的独立验证，`tools/dev/ci-status.sh` 取回）**：
+
+```text
+35563da ci    success 5m46s  clean build 3m58s + full test suite (MySQL + Redis) 1m40s
+35563da image success 3m17s  （提交版 Dockerfile 在 runner 上构建 + demo gate）
+67197fa ci    success 5m24s  clean build 3m59s + full test suite 1m18s
+67197fa image success 2m23s
+```
+
+**端到端正向验证（修复后的镜像）**：用当前源码在本地重建验证镜像
+`docker build -f build/Dockerfile.verify -t jobpilot-backend:0017a .`（`image_build_rc=0`；
+Docker Hub 不可达，故用 0016 P1b 的 scratch Dockerfile，与提交版 Dockerfile 同一套命令），
+再跑 `JOBPILOT_BACKEND_IMAGE=jobpilot-backend:0017a tools/dev/capture-acceptance.sh
+--capture docs/examples/capture-acceptance-sample.json --keep-evidence build/0017a/section-19.5-evidence.txt`：
+
+```text
+3 legs before it unchanged … publish (created=1 updated=0 total=1)
+dry run: clean=1 payload_fields=…,published_at,…
+=== detail read-back ===
+  published_at round-trips: "'2026-09-20 00:00:00' == '2026-09-20 00:00:00'"
+  fields_compared=17
+=== F14 (a colliding source observation must not win) ===
+PASS: F14: …
+legs passed: 9
+CAPTURE_ACCEPTANCE_OK
+```
+与上面同一脚本、同一断言的**负控制**（旧镜像）失败 ⇒ 断言有效；正负两侧合起来即
+"契约缺口已闭合"的完整证据。

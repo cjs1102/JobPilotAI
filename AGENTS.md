@@ -40,9 +40,12 @@ packaging — 0013-0017 and the 0015A hardening are all archived under
   scaffold once against a real capture JSON.
 - 0015's D6 (`ai_worker` `resume_optimize` wording pass) remains **deferred by
   owner decision** (0015 plan §17).
-- 0017 found one real contract gap: `publish-capture` sends `published_at`, but
-  `POST /internal/jobs/import` neither documents nor parses it, so a manual row's
-  public `posted_at` stays null (0017 plan §11 / project-state).
+- 0017 found one real contract gap, **fixed by 0017A (2026-10-10)**: `publish-capture`
+  sends `published_at`, but the manual import neither documented nor parsed it, so a
+  manual row's public `posted_at` stayed null. `published_at` is now an optional
+  documented field of `POST /internal/jobs/import` (`docs/04` §5.2) written with
+  `COALESCE(VALUES(published_at), published_at)`; see
+  `docs/exec-plans/completed/0017A-manual-import-published-at.md`.
 - 0016's CI **`image` job is confirmed green**, and the first real CI run exposed
   and fixed four things it was meant to expose: the workflow ran for the first
   time on 2026-10-10 (`clean build` ✓ and `container image and the end-to-end

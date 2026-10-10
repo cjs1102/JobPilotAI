@@ -20,7 +20,9 @@
 > end to end) that still needs one real-machine JSON from the owner, 0015's D6
 > stays deferred by owner decision, 0017 found one real contract gap
 > (`publish-capture` sends `published_at`, but `/internal/jobs/import` neither
-> documents nor parses it — see `## Completed Plan (0017)`), and the repository is
+> documented nor parsed it) which **0017A fixed on 2026-10-10** — see
+> `## Completed Plan (0017)` and `completed/0017A-manual-import-published-at.md` —
+> and the repository is
 > still **private**: making it public, filling About/description and rotating the
 > old personal access token are owner actions listed in
 > [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
@@ -179,21 +181,26 @@ Delivered:
   tree pushed minutes earlier: the private IPv4 of the development host in
   `docs/quality/test-overlap-audit.md`, redacted in `b2a55be`.
 
-**Defect found and carried forward (recorded, not fixed here — production code is
-out of 0017's scope):** `publish-capture` normalizes the capture's `published_at`
-into the manual-import payload
+**Defect found by 0017 and fixed by 0017A (2026-10-10):** `publish-capture`
+normalizes the capture's `published_at` into the manual-import payload
 (`source_adapters/jobpilot_sources/capture/publisher.py:220-224`), but
-`POST /internal/jobs/import` neither documents it (`docs/04-api-design.md:599-625`)
-nor parses it (`service/src/job/internal_job_import_controller.cpp:391-477`), so
-the value is dropped silently and the public `posted_at` stays `null`; the
-source-sync path does accept `published_at`
-(`service/src/job/internal_source_sync_controller.cpp:447`). The new scaffold
-observed it. Impact: a manual row never carries a published date, while the
+`POST /internal/jobs/import` neither documented it (`docs/04-api-design.md:599-625`)
+nor parsed it (`service/src/job/internal_job_import_controller.cpp:391-477`), so
+the value was dropped silently and the public `posted_at` stayed `null`; the
+source-sync path already accepted `published_at`
+(`service/src/job/internal_source_sync_controller.cpp:447`). The 0017-C scaffold
+observed it. Impact: a manual row never carried a published date, while the
 "published within N days" filter (`docs/04:488`,
-`service/src/job/job_dao.cpp:217-218`) requires `published_at IS NOT NULL`; the
-end-to-end effect of that filter on manual rows was **not** measured. Two
-candidate fixes for a future stage: extend the manual-import contract so it
-carries the field, or have the publisher say so in a note and stop sending it.
+`service/src/job/job_dao.cpp:217-218`) requires `published_at IS NOT NULL`.
+**0017A fixed it** (`docs/exec-plans/completed/0017A-manual-import-published-at.md`):
+`published_at` is now an optional, documented field of the manual import
+(`docs/04` §5.2), parsed into `JobImportData::publishedAt` and written by
+`JobIngestionDao::UpsertJob` with
+`COALESCE(VALUES(published_at), published_at)` so an upsert that omits it never
+clears a stored value; the public detail exposes it as `posted_at`. Verified by
+the extended `JobIngestionDaoTest` / `JobIngestionHttpTest` cases and by
+`tools/dev/capture-acceptance.sh`, which now asserts the `posted_at` round-trip
+instead of reporting the gap.
 
 ## Completed Plan (0015)
 
@@ -631,7 +638,8 @@ Performance baseline:
     bookmarklet's real-machine run through `tools/dev/capture-acceptance.sh`
     (item 7 — the scaffold and the synthetic path are proven end to end, the real
     JSON is the owner's), 0015's D6 deferral, the `published_at` manual-import gap
-    recorded in `## Completed Plan (0017)`, and the owner-only release actions
+    (recorded in `## Completed Plan (0017)` and **fixed by 0017A on 2026-10-10**),
+    and the owner-only release actions
     (make the repository public, fill About/description, confirm the newest CI
     runs, rotate the old PAT) collected in
     [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).

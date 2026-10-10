@@ -237,9 +237,14 @@ CREATE TABLE notifications (
 | notifications | 用户查未读 | `idx_user_status` |
 
 > 0014 的 6 个新列（`education_required` / `experience_years_*` / `job_nature` /
-> `deadline` / `deadline_date_only`）本阶段**不新增索引**：计划曾提议
-> `idx_job_nature_education`，按确认决定延后（新字段本阶段不进入检索/排名消费，
-> 见 §9.4 与 `docs/04` §5.1）。其中 `deadline_date_only` 是 F13 落地时派生的
+> `deadline` / `deadline_date_only`）在 0014 阶段**不新增索引**（计划曾提议
+> `idx_job_nature_education`，按确认决定延后）。**0015A 改变了这一决定**：新增
+> `idx_deadline (deadline)`（服务于 `deadline ASC, id ASC` 排序，EXPLAIN 实测由
+> filesort 180 ms 降为索引扫描 0.13 ms）与 `idx_review_status (review_status, id)`
+> （队列扫描 + 公共可见性谓词）；`idx_job_nature_education` 仍**不加**——真实分布下
+> 优化器不选它（`FORCE INDEX` 才更快），按「无证据不加索引」处理。三个焦点字段
+> （`education_required` / `job_nature` / `deadline`）已进入检索/排序消费，详见 §9.2
+> 的索引决定与 `docs/04` §5.1。其中 `deadline_date_only` 是 F13 落地时派生的
 > 类型标志（见 §9.1/§9.6）。
 
 > 岗位搜索初期用 `LIKE '%kw%'`，数据量大后引入全文索引或 ES（见架构文档 §12 演进路径）。
@@ -443,7 +448,33 @@ deadline             DATETIME NULL   -- 投递截止时间（UTC 瞬时，见 §
 deadline_date_only   TINYINT  NULL   -- deadline 是否仅日期（见 §9.1）
 ```
 
-**未新增索引**（含计划曾提议的 `idx_job_nature_education`，本阶段延后）。
+**未新增索引**（0014 决定，含计划曾提议的 `idx_job_nature_education`，0014 阶段延后）。
+
+0015A 增量（同一批落地，Step 2）：
+
+```sql
+review_status  TINYINT      NOT NULL DEFAULT 0  -- 0 clean / 1 needs_review / 2 quarantined
+reviewed_at    DATETIME     NULL                -- 最近一次复核时间
+review_note    VARCHAR(255) NULL                -- 复核备注
+KEY idx_review_status (review_status, id)       -- 队列扫描 + 公共可见性谓词
+KEY idx_deadline (deadline)                     -- deadline ASC,id ASC 排序（见下）
+CREATE TABLE job_review_items(...)              -- 异常与复核审计（reason_code/reason_text/outcome/resolution）
+```
+
+**索引决定（0015A，以真实 `EXPLAIN` 为准）**：
+
+- **新增 `idx_deadline (deadline)`**：在 5 万行 scratch 数据集上，`ORDER BY deadline ASC,
+  id ASC` 由 `idx_status`+filesort（EXPLAIN ANALYZE ≈180 ms）变为 `idx_deadline` 索引扫描
+  （**≈0.13 ms**，无 filesort）。混合方向（`deadline ASC, id DESC`）或 NULLs-last 表达式
+  （`ORDER BY deadline IS NULL, deadline ASC`）都会让优化器退回 filesort 且不使用该索引，
+  因此 0015A 的 `deadline_asc` 定义为 `deadline ASC, id ASC`（NULL 在前）并在此记录该取舍。
+- **未新增 `idx_job_nature_education`**：虽然 `FORCE INDEX` 下它更快（列表 73 ms vs 330 ms、
+  计数 33.6 ms vs 323 ms），但在真实分布（`status=1` 约占一半）下优化器在 `ANALYZE TABLE`
+  前后都选择 `idx_status`，即该索引**不会被使用**；按「无证据不加索引」的决定暂不新增，
+  留待 `status` 分布变得更有选择性时再以 `EXPLAIN` 复评。
+- **`idx_review_status`**：scratch 数据全为 `clean`（无 `needs_review` 行），因此该索引无法
+  被实测触发；它服务于按构造应为少数的 `review_status = 1` 队列谓词，待 Step 5 回填后以真实
+  数据复测（证据待补，不声称已验证）。
 
 `jobs.source` 的取值注释同步修正：`manual`/`import`/`crawler` 是人工路径取值；
 观测路径取值由 C++ allowlist `IsSupportedObservationSource`
@@ -466,6 +497,43 @@ deadline_date_only   TINYINT  NULL   -- deadline 是否仅日期（见 §9.1）
   非空时 `deadline` 必须非空；`deadline_date_only = 1` 时必须满足 §9.1 的
   `04:00:00` 不变量。
 - `uk_source_url` 仍是唯一幂等键；`status` / freshness 列语义不变。
+- **0015A 质量状态（quality status）**：`jobs.review_status ∈ {0,1,2}`（0 clean /
+  1 needs_review / 2 quarantined），`NOT NULL DEFAULT 0`，既有行升级后一律为 `0`
+  （**不批量标记、不回填**，历史数据按 `docs/04` 的内部 dry-run 流程分类）。
+  公共搜索/推荐只返回 `review_status = 0`；`needs_review`/`quarantined` 仅能通过
+  受保护的内部端点访问。`job_review_items` 逐条记录 `reason_code`（稳定机器码）、
+  `reason_text`、`outcome` 与 `resolution`；`review_status` 不参与 `uk_source_url`
+  幂等键。
+- **`job_review_items.outcome` 词表与列宽**：列为 `VARCHAR(24)`，规范词表
+  `rejected` / `needs_review` / `accepted_advisory` 三者都能原样存储；接口响应与
+  `ToString` 输出同一组字符串。加宽前的 `VARCHAR(16)` 无法容纳
+  `accepted_advisory`（17 字节），该缺陷由 §9.4 的加宽 ALTER 修正。
+- **平台名注册表路径（0015A item 2 / decision 4）**：唯一来源是
+  `source_adapters/jobpilot_sources/data/platform_names.yaml`（Python 与 C++ 共用，
+  严禁第二份硬编码清单）。C++ 侧在服务启动时由环境变量
+  `JOB_QUALITY_PLATFORM_NAMES_FILE` 解析，缺省用该仓库相对路径，因此服务需从
+  仓库根目录启动。文件缺失/不可读时注册表为空并输出告警，未知名称永不触发复核
+  （fail-open）。
+- **入库即写判定**：人工导入与来源观测都在**同一个 upsert 事务**内写
+  `review_status` 与 `job_review_items`（`resolution='open'`，重复观测刷新未决条目）；
+  `reject` 的 item 不写任何行，整个请求返回 `400`（`docs/04` §5.4/§5.5）。
+- **`employer_is_platform` 的已实现规则（相对 ExecPlan §6.1 code 3 的偏差）**：引擎只实现
+  code 2（规范化公司名命中注册表 → `needs_review`）。计划中的 code 3
+  `employer_is_platform_contradicted`（存在相反雇主信号时降级为「已接受并标记」）**未实现**：
+  `JobImportData` 目前不携带结构化雇主信号（`hiringOrganization` / `page_title`），
+  没有确定性输入可判定「相反信号」，用模糊关键词猜测会违反 §5.5.2 的确定性要求。
+  为避免计划与代码长期分歧，该偏差记录在此；计划文件需由 owner 同步修订。
+  在此之前，命中注册表的公司名一律进入复核队列（fail-safe：人工一键 `approve` 即可放行，
+  不会静默隐藏真实雇主）。
+- **描述上限的唯一权威**：应用/入库层的硬上限是 `kMaxDescriptionBytes = 49,152` 字节
+  （`job_quality.h`，`description_too_large` 拒绝并给出 `limit_bytes`/`actual_bytes`）；
+  `jobs.description` 的 `TEXT` 65,535 字节只是**列存储容量**，不是应用上限。代码中两者
+  以 `static_assert` 绑定（应用上限必须小于列容量），因此不可能互相矛盾。
+- **复核审计行的约定**：Review 决定的审计行形如
+  `reason_code='review_fix_<field>'`、`reason_text='<field>: <before> => <after>'`、
+  `outcome='needs_review'`、`resolution ∈ {approved,fixed,rejected}`、`resolved_by=<reviewer>`；
+  历史 backfill 写入的行以 `resolved_by='backfill'`、`resolution='open'` 标记，使
+  `mode=revert` 能精确识别并回滚（只回滚这些行，不动人工已复核的记录）。
 - **人工采集胜出（F14）**：`POST /internal/jobs/source-sync` 不得覆盖
   `source='manual'` 的行——不更新其任何列、不改 `source`、不改生命周期字段、
   不替换其 `job_requirements`、不关闭它；该观测被跳过并计入可诊断计数
@@ -492,6 +560,46 @@ ALTER TABLE jobs
 
 既有行无需回填；升级路径必须在**pre-0014 库**上实跑一次并复验 §3 形状断言
 （0014 Step 4 的附加证据，非 CI 门禁）。
+
+0015A 增量（同一批落地）：
+
+```sql
+ALTER TABLE jobs
+    ADD COLUMN review_status TINYINT NOT NULL DEFAULT 0 COMMENT '0015A 质量状态:0 clean/1 needs_review/2 quarantined',
+    ADD COLUMN reviewed_at   DATETIME DEFAULT NULL COMMENT '0015A 最近一次复核时间',
+    ADD COLUMN review_note   VARCHAR(255) DEFAULT NULL COMMENT '0015A 复核备注',
+    ADD KEY idx_review_status (review_status, id),
+    ADD KEY idx_deadline (deadline);
+
+CREATE TABLE IF NOT EXISTS job_review_items (
+    id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    job_id      BIGINT UNSIGNED NOT NULL,
+    reason_code VARCHAR(64)  NOT NULL,
+    reason_text VARCHAR(255) DEFAULT NULL,
+    outcome     VARCHAR(24)  NOT NULL,
+    resolution  VARCHAR(16)  NOT NULL DEFAULT 'open',
+    resolved_by VARCHAR(64)  DEFAULT NULL,
+    resolved_at DATETIME     DEFAULT NULL,
+    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_job (job_id),
+    KEY idx_reason (reason_code),
+    KEY idx_resolution (resolution)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+`review_status` 既有行取 `DEFAULT 0`（clean）——这是**列默认值**，不代表历史数据已被
+质量校验；历史分类/回填只能通过 `docs/04` 的内部 dry-run → 审批 → apply 流程执行。
+
+0015A 复核词表列宽修正（同一批落地，加宽而非新增语义）：
+
+```sql
+-- 规范词表包含 accepted_advisory（17 字节），原 VARCHAR(16) 无法存储该值。
+ALTER TABLE job_review_items
+    MODIFY COLUMN outcome VARCHAR(24) NOT NULL;
+```
+
+既有值（`rejected`/`needs_review`）不受影响；本 ALTER 幂等可重复执行，
+不新增列、不改默认值、不改索引。
 
 ### 9.5 实施顺序
 

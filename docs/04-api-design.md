@@ -289,6 +289,12 @@ GET /api/v1/jobs
   &skill=Redis
   &include_stale=true
   &posted_within_days=30
+  &education_max=3
+  &job_nature=1
+  &deadline_before=2026-11-15%2000:00:00
+  &deadline_after=2026-09-01%2000:00:00
+  &open_only=true
+  &sort=deadline_asc
   &page=1
   &page_size=20
 ```
@@ -307,6 +313,7 @@ GET /api/v1/jobs
         "salary_min": 20,
         "salary_max": 35,
         "source": "import",
+        "source_url": "https://example.invalid/jobs/20001",
         "posted_at": "2026-09-20 08:00:00",
         "first_seen_at": "2026-09-21 10:00:00",
         "last_seen_at": "2026-10-08 12:00:00",
@@ -331,7 +338,40 @@ GET /api/v1/jobs
 - `salary_min/salary_max` 表示用户可接受薪资区间，岗位薪资区间与之有交集才返回。
 - 使用薪资过滤时，未提供薪资区间的岗位不返回。
 - `skill` 为精确技能过滤，匹配 `job_requirements.skill`。
-- 公共搜索结果按 `create_time DESC, id DESC` 稳定排序。
+- 公共搜索结果按 `create_time DESC, id DESC` 稳定排序；`sort=deadline_asc` /
+  `education_asc` 覆盖该排序（见下）。
+
+0015A 增量（item 3，查询过滤与排序，与 `docs/03` §9.2 的索引决定同批落地）：
+
+- `education_max=1..5`：`education_required IS NULL OR education_required <= ?`
+  —— **学历未知（NULL）的岗位仍然可见**。
+- `job_nature=1|2|3`：精确匹配（`1校招/2实习` 等按 §5.1 既有枚举）。
+- `deadline_before` / `deadline_after`：UTC `"YYYY-MM-DD HH:MM:SS"` 区间；
+  **没有 `deadline` 的岗位两个边界都不满足**（与 `open_only` 区分）。
+- `open_only=true`：`deadline IS NULL OR deadline >= NOW()`——**只作筛选**，
+  不关闭岗位、不改 `status`、不写 freshness（F13 不变量）。
+- `sort=created_desc|deadline_asc|education_asc`（默认 `created_desc`）：
+  - `deadline_asc` = `ORDER BY deadline ASC, id ASC`，即 **NULL（未知截止）排在最前**。
+    这是索引可取的方向（`idx_deadline`，见 `docs/03` §9.2 的 EXPLAIN 证据）；若要
+    NULL 排最后则必须用表达式排序，会退回 filesort 且不使用该索引，故不采用。
+  - `education_asc` = `ORDER BY education_required ASC, id ASC`（同样 NULL 在前）；
+    该字段**没有索引**（证据见 `docs/03` §9.2）。
+  - `sort` 只作用于 `GET /api/v1/jobs`；`GET /api/v1/jobs/recommended` 始终按
+    `rule_v1` 分数排序（其过滤条件与 `/jobs` 一致，但排序不变）。
+- 非法值（`education_max>5`、`job_nature>3`、时间格式错误、未知 `sort`）→ `400`。
+
+0015A 增量（Step 1，**只新增响应键，不改既有键**）：
+
+- `source_url`：原始岗位链接（与 `GET /api/v1/jobs/{id}` 详情返回**同一个值**；
+  没有值时返回 `null`，不返回空字符串）。列表因此不再需要为每一行再取一次详情才能
+  打开原始岗位。该键同样出现在 `GET /api/v1/jobs/recommended` 的条目里。
+- 0015A 的查询过滤/排序（`education_max` / `job_nature` / `deadline_before|after` /
+  `open_only` / `sort`）已在 Step 6/3 落地，`docs/03` §9.2 的索引注记与本节同步
+  （ExecPlan 0015A §5.6）。
+- **公共可见性（0015A item 4）**：默认只返回 `review_status = 0`（clean）的岗位；
+  `needs_review`/`quarantined` 仅能通过受保护的内部复核端点访问（`docs/03` §9.3）。
+  这是 0015A 唯一的行为变更；回滚开关 `JOB_PUBLIC_INCLUDE_NEEDS_REVIEW=true`
+  只改变可见性、不改任何数据。
 
 0014 增量字段（Step 4，**只新增响应键，不改既有键**；本阶段不新增请求参数）：
 
@@ -500,9 +540,55 @@ X-Internal-Token: <environment secret>
 {
   "created": 1,
   "updated": 0,
-  "total": 1
+  "total": 1,
+  "items": [
+    {
+      "index": 0,
+      "source_url": "https://example.com/job/1",
+      "review_status": 0,
+      "rejected": false,
+      "findings": []
+    }
+  ],
+  "needs_review": 0,
+  "rejected": 0,
+  "clean": 1
 }
 ```
+
+0015A 预检质量（quality gate，判定规则见 `docs/03` §9.3）：
+
+- 每个 item 追加一个 `items[]` 条目：`{index, source_url, review_status, rejected,
+  findings:[{code, reason, outcome, review_status}]}`，`code` 是稳定机器码、
+  `reason` 是人类可读句子、`outcome ∈ {rejected, needs_review, accepted_advisory}`。
+- 顶层计数器 `needs_review` / `rejected` / `clean` 与 `items[]` 对应。
+- `reject`（`company_missing`、字节上限、`source_url_unusable`、`description_too_large`）
+  **使整个请求返回 `400`（`code=10001`）且不写入任何行**；`data` 里带
+  `diagnostic: {code, field, reason}`（同时保留 `items[]` 与计数器），
+  例如 `{"code":"source_url_unusable","field":"source_url","reason":"..."}`。
+- `needs_review`：写入 `review_status = 1` 并登记 `job_review_items`，公共搜索/推荐不可见。
+- 仅 advisory（如 `source_url_shape_unrecognised`、`description_marker_minor`）保持
+  `review_status = 0`，行仍然可见。
+- 判定是 service 层的纯函数（`EvaluateJobQuality` + `MarkDuplicateContentInBatch`），
+  无 I/O、无时钟、无随机；`source_url` 必须是绝对 `http(s)` URL。
+- **`description` 契约（权威）**：可选，缺失不是异常；上限为 **49,152 字节（48 KiB）
+  UTF-8 字节**，按字节判定（C++ `std::string::size()`、Python
+  `len(value.encode("utf-8"))`），**从不截断**：超限返回 `400` + `description_too_large`，
+  `data.diagnostic` 带 `limit_bytes`/`actual_bytes`。`jobs.description` 仍为 `TEXT`
+  （65,535 字节容量，列不变），该容量只是存储上限，不是应用上限。示例：
+
+```json
+{"code":"description_too_large","field":"description",
+ "reason":"description is 49153 bytes, over the 49152 byte cap (not truncated)",
+ "limit_bytes":49152,"actual_bytes":49153}
+```
+
+- **平台名注册表**：唯一来源是
+  `source_adapters/jobpilot_sources/data/platform_names.yaml`，Python 与 C++ 共读同一文件；
+  C++ 侧路径解析顺序为环境变量 `JOB_QUALITY_PLATFORM_NAMES_FILE` → 仓库相对默认路径
+  （Python 侧另有打包副本回退，见 `source_adapters`）。规范化 = ASCII 去首尾空白 +
+  A–Z 折叠 + 反复剥离后缀 `招聘网/人才网/官网/招聘/网`；未登记的名称一律 fail-open
+  （不触发复核）。客户端/pre-flight 检查只是 UX 提示，**服务端判定才是权威**。
 
 - `jobs` 数量必须为 `1..100`（手工批次上限；来源观测批次见 5.5）。
 - `source_url` 必填，并以唯一索引做幂等键。
@@ -576,9 +662,27 @@ X-Internal-Token: <environment secret>
   "closed": 0,
   "complete": true,
   "skipped_manual": 1,
-  "skipped_manual_urls": ["https://example.com/job/1"]
+  "skipped_manual_urls": ["https://example.com/job/1"],
+  "items": [
+    {
+      "index": 0,
+      "source_url": "https://example.com/job/1",
+      "review_status": 0,
+      "rejected": false,
+      "findings": []
+    }
+  ],
+  "needs_review": 0,
+  "rejected": 0,
+  "clean": 12
 }
 ```
+
+- 0015A：本接口与 5.4 使用**同一个**确定性判定函数与同一组响应字段
+  （`items[]` / `findings` / `needs_review` / `rejected` / `clean`），
+  `reject` 同样返回 `400` + `data.diagnostic{code,field,reason}` 且不写入任何行。
+  判定在写库前完成：被拒绝的观测不会打开事务，因此也不会刷新 freshness 或关闭岗位。
+  结构化适配器（`greenhouse`/`lever`/`ashby`）只可能命中硬缺陷码，见 `docs/03` §9.3。
 
 批量与完整性约束：
 
@@ -622,6 +726,64 @@ X-Internal-Token: <environment secret>
 实现说明：适配器代码位于 `source_adapters/`（Greenhouse / Lever / Ashby，
 fixture 驱动，可选 live smoke）；配置、运行方式与归一化规则见
 [`source_adapters/README.md`](../source_adapters/README.md)。
+
+### 5.6 岗位复核（Review Queue，0015A）
+
+三个**受保护**的内部端点，访问控制只复用既有的 `X-Internal-Token`
+常时比较机制（无角色系统）；`reviewer` 只是审计标签，**不是认证身份**，token
+永不写入日志（有 log-scan 测试证明）。错误沿用统一 `{code,message,data}` 信封。
+
+```text
+GET  /internal/jobs/review-queue?status=needs_review|quarantined|clean&page=&page_size=
+POST /internal/jobs/review/{job_id}   {"decision":"approve"|"fix"|"reject","reviewer":"<label>","note":"...","fix":{...}}
+POST /internal/jobs/review/backfill?mode=dry_run|apply|revert
+```
+
+队列响应（200）：
+
+```json
+{
+  "items": [
+    {"job_id": 1024, "title": "C++后端开发", "company": "某公司",
+     "location": "深圳", "source_url": "https://example.com/job/1",
+     "source": "manual", "description_excerpt": "…",
+     "review_status": 1, "reason_code": "employer_is_platform",
+     "reason_text": "employer equals a registered platform name",
+     "outcome": "needs_review", "resolution": "open",
+     "created_at": "2026-10-10 10:00:00"}
+  ],
+  "total": 1, "page": 1, "page_size": 20
+}
+```
+
+复核响应（200）：`{"job_id":1024,"review_status":0,"decision":"approve",
+"reviewer":"ops","note":"...","idempotent":false,"changed_fields":[]}`。
+
+状态机（ExecPlan 0015A §6.2）：
+
+- `approve` / `fix` → `review_status = 0`（公共可见）；`reject` → `2`（永久隐藏，**行保留**用于审计）。
+- 重复同一决定 → 幂等 `200`（`idempotent=true`，不改变任何状态）；
+  与已记录决定冲突 → `409`（`code=40005`）。
+- `reject` 必须带非空 `note`；`fix` 的字段按 §5.5 重新校验（公司/标题 ≤128 字节且非空、
+  `source_url` 为绝对 `http(s)` 且 ≤255 字节、`description` ≤49,152 字节、公司名不得
+  规范化成注册表平台名）。校验失败 → `400` + `data.diagnostic{code,field,reason}`，
+  **不改变任何状态**。
+- `fix` 为每个变更字段写入 before/after 审计行
+  （`job_review_items.reason_code='review_fix_<field>'`，`reason_text` 形如
+  `company: 旧值 => 新值`，`resolution='fixed'`）；同一次决定会把该行所有未决发现
+  标记为 `approved`/`fixed`/`rejected`，并记录 `resolved_by`/`resolved_at`。
+
+历史分类（§5.4.2，可审计、可回滚）：
+
+- `mode=dry_run` **只读**：返回 `active_jobs`、`scanned`、`would_flag`、
+  `hidden_share_percent`、`per_reason`（按 reason code 计数）、有界 `sample`、
+  `threshold_percent=5` / `threshold_rows=100` / `threshold_exceeded`，以及
+  `before_needs_review` 与 `after_needs_review` 投影；**不写任何行**。
+- 只分类当前 `review_status = 0` 的活跃行，因此**不会覆盖**已复核/已隔离的行，
+  也使 `mode=revert` 能精确恢复 apply 前的分布。
+- `mode=apply` 只在 owner 显式授权后执行；`mode=revert` 把 backfill 写入的未决行
+  （`resolved_by='backfill'`、`resolution='open'`）恢复为 `review_status = 0` 并删除这些行。
+  三种模式都不删除岗位行。
 
 ---
 

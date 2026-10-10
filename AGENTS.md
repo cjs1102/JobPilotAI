@@ -18,8 +18,12 @@ Capture (Steps 1-8) are complete and archived under
 **environment-limited** and carried forward, not done: no compliant, reusable
 China list contract could be verified, so no China source adapter is implemented
 and no China `source` identifier is registered — the registered sources remain
-`greenhouse`/`lever`/`ashby` — and the real-browser bookmarklet acceptance is
-still UNVERIFIED (plan §19.5).
+`greenhouse`/`lever`/`ashby`. The real-browser bookmarklet **extraction** step has
+since been run by the product owner on a real login-walled posting (Edge; JSON
+produced; one Network observation saw no request issued by the bookmarklet —
+0014 §19.6, 【用户报告】), but `publish-capture` and backend persistence were
+**not** executed in that run, so the acceptance as a whole is still **not**
+accepted (plan §19.5/§19.6).
 Product direction is China-first per
 `docs/adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
 manual capture import, campus focus, company career pages, never auto-submit);

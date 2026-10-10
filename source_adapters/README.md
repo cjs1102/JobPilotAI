@@ -622,12 +622,17 @@ mapping and the engine-host decision table (94 rows in total across both layers)
 path against `job_quality.h` when the C++ tree is present (and skips otherwise).
 The default Python suite never compiles or runs C++.
 
-### Browser evidence is still pending
+### Browser evidence is partly collected
 
-The plan's Step 6 acceptance also asks for one capture from a **real
-login-walled page**, produced by a human running the bookmarklet in their own
-browser. That cannot be automated (and must not be simulated by logging in), so
-it is recorded as **UNVERIFIED** in the ExecPlan until the product owner runs it.
-What *is* verified offline is the extraction itself: `node` executes the real
+The plan's Step 6 acceptance asks for one capture from a **real login-walled
+page**, produced by a human running the bookmarklet in their own browser. That
+cannot be automated (and must not be simulated by logging in). The product owner
+has since run the **extraction** step on a real login-walled posting in Edge and
+it produced JSON, and one Network observation saw no request issued by the
+bookmarklet (recorded as 【用户报告】in the archived plan's §19.6, with its
+limits). The **publishing** half — `publish-capture`, the backend import and
+MySQL persistence — was **not** executed in that run, so the acceptance stays
+open and the ExecPlan still records the overall item as unverified. What *is*
+verified offline is the extraction itself: `node` executes the real
 `bookmarklet.js` against recorded fake DOMs (a rich JSON-LD page and a minimal
 page), and the produced artifacts are fed back through the Python parser.

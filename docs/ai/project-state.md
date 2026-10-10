@@ -224,6 +224,11 @@ Remaining work / next steps:
    authorization to widen the candidate set).
 2. The real-browser bookmarklet acceptance remains **UNVERIFIED** (plan §19.5
    template); it is owned by the product owner and is not a stage blocker.
+   *[Clarified 2026-10-10, original wording kept: the owner has since run the
+   **extraction** step on a real login-walled posting (Edge; JSON produced; one
+   Network observation saw no request issued by the bookmarklet — 0014 §19.6,
+   【用户报告】). `publish-capture` and backend persistence were not executed in
+   that run, so the item as a whole is still not accepted.]*
 3. Stage **0015** (resume tailoring) is next, then **0016** (open-source packaging).
 
 Note: `## Next Entry` items 1-5 and the stage-numbering table below were written on
@@ -406,9 +411,15 @@ Performance baseline:
    server-rendered, unsigned school job list that needs the product owner's
    authorization. Until then **no China source adapter is registered** (only
    `greenhouse`/`lever`/`ashby`).
-7. **0014 carry-forward — the real-browser bookmarklet acceptance is still
-   UNVERIFIED.** The plan's §19.5 holds the redacted-evidence template; this is
-   owned by the product owner and is not a stage blocker.
+7. **0014 carry-forward — the real-browser bookmarklet acceptance is partly
+   verified and still not accepted.** The owner ran the extraction step on a real
+   login-walled posting (Edge; JSON produced; one Network observation saw no
+   request issued by the bookmarklet) and it is recorded in the archived plan's
+   §19.6 as 【用户报告】with its limits. `publish-capture`, the backend import and
+   MySQL persistence were **not** executed in that run, so the §19.5 template's
+   `created/updated/total` and public search-visibility rows are still empty and
+   the acceptance as a whole stays open; it is owned by the product owner and is
+   not a stage blocker.
 8. **0015 is closed with a green L4** — both plans are archived: 0015 at
    `completed/0015-resume-tailoring-and-explainable-matching.md` (L4 green at
    `26e2069`; D6 deferred by owner decision) and 0015A at

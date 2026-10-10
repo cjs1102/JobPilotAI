@@ -6,10 +6,13 @@
 > coverage`
 >
 > `origin/main` matches this baseline. 0010 Job Ingestion, the Architecture
-> Re-Research, 0011 Job Search / Ranking, and 0012 Steps 1-8 (freshness schema,
+> Re-Research, 0011 Job Search / Ranking, 0012 Steps 1-8 (freshness schema,
 > source observation domain, Source Sync DAO/Service/API, freshness search,
-> Python ATS adapters, end-to-end integration) are committed and pushed. The
-> active plan is still 0012 Job Source Adapter + Freshness.
+> Python ATS adapters, end-to-end integration), 0013 AI Matching, and 0014 China
+> Campus Sources + Manual Capture are complete and archived; **no plan is
+> active**. 0014's Step 5 is environment-limited and carried forward (see the
+> Completed Plan section and `## Next Entry` items 6/7). The next stage is
+> **0015 resume tailoring**, then 0016 open-source packaging.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active ExecPlan should be enough for a new Agent to continue
@@ -57,8 +60,17 @@ are preserved in
   pushed: additive freshness columns, Python Greenhouse/Lever/Ashby adapters,
   internal `POST /internal/jobs/source-sync` observations with completeness
   semantics, disappearance grace and reopen, and freshness-aware public search.
-  Step 9 (documentation) and Step 10 (L4 verification) remain.
-- AI Task remains outside completed slices.
+- The 0013 AI Matching slice is implemented, committed, and archived: additive
+  lease/rule-baseline columns on `ai_tasks`, deterministic `match_rule_v1` in
+  C++, public `POST /api/v1/ai/match` plus task polling, token-protected
+  `/internal/ai/tasks/*`, and an optional Python `ai_worker/`.
+- The 0014 China campus sources + manual capture slice is implemented through
+  Step 8 with **Step 5 environment-limited**: F13 Beijing-time deadline
+  semantics, F14 manual-record priority, the additive `jobs` migration (6
+  nullable columns, 0 indexes), the Python capture framework, and the manual
+  capture channel (bookmarklet + local publisher through
+  `/internal/jobs/import`). No real China source adapter exists yet and no China
+  `source` identifier is registered.
 
 The revised architecture direction is:
 [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md).
@@ -73,6 +85,64 @@ Key decisions:
 - RabbitMQ, Gateway, general Crawler, and AutoApply are not MVP requirements.
 - Freshness lifecycle is introduced with 0012 Source Adapter, not 0011.
 - A single missing fetch never closes a Job.
+
+## Completed Plan (0014)
+
+[`completed/0014-china-campus-sources-and-manual-capture.md`](../exec-plans/completed/0014-china-campus-sources-and-manual-capture.md)
+— archived 2026-10-09; the plan is frozen as historical evidence.
+
+Progress:
+
+```text
+Steps 1-8 executed (Step 2/3 delivered except source registration; Step 5
+environment-limited and CARRIED FORWARD)
+Step 5: environment-limited (no compliant list contract verified) — accepted
+Step 8: L4 passed once (2026-10-09): Debug / ASan / UBSan 254/254 each,
+        service + root Release builds ok, Python 337 and 190
+```
+
+Delivered:
+
+- Step 1/4: `jobs` additive fields + contracts (`docs/03` §9, `docs/04` §5.1/§5.2/
+  §5.4/§5.5), both JSON parsers, both validators, both upserts, read-back and
+  response mapping; existing-database ALTER executed against a pre-0014 database
+  and re-verified with the schema suite.
+- Step 2/3: source register + offline fixtures, and the Python China framework
+  (robots per-path fail-closed, retry/backoff, charset precedence, HTML/JSON-LD/
+  RSS/sitemap parsers, SSRF guard, size/request/page budgets, salary rules, F13).
+- Step 6: manual capture (credential-free bookmarklet + local publisher reusing
+  `POST /internal/jobs/import` with `source="manual"`; F14 proven end-to-end).
+- Step 7: documentation sync (root README, this file, the plan, agent-workflow §8).
+- Step 8: the stage's single L4 — Debug/ASan/UBSan 254/254 each, service and root
+  Release builds ok, Python `source_adapters` 337/337 and `ai_worker` 190/190 (plan
+  §21.2).
+
+**Carried forward (incomplete): Step 5.** The first real China source could not be
+verified compliantly — 国聘's job list requires its client-side request signature
+(anti-automation risk control) and 清华's job-list host
+`career.cic.tsinghua.edu.cn` returns a persistent `robots.txt` HTTP 503
+(fail-closed). No China adapter is implemented and the four-place allowlist is
+unchanged; the registered sources remain `greenhouse` / `lever` / `ashby`. This
+stays visible in `## Next Entry` items 6/7. Evidence:
+[`../../source_adapters/README.md`](../../source_adapters/README.md) source
+register and
+[`../../source_adapters/jobpilot_sources/tests/fixtures/cn_source_probe_2026-10-09.json`](../../source_adapters/jobpilot_sources/tests/fixtures/cn_source_probe_2026-10-09.json).
+
+Remaining work / next steps:
+
+1. Step 5 re-entry: only with a newly verifiable candidate (written permission or
+   a documented public API for 国聘; a re-probe once
+   `career.cic.tsinghua.edu.cn/robots.txt` stops returning 503; or a different
+   server-rendered, unsigned school list — the last needs the product owner's
+   authorization to widen the candidate set).
+2. The real-browser bookmarklet acceptance remains **UNVERIFIED** (plan §19.5
+   template); it is owned by the product owner and is not a stage blocker.
+3. Stage **0015** (resume tailoring) is next, then **0016** (open-source packaging).
+
+Note: `## Next Entry` items 1-5 and the stage-numbering table below were written on
+2026-10-08 as the recorded stage-numbering decision and are preserved verbatim
+(items 6/7 are the 0014 carry-forward added when the stage closed); the current
+status is this section.
 
 ## Stage Handoff Map
 
@@ -91,7 +161,7 @@ Key decisions:
 | Architecture Re-Research | `../architecture/open-source-mvp.md`, `../adr/README.md` | ADR-0007 through ADR-0010 | `635fc31` |
 | Job Search / Ranking | `completed/0011-job-search-ranking.md` | Job ranking/search modules and tests | `214dc9e` |
 
-## Latest Completed Plan
+## Completed Plan (0013)
 
 [0013-ai-matching.md](../exec-plans/completed/0013-ai-matching.md)
 
@@ -107,9 +177,11 @@ on `ai_tasks`, deterministic `match_rule_v1` scoring in C++, public
 `POST /api/v1/ai/match` plus `GET /api/v1/ai/tasks/{id}`, token-protected
 `/internal/ai/tasks/{claim,complete,fail,input}`, and an optional Python
 `ai_worker/` that adds embedding/LLM explanation without ever replacing the
-deterministic score. `resume_optimize` / `interview_gen` stay reserved for 0014.
+deterministic score. `resume_optimize` / `interview_gen` stay reserved for 0015 (the
+stage-numbering decision in `## Next Entry` renumbered resume tailoring from 0014
+to 0015).
 
-## Previous Completed Plan
+## Completed Plan (0012)
 
 [../exec-plans/completed/0012-job-source-adapter-freshness.md](../exec-plans/completed/0012-job-source-adapter-freshness.md)
 
@@ -172,6 +244,12 @@ HTTP request
 - 0012 L4: full Debug, ASan, and UBSan CTest 172/172 each (0 failures, no
   sanitizer diagnostics); `service/` and root Release builds passed; Python
   adapter suite 85/85; `ctest -L job` 84/84.
+- 0014 L4 (2026-10-09, one run, service presets, sequential phases): full Debug,
+  ASan and UBSan CTest **254/254 each** (0 failures, no sanitizer diagnostics, no
+  `LastTestsFailed.log` in any preset); `service/` Release built and
+  `jobpilot_service` links cleanly; root Release built; Python `source_adapters`
+  **337/337** and `ai_worker` **190/190**. Raw logs and per-phase timestamps are
+  recorded in the 0014 plan §21.
 - Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
   all published with `complete=false` only where the 200-job limit required it.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test
@@ -204,16 +282,40 @@ Performance baseline:
 ## Next Entry
 
 1. Review the archived 0013 plan and its L4 evidence
-   (`completed/0013-ai-matching.md`); no plan is active.
-2. After 0013, plan the China-first source layer decided in
+   (`completed/0013-ai-matching.md`); 0013 is complete and archived.
+2. The China-first source layer decided in
    `adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
-   manual capture import, campus focus, company career pages); the three
-   overseas adapters from 0012 become optional sources.
+   manual capture import, campus focus, company career pages) is planned as
+   stage **0014**: its active ExecPlan is authored and implementation has not
+   started. The three overseas adapters from 0012 become optional sources.
 3. `resume_optimize` and `interview_gen` remain contract-only; the Chinese
-   resume/ATS tailoring work belongs to the resume-tailoring stage.
-4. Follow the remaining roadmap stages after that.
+   resume/ATS tailoring work is stage **0015**.
+4. Follow stage **0016** (open-source packaging) after that.
 5. Keep AutoApply, RabbitMQ, general Crawler, Gateway, and SaaS RBAC out of
    the MVP unless a separate ADR changes the decision.
+6. **0014 carry-forward — Step 5 (first real China source) is environment-limited
+   and NOT done.** It can only complete with a compliant, verifiable candidate:
+   written permission or a documented public API for 国聘; a re-probe once
+   `career.cic.tsinghua.edu.cn/robots.txt` stops returning 503; or a different
+   server-rendered, unsigned school job list that needs the product owner's
+   authorization. Until then **no China source adapter is registered** (only
+   `greenhouse`/`lever`/`ashby`).
+7. **0014 carry-forward — the real-browser bookmarklet acceptance is still
+   UNVERIFIED.** The plan's §19.5 holds the redacted-evidence template; this is
+   owned by the product owner and is not a stage blocker.
+
+Stage numbering (decided 2026-10-08). It supersedes older references inside the
+archived completed plans, which are historical evidence and are never rewritten:
+
+| Stage | Scope | Plan |
+|---|---|---|
+| 0014 | China campus sources and manual capture | [`completed/0014-china-campus-sources-and-manual-capture.md`](../exec-plans/completed/0014-china-campus-sources-and-manual-capture.md) |
+| 0015 | Resume tailoring (Chinese resume and ATS) | not started; labeled 0014 by `completed/0013-ai-matching.md` sections 3/14/17 |
+| 0016 | Open-source packaging | not started |
+
+Note added 2026-10-09 when 0014 closed: the 0014 row above records the
+2026-10-08 decision and is preserved verbatim; the archived plan now lives at
+[`completed/0014-china-campus-sources-and-manual-capture.md`](../exec-plans/completed/0014-china-campus-sources-and-manual-capture.md).
 
 0011 must remain:
 

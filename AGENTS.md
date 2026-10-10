@@ -5,12 +5,18 @@
 C++17 Linux backend for an AI-assisted job application platform. `service/` is
 the canonical runnable entry; root CMake is the unified developer entry.
 
-Current phase: 0013 AI Matching is complete (Steps 1-10) and archived under
-`docs/exec-plans/completed/`; no plan is active. Product direction is China-first
+Current phase: 0013 AI Matching (Steps 1-10) and 0014 China Campus Sources +
+Manual Capture (Steps 1-8) are complete and archived under
+`docs/exec-plans/completed/`; no plan is active. 0014's Step 5 (first real China
+source) is **environment-limited** and carried forward, not done: no compliant,
+reusable China list contract could be verified, so no China source adapter is
+implemented and no China `source` identifier is registered — the registered
+sources remain `greenhouse`/`lever`/`ashby` — and the real-browser bookmarklet
+acceptance is still UNVERIFIED (plan §19.5). Product direction is China-first
 per `docs/adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
 manual capture import, campus focus, company career pages, never auto-submit);
-the next stage is the China source layer. P1 network/HTTP remains behaviorally
-frozen.
+the next stage is **0015 resume tailoring**, then 0016 open-source packaging. P1
+network/HTTP remains behaviorally frozen.
 
 Verification and agent workflow rules: `docs/ai/agent-workflow.md`. Read it
 before running any test suite — it defines the levels, when a suite may run, and

@@ -6,7 +6,7 @@ merges **strictly validated, evidence-bound** output onto the deterministic
 `match_rule_v1` baseline. The worker never touches business tables and never
 recomputes the score
 ([ADR-0009](../docs/adr/0009-ai-pipeline-and-provider-strategy.md),
-[ExecPlan 0013](../docs/exec-plans/active/0013-ai-matching.md)).
+[ExecPlan 0013](../docs/exec-plans/completed/0013-ai-matching.md)).
 
 ## Guarantees
 

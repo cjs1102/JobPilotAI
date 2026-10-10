@@ -48,6 +48,8 @@ Binding rules:
    Flaky failures are investigated, not retried into green.
 5. **Python suites are cheap** (seconds) but still follow rule 2: run the suite
    for the package you touched.
+6. **Execution budget and stop conditions** are binding too: see §8 before
+   starting long-running verification, source probing, or a stage close.
 
 ### 2.1 Change-type minimums
 
@@ -166,3 +168,48 @@ labelled explicitly in the report.
 | Sanitizer phase "hung" | cold full-tree instrumented rebuild | §3.7 |
 | MySQL "Can't connect through socket" | `localhost` instead of `127.0.0.1` | §3.3 |
 | Same green suite run three times in one stage | no re-run policy | §2.1 |
+| Hours spent probing one dead or gated source | no probing budget or stop condition | §8.2, §8.3 |
+| `git status` / full diff re-inspected after every edit | no single-review rule | §8.5 |
+| A failed long run leaves no usable report | failure reported as "inconclusive" only | §8.6 |
+
+## 8. Execution budget and stop conditions
+
+Long verification, source probing and stage closes must be **bounded and
+reported**. These rules extend §2.1 (change-type minimums), §2.2-§2.4 (L4
+preconditions and invalidation) and §3 (harness prerequisites); they do not
+replace or weaken any of them.
+
+1. **Reuse unaffected evidence.** Before running anything, check whether an
+   identical, still-valid result already exists for the unchanged code or
+   configuration (a recorded command + raw pass line + commit/sha, per §2 rule 1)
+   and cite it. Re-running green work "to be sure" is a process defect, not
+   diligence.
+2. **Cap candidate probing.** A single candidate source gets at most **5 minutes
+   of probing** by default, and a stricter limit written in the stage plan wins.
+   Count every request/redirect/tool invocation inside that budget; when the
+   budget is exhausted, stop and report rather than extending it silently.
+3. **Retry boundedly, then stop.** Network failures get a small bounded retry
+   (the project default is `{retries: 2, baseDelayMs: 500, maxDelayMs: 8000}`,
+   clamped `Retry-After`), then the attempt stops with a recorded status. Never
+   retry a `Disallow`, a refused redirect, a `4xx` that is not `429`, or a
+   certificate error — and never relax a compliance guard to make a probe
+   succeed.
+4. **Test by impact.** Run the tests that the change can falsify (targeted first)
+   plus the regression the blast radius requires, per §2.1. A docs-only change is
+   L0; a stage close is the single L4 of §2.2. "More tests than needed" is not a
+   substitute for "the right tests".
+5. **One Git review per stage.** Inspect `git status` / `git diff` (and
+   `git diff --check`) **once**, at the end of the stage, after the documented
+   verification has run. Intermediate edits are tracked by the edit tools, not by
+   repeated whole-tree reviews; a review performed before the last write is not a
+   review.
+6. **Failures still deliver facts.** When a run or probe fails or stops at its
+   budget, report what *was* verified, the exact stop reason, what remains
+   uncertain, and the smallest next options. "Inconclusive" alone is not an
+   acceptable report; a labelled harness/credential error is not a product
+   failure (§3, §4).
+7. **Never buy time by cheating the bar.** Skipping a required verification,
+   weakening a security or compliance constraint, substituting a cheaper
+   assertion, or fabricating/extrapolating a result to fit a budget is always a
+   failure, regardless of the time saved. If the budget genuinely cannot cover a
+   required check, stop and report the blocker as a blocker (§4, §6).

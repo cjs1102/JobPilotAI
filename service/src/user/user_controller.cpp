@@ -36,12 +36,21 @@ namespace jobpilot::service
             case ErrorCode::kJobNotFound:
             case ErrorCode::kResumeNotFound:
             case ErrorCode::kApplicationNotFound:
+            case ErrorCode::kAiTaskNotFound:
                 return 404;
             case ErrorCode::kEmailExists:
             case ErrorCode::kDuplicateApplication:
                 return 409;
+            // Same mapping as the AI and internal controllers (a user endpoint
+            // cannot currently produce an AI code; kept exhaustive so future
+            // enumerators cannot reintroduce the -Wswitch warning).
+            case ErrorCode::kAiServiceBusy:
+                return 503;
+            case ErrorCode::kAiAnalysisFailed:
             case ErrorCode::kInternalError:
             case ErrorCode::kDatabaseError:
+                return 500;
+            default:
                 return 500;
             }
 
@@ -64,6 +73,8 @@ namespace jobpilot::service
                 return "Not Found";
             case 409:
                 return "Conflict";
+            case 503:
+                return "Service Unavailable";
             default:
                 return "Internal Server Error";
             }

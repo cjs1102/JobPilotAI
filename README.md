@@ -21,6 +21,27 @@ JobPilotAI 是一个基于 C++ 高性能后端架构的 AI 求职自动化平台
   消失宽限与重新出现、freshness 可见性（`fresh`/`aging`/`stale`/`closed`）。
 - AI 匹配（0013）：公开 `POST /api/v1/ai/match` + `GET /api/v1/ai/tasks/{id}`，
   token 保护的 `/internal/ai/tasks/*`，确定性 `match_rule_v1` 分数永不被告覆写。
+- 岗位列表可用性与入库质量（0015A）：公开岗位搜索默认只返回 `clean`
+  （`AND j.review_status = 0`），`needs_review` 只进入内部 token 保护的复核面
+  （`GET /internal/jobs/review-queue`、`POST /internal/jobs/review/{id}`、
+  `POST /internal/jobs/review/backfill`）；列表响应新增 `source_url`，并支持
+  `education_max` / `job_nature` / `deadline_before` / `deadline_after` 过滤与
+  `sort`（`created_desc` / `deadline_asc` / `education_asc`）；描述长度按 UTF-8
+  字节硬上限 48 KiB，超限走可诊断的拒绝/复核，绝不静默截断。
+- 画像候选数据（0015 Phase A）：`profiles.education_level` / `graduation_year` /
+  `campus_status` 三个可空列（NULL = 未知，无回填）；简历 PDF 文本状态是**派生**值
+  （`ok` / `text_empty` / `pdf_no_text` / `text_unavailable`），不新增列。
+- 可解释匹配（0015 Phase B）：`rule_v1` 权重与分数口径不变；
+  `GET /api/v1/jobs?with_match=true` 的每行追加 7 个可加性键（`score` /
+  `score_version` / `matched_skills` / `missing_skills` / `reasons[]` /
+  `deal_breakers[]` / `deadline_urgency`），`GET /api/v1/jobs/recommended` 同样给出
+  这些匹配解释键；`with_match` 缺省时列表响应与旧版**逐字节一致**；`strict=true` 在
+  列表自身排序窗口内分页，`total` 为过滤后数量，窗口触顶时 `truncated=true`。
+- 简历定制产物（0015 Phase D）：`tailor_rule_v1` 确定性中文 ATS 纯文本草稿
+  （每条事实带来源标注，无法推导处是 `【请填写：…】`）；机械事实门
+  （`fact_check_status=2` 阻止确认）；需登录的 `POST`/`GET /api/v1/resumes/artifacts`、
+  `GET /api/v1/resumes/artifacts/{id}`、`POST /api/v1/resumes/artifacts/{id}/confirm`；
+  `confirmed_at IS NULL` = 草稿，确认只是状态变更。
 
 ### Python `source_adapters/`
 
@@ -36,6 +57,17 @@ JobPilotAI 是一个基于 C++ 高性能后端架构的 AI 求职自动化平台
   （无凭据、不发任何网络请求）→ 剪贴板 JSON；本机 publisher
   `python -m jobpilot_sources publish-capture` 复用既有
   `POST /internal/jobs/import`（`source="manual"`），失败可诊断且绝不误报成功。
+
+### Python 离线工具（`tools/`，仅标准库）
+
+- **只读岗位匹配报告（0015 Phase C，可选）**：`tools/job_report/render_report.py`
+  只渲染公开接口**已经返回**的内容——不重新打分、不重新排序、不补数据、不写数据库、
+  不新增服务端接口——输出**单个自包含 HTML**（内联 CSS、无外部资源、无脚本）；行序 =
+  API 返回顺序 + 位置 `rank`，每行保留原始岗位链接，没有 `reasons[]` 的行显示显式标记
+  `无匹配理由`。`--input` 模式零网络 I/O，`--url` 模式只发一次带既有 Bearer token 的
+  `GET`。用法见 [`tools/job_report/README.md`](tools/job_report/README.md)。
+- **禁止投递路径检查（0015 Phase D）**：`tools/checks/no_submission_path.py`
+  全树扫描自动投递/自动提交类标识符与语义化路由，退出码 0 = 未发现（1 = 有发现）。
 
 ### 0014 关键契约（已实现并有测试）
 
@@ -64,7 +96,11 @@ JobPilotAI 是一个基于 C++ 高性能后端架构的 AI 求职自动化平台
 - **不自动化登录墙**：不做自动登录、绕 CAPTCHA、伪造 cookie/UA、代理池；登录墙岗位
   只允许人工采集（书签小工具）。
 - **不做通用爬虫/自动投递**：没有通用 HTML 爬虫、没有自动投递、没有 RabbitMQ /
-  Gateway / SaaS RBAC。
+  Gateway / SaaS RBAC。0015 的定制简历产物同样只有草稿与人工确认，**没有任何投递/
+  发送端点**（全树检查：`tools/checks/no_submission_path.py`）。
+- **0015 不做 LLM 措辞润色**：D6（ai_worker 的 `resume_optimize` 措辞通道）按所有者
+  决定延后（0015 计划 §17），`generator='rule_v1'` / `source_version='tailor_rule_v1'`
+  是唯一生成器，不需要 AI key。
 - **截止时间不驱动生命周期**：`deadline` 只是展示字段，本阶段没有「过期自动关闭」
   或过期提示；过期的岗位仍然可见（已知可见性限制）。
 - **书签小工具的真机运行未验证**：离线（node + fixture）已验证提取逻辑，但在真实
@@ -83,7 +119,7 @@ JobPilotAI 是一个基于 C++ 高性能后端架构的 AI 求职自动化平台
 ### Libraries
 
 - spdlog、yaml-cpp、nlohmann/json、hiredis、GoogleTest
-- Python 侧（`source_adapters/`、`ai_worker/`）：标准库 + PyYAML
+- Python 侧（`source_adapters/`、`ai_worker/`）：标准库 + PyYAML；`tools/` 仅标准库
 
 ## 项目结构
 
@@ -97,6 +133,7 @@ JobPilotAI
 │   └── tests/
 ├── source_adapters/         # Python 采集：公开来源适配器 + 0014 框架 + 人工采集
 ├── ai_worker/               # 0013 可选 AI worker（Python）
+├── tools/                   # 离线工具：0015 Phase C 只读岗位报表 + 禁止投递路径检查
 ├── database/schema/         # MySQL 初始化脚本
 ├── docs/                    # 03 数据库 / 04 API / ADR / ExecPlan / ai agent 规则
 ├── docker/
@@ -112,6 +149,9 @@ JobPilotAI
 # C++（service 与 root 两套 preset）
 cmake --preset debug      && cmake --build --preset debug
 ctest --preset release -L job          # 受影响标签；L4 见 docs/ai/agent-workflow.md
+
+# 0015 Phase C 只读报表（标准库）
+python3 -m unittest discover -s tools/job_report/tests -v
 
 # Python 采集与人工采集
 cd source_adapters && python3 -m unittest discover -s jobpilot_sources/tests -t .

@@ -1,18 +1,21 @@
 # JobPilotAI Current Project State
 
-> Snapshot: 2026-10-08
+> Snapshot: 2026-10-10
 >
-> Baseline HEAD: `e3a640a test(job): add end-to-end source sync and freshness
-> coverage`
+> Baseline HEAD: `ae85868 feat(resume): expose the human-confirmed
+> tailored-artifact endpoints`
 >
-> `origin/main` matches this baseline. 0010 Job Ingestion, the Architecture
-> Re-Research, 0011 Job Search / Ranking, 0012 Steps 1-8 (freshness schema,
-> source observation domain, Source Sync DAO/Service/API, freshness search,
-> Python ATS adapters, end-to-end integration), 0013 AI Matching, and 0014 China
-> Campus Sources + Manual Capture are complete and archived; **no plan is
-> active**. 0014's Step 5 is environment-limited and carried forward (see the
-> Completed Plan section and `## Next Entry` items 6/7). The next stage is
-> **0015 resume tailoring**, then 0016 open-source packaging.
+> 0010 Job Ingestion, the Architecture Re-Research, 0011 Job Search / Ranking,
+> 0012 Steps 1-8 (freshness schema, source observation domain, Source Sync
+> DAO/Service/API, freshness search, Python ATS adapters, end-to-end
+> integration), 0013 AI Matching, and 0014 China Campus Sources + Manual Capture
+> are complete and archived; the **0015A** job-list/intake hardening is closed.
+> **0015 resume tailoring and explainable matching is the active stage**: Phases
+> A-C are complete and Phase D is implemented through the D5 routes, which passed
+> their L2 verification (commit `ae85868`; D6 deferred by owner decision), with
+> the stage's single L4 pending (`## Active Plan (0015)`). 0014's Step 5 is
+> environment-limited and carried forward (see the Completed Plan section and
+> `## Next Entry` items 6/7). 0016 open-source packaging follows 0015.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active ExecPlan should be enough for a new Agent to continue
@@ -71,6 +74,10 @@ are preserved in
   capture channel (bookmarklet + local publisher through
   `/internal/jobs/import`). No real China source adapter exists yet and no China
   `source` identifier is registered.
+- **0015 (resume tailoring and explainable matching) is the active stage**, and
+  **0015A (job-list usability and intake quality) is closed**; 0014's Step 5
+  carry-forward is unchanged. Details: `## Active Plan (0015)` and
+  `## Completed Plan (0015A)` below.
 
 The revised architecture direction is:
 [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md).
@@ -85,6 +92,75 @@ Key decisions:
 - RabbitMQ, Gateway, general Crawler, and AutoApply are not MVP requirements.
 - Freshness lifecycle is introduced with 0012 Source Adapter, not 0011.
 - A single missing fetch never closes a Job.
+
+## Active Plan (0015)
+
+[`active/0015-resume-tailoring-and-explainable-matching.md`](../exec-plans/active/0015-resume-tailoring-and-explainable-matching.md)
+— Phases A-C complete, Phase D implemented through D5 (D6 deferred by owner
+decision, plan §17); D5 passed its L2 verification (commit `ae85868`) and the
+stage's single L4 is pending.
+
+Delivered:
+
+- Phase A: `profiles.education_level` / `graduation_year` / `campus_status` are
+  nullable columns with no backfill (NULL = unknown); `test_schema` covers the
+  live, fresh and pre-0015 migrated databases. Resume PDF text status is
+  **derived** (`ok` / `text_empty` / `pdf_no_text` / `text_unavailable`) — no new
+  column.
+- Phase B: `rule_v1` weights unchanged; `match_explanation` adds deadline
+  urgency, deal-breakers as data and reasons; 7 additive keys on `/recommended`
+  and on the job list with `with_match=true`; the default payload is
+  byte-identical; `strict=true` paginates in the shared ORDER BY window, `total`
+  is the surviving count and a capped window is flagged `truncated`.
+- Phase C: `tools/job_report/render_report.py` — stdlib-only offline
+  self-contained HTML report with 11 deterministic tests.
+- Phase D: D0/D1 contracts (`docs/03` §10.6, `docs/04` §9); D2 `tailor_rule_v1`
+  deterministic draft; D3 `resume_artifacts` table + DAO + schema tests; D4
+  mechanical fact-provenance gate (`fact_check_status=2` blocks confirmation);
+  D5 four authenticated routes — `POST`/`GET /api/v1/resumes/artifacts`,
+  `GET /api/v1/resumes/artifacts/{id}`,
+  `POST /api/v1/resumes/artifacts/{id}/confirm` — with draft
+  (`confirmed_at IS NULL`) vs confirmed distinguishable, **409** on a failed fact
+  gate or an already-confirmed artifact, `/submit` / `/apply` / `/send` probes
+  → 404, and **no submission endpoint anywhere**
+  (`tools/checks/no_submission_path.py`). `IResumeDao` also
+  gained the `FindOwnedVersion` seam used by draft generation.
+  D5's L2 evidence (commit `ae85868`, pushed): release preset build rc=0;
+  selected ctest 30/30 (`test_resume_http` 5/5, `test_resume_artifact_dao` 4/4,
+  `test_resume_dao` 2/2, `test_resume_service` 6/6, `test_ai_task_service` 13/13);
+  `tools/checks/no_submission_path.py` rc=0; `git diff --check` rc=0.
+
+The stage's single L4 has not run yet; no stage-level test totals exist (the D5
+figures above are L2 scope only).
+
+## Completed Plan (0015A)
+
+[`active/0015A-job-list-usability-and-intake-quality.md`](../exec-plans/active/0015A-job-list-usability-and-intake-quality.md)
+— **closed 2026-10-10** (the plan file is still under `active/`; see
+`## Next Entry` item 9).
+
+Progress:
+
+```text
+Steps 0-8 complete; the stage's single L4 passed
+L4: Debug / ASan / UBSan 286/286 each; both Release builds ok; Python 446 and 190;
+    sanitizers clean; backfill isolation: dev database explicitly SKIP, scratch 7/7
+```
+
+- Public job search defaults to `clean` only (`AND j.review_status = 0`);
+  `needs_review` rows are reachable only through the internal token-protected
+  review surface (`GET /internal/jobs/review-queue`,
+  `POST /internal/jobs/review/{id}`, `POST /internal/jobs/review/backfill`).
+- The list payload carries `source_url`; `education_max` / `job_nature` /
+  `deadline_before` / `deadline_after` filters and `sort` (`created_desc` /
+  `deadline_asc` / `education_asc`) are live.
+- Description length is capped at 48 KiB of UTF-8 bytes; over-long input is
+  rejected or routed to review with diagnostics, never silently truncated.
+
+Recorded database state (observation, not a defect, no cause asserted): `jobs`
+has 4 rows, all `review_status=0`, and `job_review_items` has 0 rows; a
+historical dry run once saw 6 active jobs with no baseline snapshot, and the
+cause is unproven.
 
 ## Completed Plan (0014)
 
@@ -141,8 +217,8 @@ Remaining work / next steps:
 
 Note: `## Next Entry` items 1-5 and the stage-numbering table below were written on
 2026-10-08 as the recorded stage-numbering decision and are preserved verbatim
-(items 6/7 are the 0014 carry-forward added when the stage closed); the current
-status is this section.
+(items 6/7 are the 0014 carry-forward added when 0014 closed; items 8/9 record
+the 0015 opening); the current status is this section.
 
 ## Stage Handoff Map
 
@@ -250,6 +326,13 @@ HTTP request
   `jobpilot_service` links cleanly; root Release built; Python `source_adapters`
   **337/337** and `ai_worker` **190/190**. Raw logs and per-phase timestamps are
   recorded in the 0014 plan §21.
+- 0015A L4 gate: full Debug, ASan and UBSan CTest **286/286 each** (sanitizers
+  clean); both `service/` and root Release builds passed; Python
+  `source_adapters` **446** and `ai_worker` **190**; the review-backfill
+  isolation ran with the dev database explicitly SKIPped and the scratch database
+  7/7.
+- 0015 stage L4: **not run yet** — the stage is active and its single L4 runs at
+  close, so no stage-level test totals exist in this snapshot.
 - Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
   all published with `complete=false` only where the 200-job limit required it.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test
@@ -303,6 +386,13 @@ Performance baseline:
 7. **0014 carry-forward — the real-browser bookmarklet acceptance is still
    UNVERIFIED.** The plan's §19.5 holds the redacted-evidence template; this is
    owned by the product owner and is not a stage blocker.
+8. **0015 is active.** Phases A-C are complete and Phase D is implemented through
+   D5, whose L2 verification passed (commit `ae85868`); only D7 — this docs sync
+   plus the stage's single L4 — remains. The plan's D7 checkbox stays open until
+   the L4 evidence is recorded.
+9. **0015A is closed but its plan file still sits under `active/`** with its own
+   status header and §13 checkboxes unupdated; updating them and archiving the
+   file is the Lead's call (plan §5.5 assigns that file to the Lead).
 
 Stage numbering (decided 2026-10-08). It supersedes older references inside the
 archived completed plans, which are historical evidence and are never rewritten:
@@ -316,6 +406,10 @@ archived completed plans, which are historical evidence and are never rewritten:
 Note added 2026-10-09 when 0014 closed: the 0014 row above records the
 2026-10-08 decision and is preserved verbatim; the archived plan now lives at
 [`completed/0014-china-campus-sources-and-manual-capture.md`](../exec-plans/completed/0014-china-campus-sources-and-manual-capture.md).
+
+Note added 2026-10-10 when 0015 opened: **0015 is now active** (Phases A-C
+complete, Phase D implemented through D5 — see `## Active Plan (0015)`), and
+**0015A is closed**; the table rows above are preserved verbatim.
 
 0011 must remain:
 
@@ -335,6 +429,8 @@ Do not start a new P2 module without its own approved plan.
 ## Key Entry Points
 
 - AI routing: [README.md](README.md)
+- Active ExecPlan (0015):
+  [../exec-plans/active/0015-resume-tailoring-and-explainable-matching.md](../exec-plans/active/0015-resume-tailoring-and-explainable-matching.md)
 - Full historical state:
   [references/project-state-full.md](references/project-state-full.md)
 - Current architecture:

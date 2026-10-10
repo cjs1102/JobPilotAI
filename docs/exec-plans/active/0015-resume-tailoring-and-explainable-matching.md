@@ -670,7 +670,7 @@ Stop and report to the Lead (do not widen scope) if:
 - [x] Reuse research (0015A §17 verbatim goal, competitive note §4, project-state)
 - [x] Confirm current-tree facts (HEAD `bd7d451`)
 - [x] Design + contracts + phases (this document)
-- [ ] Phase A: contract (A1) → columns/DTO/DAO (A2) → PDF contract (A3)
+- [x] Phase A: contract (A1) → columns/DTO/DAO (A2) → PDF contract (A3)
   - [x] A1 + A2 (minus PDF): `docs/03` §10 + §3 DDL + §5 note, `docs/04` §3.4 keys,
         `database/schema/01_user.sql`, `UserProfile`/DAO/`UpdateProfile`/`ProfileToJson`,
         `test_user_*` + `test_schema` (fresh + migrated); NULL = unknown, no backfill.
@@ -684,7 +684,7 @@ Stop and report to the Lead (do not widen scope) if:
         phase B's match input bundle (B1), which is where "resume text unavailable" becomes a
         match-input/reason statement.
   - [x] Phase A complete (A1+A2 profile candidate data, A3 explicit PDF text contract).
-- [ ] Phase B: contract (B0) → candidate components (B1) → reasons (B2) →
+- [x] Phase B: contract (B0) → candidate components (B1) → reasons (B2) →
       deal-breakers/urgency (B3) → writers + docs (B4)
   - [x] B0: `docs/04` §5.1 additive keys + `with_match`/`strict` + the `rule_v1`-only authority
         statement; `docs/03` §10.5 records the index decision (no new index).
@@ -700,7 +700,7 @@ Stop and report to the Lead (do not widen scope) if:
         strict-filtered set, and a capped window (2000) is surfaced as `truncated: true`.
         Both parameters require a session, accept only `true|false`, and `with_match` absent
         is byte-identical (asserted in `test_job_http`).
-- [ ] Phase C: decision 2 (C1) → implement (C2) → docs (C3)
+- [x] Phase C: decision 2 (C1) → implement (C2) → docs (C3)
   - [x] C1: owner default decision 2 = **C1 offline self-contained report**. Data source is the
         existing authenticated `GET /api/v1/jobs?with_match=true` (or a captured response body);
         no server surface, no new auth mechanism, no frontend tooling, no new dependency.
@@ -710,7 +710,7 @@ Stop and report to the Lead (do not widen scope) if:
         `无匹配理由` marker; `--input` mode performs zero network I/O and `--url` mode performs a
         single `GET` with the existing Bearer token (never a mutating verb, never the database).
   - [x] C3: documented in `docs/04` §8 + `tools/job_report/README.md`; deterministic fixture tests
-        in `tools/job_report/tests/test_render_report.py` (10 cases, all green).
+        in `tools/job_report/tests/test_render_report.py` (11 tests, all green).
 - [ ] Phase D: decisions 1/3 (D0) → contract (D1) → `tailor_rule_v1` (D2) →
       artifact persistence (D3) → fact gate (D4) → confirmation boundary (D5) →
       worker (D6, conditional) → docs + single L4 (D7)
@@ -728,10 +728,10 @@ Stop and report to the Lead (do not widen scope) if:
         asserted fact provenance-tagged, anything underivable becomes `【请填写：…】`, no LLM in
         the path; `test_tailor_rule` 5/5 (determinism, provenance, no-invention, matched/missing
         requirements, ATS section contract).
-  - [ ] D3: artifact persistence (new `07_resume_artifact.sql` + DAO + ownership checks +
-        `test_schema` on fresh AND migrated DBs, new `test_resume_artifact_dao`).
-  - [ ] D4: mechanical fact-provenance gate + persistence (fail ⇒ `fact_check_status=2` ⇒
-        confirmation blocked).
+  - [x] D3: artifact persistence — `database/schema/07_resume_artifact.sql` (+ the `docs/03`
+        §10.6 migration), `ResumeArtifactDao` with ownership through
+        `IResumeDao::OwnedVersionExists`, and `test_schema` asserting the table on the live,
+        fresh and pre-0015 migrated databases (`test_resume_artifact_dao` covers the DAO).
   - [x] D4 (fact gate): pure `FactCheck(draft)` — every fact must cite an allowed source AND appear
         in the content; every content line must be a heading, an explicit `【请填写：…】` slot,
         inside the delimited verbatim quote block (`原始简历文本（逐字引用）：` …
@@ -741,8 +741,16 @@ Stop and report to the Lead (do not widen scope) if:
         blocked. `test_tailor_rule` 9/9 (incl. an injected unsourced claim being caught, unknown
         provenance, a dangling fact, placeholder handling) and `test_resume_artifact_dao` 4/4
         (the persisted gate verdict blocks `Confirm`).
-  - [ ] D5: human-confirmation boundary + artifact read endpoints (draft vs confirmed; **no
-        submission endpoint exists**).
+  - [x] D5 (verified, L2 scope): the four authenticated routes are live — `POST
+        /api/v1/resumes/artifacts`, `GET /api/v1/resumes/artifacts`, `GET
+        /api/v1/resumes/artifacts/{id}` and `POST /api/v1/resumes/artifacts/{id}/confirm`;
+        draft vs confirmed is distinguishable, and a state change that cannot happen (failed
+        fact gate, already confirmed) answers **409**; `/submit` / `/apply` / `/send` probes
+        answer **404** and **no submission endpoint exists**. Commit `ae85868` (pushed to
+        origin/main). Evidence: release preset build rc=0; selected ctest 30/30
+        (`test_resume_http` 5/5, `test_resume_artifact_dao` 4/4, `test_resume_dao` 2/2,
+        `test_resume_service` 6/6, `test_ai_task_service` 13/13);
+        `tools/checks/no_submission_path.py` rc=0; `git diff --check` rc=0.
   - [x] D6 — **DEFERRED by owner decision (recorded in §17)**, not skipped silently: the worker
         path is optional, the deterministic `tailor_rule_v1` draft is the deliverable, and no LLM
         surface / AI key / worker handler is wired in this stage. `generator='rule_v1'` +

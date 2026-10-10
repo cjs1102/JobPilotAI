@@ -43,6 +43,6 @@ python3 tools/job_report/render_report.py \
 python3 -m unittest discover -s tools/job_report/tests -v
 ```
 
-10 个用例覆盖：行顺序与 `rank`、每行的原始链接、score/version/技能/理由/deal-breaker/紧迫度、
+11 个用例覆盖：行顺序与 `rank`、每行的原始链接、score/version/技能/理由/deal-breaker/紧迫度、
 「无理由」显式标记、空列表、自包含（无外部资源/无脚本）、渲染确定性、`--input` 零网络 I/O、
 `--url` 只发一次带 token 的 `GET`。仅使用 Python 标准库。

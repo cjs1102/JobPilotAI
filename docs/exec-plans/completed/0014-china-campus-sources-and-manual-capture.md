@@ -13,6 +13,7 @@
 > `greenhouse`/`lever`/`ashby`. This archive must not be read as "China sources
 > are done". Re-entry conditions: §20.4. The real-browser bookmarklet acceptance
 > is still **UNVERIFIED** (§19.5).
+> 真实浏览器书签验收的操作记录与限制见 §19.6。
 >
 > Historical planning-phase status, preserved as written: "Active — Research /
 > Design / ExecPlan (this document). No production code is written by this
@@ -1060,6 +1061,27 @@ $ cd source_adapters && python3 -m unittest discover -s jobpilot_sources/tests -
 - 未跑 L4；未跑 C++ 全矩阵（按 task-11 指示）。E2E 只跑了上述一次 service 级
   人工通道验证（非 L4）。
 - Step 5 真实来源适配器与四处 allowlist 注册仍未完成（见 §13 说明与 README）。
+
+### 19.6 真机验收记录（2026-10-10，产品负责人执行）
+
+> 本节为 **append-only 追加记录**（owner 已批准；§19.1-§19.5、§13、§20、§21 原文未改一字）。
+> 标注【用户报告】的条目是产品负责人在自己浏览器中的观察，**不是**代码、日志或形式化安全证据。
+
+- 【用户报告】**Edge** 书签已在**真实招聘岗位详情页**执行成功。
+- 【用户报告】**实习僧首页**测试只验证了脚本执行与 JSON 生成，**不算有效的单岗位提取样本**。
+- 【用户报告】**牛客网桌面版**岗位详情页成功生成 JSON，但**招聘企业字段被误识别为平台名称**，
+  **描述混有推荐岗位内容**。
+- 【用户报告】**牛客网移动版**岗位详情页成功生成 JSON，包含岗位职责与要求，但**公司字段缺失**。
+- 【用户报告】**清空 Network 记录后直接点击书签，未观察到新增请求** —— 这只是**本次观察
+  结果**，**不得**描述为形式化安全证明；「无网络请求、无凭据」不变量仍以代码与离线测试为准
+  （`capture/bookmarklet.js`；`tests/test_capture_bookmarklet.py`）。
+- `publish-capture`、后端导入与 MySQL 持久化**未在本次浏览器验收中执行**；因此 §19.5 模板中的
+  `created/updated/total` 与公共搜索可见性两行**仍然空缺**。
+- **Step 5 中国真实来源仍为 environment-limited / 未完成**（四处 allowlist 仍为
+  `greenhouse`/`lever`/`ashby`；见 §20.3/§20.4）。
+
+**结论**：书签的**提取**步骤已在真实登录墙页面上完成并产出 JSON；**发布与读回**尚未执行，
+因此 §19.5 的整体状态仍为「未验证」，本节只记录该验证项已迈出的第一步。
 
 ## 20. Step 5 实施记录（task-12：首个真实来源适配器尝试 + robots 修订）
 

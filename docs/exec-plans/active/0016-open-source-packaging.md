@@ -360,6 +360,23 @@ is never marked green without evidence. CE-2 is currently expected to succeed:
 the stale "cannot reach Conan Center" record was disproved by a 200 from
 `center2.conan.io/v1/ping` on 2026-10-10 (§2).
 
+**Environment note (2026-10-10, P1).** CE-2 succeeded from a fresh `CONAN_HOME`.
+CE-5 could **not** run for the committed `ubuntu:24.04` base: Docker Hub is
+unreachable from this host — the daemon is bound to the dead proxy
+`192.168.150.1:17897` (`/etc/systemd/system/docker.service.d/http-proxy.conf`),
+`registry-1.docker.io` resolves to `104.244.46.246`, and a direct TCP connect to
+:443 times out, so `docker build` fails at the base-image pull with
+`failed to resolve source metadata for docker.io/library/ubuntu:24.04 ... EOF`.
+The same commands were therefore verified in a **scratch image built from a
+locally cached base** (`redis:7`, Debian bookworm): bootstrap inside the
+container, `cmake --preset release --target jobpilot_service`, the service
+answering `/health` against the compose MySQL/Redis, and an uploaded resume's
+bytes surviving a container recreation inside `resume_storage`. That is evidence
+for the container, compose and volume mechanics, **not** for the `ubuntu:24.04`
+package names. The P4 CI job that builds the committed image is where CE-5 gets
+its real evidence; until the owner reports that run, the image must not be
+described as verified.
+
 ### 8.2 Targeted slices
 
 - P1: CE-1 + CE-2 + a configure-only run of both entries (root and service) + the
@@ -389,7 +406,7 @@ gate is fixed and only the affected levels are re-run.
 | Step | Work | Depends on | Acceptance criteria |
 |---|---|---|---|
 | **P0** | Owner reviewed this plan and ruled §11 (done, 2026-10-10) | — | approval recorded in §11; no implementation started before it |
-| **P1** | Build and run contract (C1, C2): `conan.lock`, pinned settings, `tools/dev/bootstrap.sh`, the TSan target-order fix, multi-stage `Dockerfile`, compose service behind a profile, `resume_storage` attached to the service's storage root, `.env` handling, `/health`; worker documented as optional | P0 | CE-1, CE-2 and CE-5 pass; `cmake --preset tsan` configures; bootstrap is idempotent; both entries configure and build; `docker compose config` shows the volume attached and the default stack still starts infra only; `/health` returns 200; the isolated stack tears down cleanly |
+| **P1** | Build and run contract (C1, C2): `conan.lock`, pinned settings, `tools/dev/bootstrap.sh`, the TSan target-order fix, multi-stage `Dockerfile`, compose service behind a profile, `resume_storage` attached to the service's storage root, `.env` handling, `/health`; worker documented as optional | P0 | CE-1 and CE-2 pass; CE-5 passes for a locally cached base and stays open for the committed `ubuntu:24.04` base until the P4 CI run (environment-limited, §8.1); `cmake --preset tsan` configures; bootstrap is idempotent; both entries configure and build; `docker compose config` shows the volume attached and the default stack still starts infra only; `/health` returns 200 against the compose MySQL/Redis; an uploaded resume's bytes survive a container recreation inside `resume_storage`; the isolated stack tears down cleanly |
 | **P2** | Database bootstrap + upgrade documentation, demo database isolation | P1 | a fresh isolated database reaches the expected 13 tables from committed files; the upgrade path is documented and applied once to a copy; the dev database is verified untouched |
 | **P3** | Demo gate (C3): `tools/dev/` gate script + extended `docs/examples/job-import.json` + assertions | P1, P2 | CE-3 passes end to end with no AI key and no outbound network; the negative control exits non-zero; raw output archived |
 | **P4** | CI workflow: build job + DB-backed job with an isolated CI database and dedicated credentials, no AI key, TSan out of the required matrix | P1, P3 | CE-4 passes (workflow command list replayed locally); the workflow file validates; the owner confirms the first GitHub run afterwards |
@@ -517,19 +534,35 @@ rewritten (archived/historical text is never rewritten here). This plan is the
 
 ## 17. Known Issues and Follow-ups
 
-- `JP_ENABLE_TSAN` names two targets before they are defined
+- **Fixed in P1 while verifying the run story:** the MySQL service's healthcheck
+  was `mysqladmin ping -h localhost`, which uses the unix socket and therefore
+  succeeds while the entrypoint's first-init server is still running with
+  networking disabled. A dependent service could start before the database was
+  reachable and fail its first query (observed as
+  `mysql_real_connect failed: Can't connect to server on 'mysql' (115)` in the
+  isolated stack, while the same request succeeded once MySQL had settled). The
+  healthcheck now pings over TCP as the application user, which also proves the
+  user and the schema load are finished.
+- **Docker Hub is unreachable on this host** (the daemon is bound to the dead
+  proxy `192.168.150.1:17897` and `registry-1.docker.io` resolves to a poisoned
+  address), so the committed `Dockerfile`'s `ubuntu:24.04` base cannot be pulled
+  here and CE-5 stays open for that base until the P4 CI job builds it. This is
+  an environment condition; the stage deliberately does not "fix" the daemon
+  proxy or the registry.
+- `JP_ENABLE_TSAN` named two targets before they were defined
   (`service/CMakeLists.txt:465-466` vs `:528,:545`): any TSan configure of the
-  current tree fails. **Decision 8: fixed in P1, TSan stays out of the required
+  current tree failed. **Decision 8: fixed in P1, TSan stays out of the required
   CI matrix.**
-- `docker-compose.yml:40-42` declares `resume_storage` with no service attached.
-  **In P1 scope by owner instruction**: the real write path is
-  `MakeLocalFileStorage(config.storage.root)` (`service/src/main.cpp:131-133`),
-  so the volume is attached to the service container at that storage root, and
-  P1 verifies it by writing and reading a resume file back through the isolated
-  stack; if that verification shows the container never writes there, the
-  declaration is removed instead and the reason recorded.
+- `docker-compose.yml:40-42` declared `resume_storage` with no service attached.
+  **Resolved in P1**: the real write path is
+  `MakeLocalFileStorage(config.storage.root)` (`service/src/main.cpp:131-133`)
+  and resumes land at `<root>/<userId>/resumes/<resumeId>/v<version><ext>`
+  (`service/src/resume/resume_service.cpp:55-66`), so the volume is mounted at
+  the service container's storage root (`/app/storage`, with
+  `STORAGE_ROOT=/app/storage`), and P1 verified it by uploading a resume in the
+  isolated stack and re-reading its exact bytes after recreating the containers.
 - `docs/quality/README.md:12-16`'s "cannot reach Conan Center" record is stale
-  (200 from `center2.conan.io/v1/ping`, 2026-10-10); P6 corrects it with a dated
+  (200 from `center2.conan.io/v1/ping`, 2026-10-10); P5 corrects it with a dated
   note rather than deleting the original.
 - `docs/07-deployment.md` and `docs/08-execution-guide.md` are historical and
   contain commands that cannot work (`jobpilot_server` under `build/bin`,

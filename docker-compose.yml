@@ -18,10 +18,20 @@ services:
       - mysql_data:/var/lib/mysql
       - ./database/schema:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      # -h 127.0.0.1 forces TCP. `mysqladmin ping -h localhost` uses the unix
+      # socket and succeeds while the entrypoint's first-init server is still
+      # running with networking disabled, so a service that waits for this
+      # healthcheck could start before the database is reachable and fail its
+      # first query (observed: mysql_real_connect errno 115). Authenticating as
+      # the application user additionally proves the user and schema load are
+      # finished.
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" --silent
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+      start_period: 30s
 
 
   redis:
@@ -35,6 +45,50 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+
+  backend:
+    # Plain `docker compose up -d` keeps starting MySQL and Redis only; the
+    # service is opt-in:  docker compose --profile app up -d
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${JOBPILOT_BACKEND_IMAGE:-jobpilot-backend:local}
+    container_name: ${JOBPILOT_BACKEND_CONTAINER_NAME:-jobpilot-backend}
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Inside the compose network the dependencies are reached by service name;
+      # these override service/config/config.yaml, which targets a service
+      # running directly on the host.
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-jobpilot}
+      MYSQL_USER: ${MYSQL_USER:-jobpilot}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      STORAGE_ROOT: /app/storage
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
+    ports:
+      - "${JOBPILOT_BACKEND_HOST_PORT:-8080}:8080"
+    volumes:
+      # Uploaded resumes are written under the storage root as
+      # <userId>/resumes/<resumeId>/v<version><ext>, so the volume is mounted at
+      # the root itself; the container writes there and nowhere else.
+      - resume_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
 
 volumes:

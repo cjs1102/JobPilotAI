@@ -1,0 +1,20 @@
+# Build context hygiene. The builder regenerates everything that is excluded
+# here, so a developer's local build tree, secrets and caches never enter the
+# image and the context stays small.
+.git
+.github
+.gitignore
+
+build/
+service/build/
+
+**/__pycache__/
+*.pyc
+
+# Secrets stay out of the image; the example file documents the variable names.
+.env
+.env.*
+!.env.example
+
+# Resume files written by a local (non-container) run.
+storage/

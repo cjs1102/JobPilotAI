@@ -193,7 +193,7 @@
 | 单元 | 写范围 | 依赖 | 验收标准 |
 |---|---|---|---|
 | A  CI 成本 | `.github/workflows/` | 无 | actionlint 两个文件 0 issue；本地复现集成 job 的全部步骤（tar 往返 + 全 309 用例在 release preset 下全绿）；给出"改造前=两次全树编译 vs 改造后=一次+产物传输"的耗时对比（本地测量，明确标注非 runner 墙钟）；推送后 owner 在 Actions 页确认三个 job 全绿。 |
-| B  重叠审计 | `docs/quality/test-overlap-audit.md`、`docs/quality/test-merge-map.json`、`tools/checks/test_coverage_map.py`、`service/tests/` | 可与 A 并行（分析阶段不编译） | 报告每条建议都有 `file:line`+断言原文证据；`test_coverage_map.py` 在合并后 exit=0；被合并用例的二进制重跑全绿；L4 里 CTest 计数 = `309 - 已合并数` 且 0 失败。 |
+| B  重叠审计 | `docs/quality/test-overlap-audit.md`、`docs/quality/test-merge-map.json`、`tools/checks/test_coverage_map.py`、`service/tests/` | 可与 A 并行（分析阶段不编译） | 报告每条建议都有 `file:line`+断言原文证据；`test_coverage_map.py` 在合并后 exit=0，且**负控制**（故意破坏的 map：留存的 removed 名 / 不存在的 survivor / 计数不一致）必须 exit≠0；被合并用例的二进制重跑全绿；L4 里 CTest 计数 = `309 - 已合并数` 且 0 失败。**若严格包含规则下 k=0**（无候选可证明被包含），验收改为：报告给出全部候选各自失败的条款 + 检查器 + 负控制原始输出 + L4 证明 309/309 仍绿；此时"覆盖未降级"由 309→309 与检查器共同证明，不制造合并。 |
 | C  验收脚手架 | `tools/dev/capture-acceptance.sh`、`docs/examples/capture-acceptance-sample.json` | 需要可用的本地镜像（已有 `jobpilot-backend:verify`） | 合成 JSON 端到端全绿（publish→import→公共搜索可见→读回断言→F14），evidence 文件含 §19.5 所需的 `created/updated/total` 与可见性两行，且不含 token；`bash -n` 与 `shellcheck`（若可用）无 error。 |
 | D  发布清单 | `docs/RELEASE_CHECKLIST.md`、`tools/checks/release_preflight.py` | 无 | 清单每项可勾选；自动项运行脚本有原始输出并 exit=0；手动项（Actions 分钟数、About/描述）明确标注为 owner 动作。 |
 
@@ -262,6 +262,18 @@ root Release 构建、两个 Python 套件（`Ran 446` / `Ran 190` + `OK`）、�
 
 ## 11. 已知问题与后续
 
+- **[0017-C 发现，真实缺陷，仅记录]** `publish-capture` 发出的 `published_at` 会被手工导入
+  端点**静默丢弃**：`source_adapters/jobpilot_sources/capture/publisher.py:220-224` 会把
+  capture 的发布日期归一化后放进 payload（并把它当作可发布字段，失败时还有 note），但
+  `POST /internal/jobs/import` 的契约（`docs/04-api-design.md:599-625`）与解析器
+  （`service/src/job/internal_job_import_controller.cpp:391-477`）都不包含 `published_at`，
+  未知键被忽略，所以值进不了 MySQL；公开详情里对应的 `posted_at` 恒为 `null`。观测证据：
+  合成 capture（`published_at=2026-09-20 08:00:00`）发布成功（created=1）后
+  `GET /api/v1/jobs/{id}` 的 `posted_at` 为 null（见 §10 P3 记录）。影响：人工采集岗位
+  的发布日期不可读；`docs/04:488` 的"发布 N 天内"过滤要求 `published_at IS NOT NULL`
+  （`service/src/job/job_dao.cpp:217-218`），因此人工记录在该过滤下会被排除——具体过滤名
+  与端到端影响**未在本阶段测量**。修法二选一（属生产代码，本阶段不做）：(a) 把
+  `published_at` 纳入手工导入契约 + 解析 + DAO；(b) 让 publisher 明确 note 并停止发送。
 - **仅 owner 可做**（本阶段只归档，不执行）：把仓库转为 public；填 About/描述/话题；
   在 Actions 页确认最后一条运行；轮换此前用过的 PAT。
 - **A 的最终证据缺口**：本机无法读 Actions API（404，无 `gh`/token）。若 owner 愿意提供

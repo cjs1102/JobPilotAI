@@ -1,0 +1,24 @@
+{
+  "capture_version": 1,
+  "captured_at": "2026-10-10T09:30:00.000Z",
+  "page_url": "https://jobs.example-cn.invalid/campus/2048?utm_source=bookmark&utm_medium=manual",
+  "page_title": "C++ 后端开发工程师（合成验收样本） - 示例科技",
+  "page_host": "jobs.example-cn.invalid",
+  "job": {
+    "title": "C++ 后端开发工程师 CACPT0017",
+    "company": "示例科技有限公司",
+    "source_url": "https://jobs.example-cn.invalid/campus/2048?utm_source=bookmark&utm_medium=manual",
+    "location": "深圳市-南山区",
+    "salary": "15-25K·14薪",
+    "education": "本科及以上",
+    "job_nature": "校招",
+    "experience": "应届生",
+    "deadline": "截止时间：2026-10-31",
+    "published_at": "2026-09-20 08:00:00",
+    "description": "<p>负责后端服务开发，熟悉 Linux、MySQL 与 Redis。</p><script>window.__never_executed = true;</script>",
+    "skills": ["C++", "Linux", "MySQL"]
+  },
+  "warnings": [
+    "synthetic acceptance sample for tools/dev/capture-acceptance.sh; it is not a real posting and its host is reserved by RFC 2606"
+  ]
+}

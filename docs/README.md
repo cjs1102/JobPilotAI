@@ -39,3 +39,6 @@ the documents below are the contracts and the evidence behind it.
 14. [`exec-plans/`](exec-plans/) — `active/` holds the plan being executed,
     `completed/` is the evidence archive of every finished stage.
 15. [`06-coding-standard.md`](06-coding-standard.md) — the code style.
+16. [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) — the release gate: what must be
+    true before an outside reader can trust a tag, which parts are automated, and
+    which parts only the repository owner can confirm.

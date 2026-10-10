@@ -53,7 +53,7 @@ def assert_contract(test: unittest.TestCase, jobs) -> None:
 
         if "description" in job:
             test.assertLessEqual(
-                len(job["description"].encode("utf-8")), 65535
+                len(job["description"].encode("utf-8")), 49152
             )
 
         if "education_required" in job:
@@ -327,6 +327,183 @@ class BuildJobDomainTest(unittest.TestCase):
         )
 
         self.assertNotIn("experience_years_min", job)
+
+
+class DescriptionCapTest(unittest.TestCase):
+    """0015A 5.5.3: the FINAL description is capped at 48 KiB of UTF-8 bytes.
+
+    ``MAX_DESCRIPTION_BYTES`` bounds the description that would be stored, not
+    the raw page: that safety budget is ``fetch.DEFAULT_MAX_RESPONSE_BYTES``
+    (2 MiB) and is deliberately independent. Over-cap content is a hard
+    ``description_too_large`` rejection carrying the byte counts.
+    """
+
+    BOARD = "https://jobs.example-cn.invalid/campus"
+
+    def board(self, description: str) -> str:
+        return json.dumps(
+            {
+                "total": 1,
+                "data": [
+                    {
+                        "title": "T",
+                        "company": "C",
+                        "source_url": "https://x.invalid/campus/1001",
+                        "description": description,
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        )
+
+    def feed(self, description: str) -> str:
+        return (
+            '<?xml version="1.0" encoding="utf-8"?>\n'
+            '<rss version="2.0"><channel><title>Board</title>\n'
+            "<item><title>运维工程师</title>"
+            "<link>https://x.invalid/campus/2002</link>"
+            f"<description>{description}</description>"
+            "</item></channel></rss>"
+        )
+
+    def test_the_cap_is_48_kib_and_is_not_the_response_body_budget(self) -> None:
+        from jobpilot_sources.fetch import DEFAULT_MAX_RESPONSE_BYTES
+
+        self.assertEqual(public_page.MAX_DESCRIPTION_BYTES, 49152)
+        self.assertEqual(public_page.MAX_DESCRIPTION_BYTES, 48 * 1024)
+        self.assertEqual(DEFAULT_MAX_RESPONSE_BYTES, 2 * 1024 * 1024)
+        self.assertGreater(
+            DEFAULT_MAX_RESPONSE_BYTES, public_page.MAX_DESCRIPTION_BYTES
+        )
+
+    def test_exactly_49152_bytes_is_published_verbatim(self) -> None:
+        value = "a" * 49152
+
+        result = public_page.parse_board(
+            self.board(value), board=self.BOARD, company=None
+        )
+
+        self.assertEqual(len(result.jobs), 1)
+        self.assertEqual(result.jobs[0]["description"], value)
+        assert_contract(self, result.jobs)
+
+    def test_49153_bytes_rejects_with_the_stable_code_and_byte_counts(self) -> None:
+        with self.assertRaises(ProviderError) as context:
+            public_page.parse_board(
+                self.board("a" * 49153), board=self.BOARD, company=None
+            )
+
+        error = context.exception
+
+        self.assertEqual(error.code, "description_too_large")
+        self.assertEqual(error.field, "description")
+        self.assertEqual(error.limit_bytes, 49152)
+        self.assertEqual(error.actual_bytes, 49153)
+
+        for token in ("description_too_large", "49153", "49152"):
+            self.assertIn(token, str(error))
+
+    def test_multibyte_cjk_proves_the_cap_is_bytes_not_characters(self) -> None:
+        accepted = "汉" * 16384
+        rejected = "汉" * 16385
+
+        self.assertEqual(len(accepted.encode("utf-8")), 49152)
+        self.assertEqual(len(rejected.encode("utf-8")), 49155)
+        # A character-based check would accept `rejected` (16,385 < 49,152).
+        self.assertLess(len(rejected), 49152)
+
+        result = public_page.parse_board(
+            self.board(accepted), board=self.BOARD, company=None
+        )
+
+        self.assertEqual(result.jobs[0]["description"], accepted)
+
+        with self.assertRaises(ProviderError) as context:
+            public_page.parse_board(
+                self.board(rejected), board=self.BOARD, company=None
+            )
+
+        self.assertEqual(context.exception.actual_bytes, 49155)
+        self.assertEqual(context.exception.limit_bytes, 49152)
+
+    def test_the_row_is_never_published_with_the_description_dropped(self) -> None:
+        # The previous behaviour omitted the field and still published the row;
+        # the 0015A contract requires a rejection with a diagnostic instead.
+        with self.assertRaises(ProviderError):
+            public_page.parse_board(
+                self.board("a" * 49153), board=self.BOARD, company=None
+            )
+
+    def test_the_feed_path_uses_the_same_cap(self) -> None:
+        accepted = public_page.parse_board(
+            self.feed("a" * 49152), board=self.BOARD, company="C"
+        )
+
+        self.assertEqual(len(accepted.jobs), 1)
+        self.assertEqual(
+            len(accepted.jobs[0]["description"].encode("utf-8")), 49152
+        )
+
+        with self.assertRaises(ProviderError) as context:
+            public_page.parse_board(
+                self.feed("a" * 49153), board=self.BOARD, company="C"
+            )
+
+        self.assertEqual(context.exception.code, "description_too_large")
+        self.assertEqual(context.exception.actual_bytes, 49153)
+
+    def test_other_optional_fields_still_omit_rather_than_raise(self) -> None:
+        payload = json.dumps(
+            {
+                "total": 1,
+                "data": [
+                    {
+                        "title": "T",
+                        "company": "C",
+                        "source_url": "https://x.invalid/campus/1001",
+                        "location": "x" * 65,
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        )
+
+        result = public_page.parse_board(
+            payload, board=self.BOARD, company=None
+        )
+
+        self.assertEqual(len(result.jobs), 1)
+        self.assertNotIn("location", result.jobs[0])
+
+    def test_a_missing_description_is_still_optional(self) -> None:
+        payload = json.dumps(
+            {
+                "total": 1,
+                "data": [
+                    {
+                        "title": "T",
+                        "company": "C",
+                        "source_url": "https://x.invalid/campus/1001",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        )
+
+        result = public_page.parse_board(
+            payload, board=self.BOARD, company=None
+        )
+
+        self.assertEqual(len(result.jobs), 1)
+        self.assertNotIn("description", result.jobs[0])
+
+    def test_plain_shape_errors_carry_no_quality_code(self) -> None:
+        with self.assertRaises(ProviderError) as context:
+            public_page.parse_board(42, board="https://x/", company="C")
+
+        self.assertIsNone(context.exception.code)
+        self.assertIsNone(context.exception.limit_bytes)
+        self.assertIsNone(context.exception.actual_bytes)
 
 
 if __name__ == "__main__":

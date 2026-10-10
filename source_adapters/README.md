@@ -104,7 +104,13 @@ without a company name would have to be invented, so such rows are skipped.
   China sources a naive value is Beijing time (see the F13 section below).
 - Nothing is fabricated: a field is omitted when the provider does not supply a
   usable value, and a row without `title` or a job URL is skipped.
-- HTML descriptions are converted to plain text.
+- HTML descriptions are converted to plain text. The **final** description is
+  capped at 48 KiB (49,152 UTF-8 **bytes**, `len(value.encode("utf-8"))`): an
+  over-cap value is a hard `description_too_large` rejection (nothing is
+  published, `limit_bytes`/`actual_bytes` reported) - never truncated and never
+  published with the description silently dropped. This cap is **not** the
+  raw-page budget: that one is the independent 2 MiB response-body safety limit
+  in `fetch.py` (see Access discipline).
 - `requirements` stays empty: no structured skills are inferred from text. The
   0014 China framework also drops *structured* skill lists, because the source
   gives names but no level and `job_requirements.level` means something specific
@@ -378,7 +384,10 @@ Every China-source fetch goes through `fetch.Fetcher`, which enforces:
   the re-check that narrows DNS-rebinding windows.
 - **Budgets**: a response-size cap, a total request budget and a **hard page
   ceiling**. Hitting any limit marks the run truncated and forces
-  `complete=false`; a truncated run can never claim completeness.
+  `complete=false`; a truncated run can never claim completeness. The
+  response-size cap (`fetch.DEFAULT_MAX_RESPONSE_BYTES`, 2 MiB) bounds the
+  **raw page**, not a stored field: it is deliberately unrelated to the 48 KiB
+  description cap, and neither number may be "aligned" to the other.
 - **Charset precedence** BOM > HTTP header > `<meta>` > `utf-8`, with
   `gb2312`/`gbk` normalized to `gb18030`; decoding never raises.
 - **XML safety**: RSS/Atom/sitemap documents that declare `DOCTYPE`/`ENTITY` are

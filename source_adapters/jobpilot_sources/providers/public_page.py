@@ -21,6 +21,18 @@ page can never prove completeness, so it is always reported with
 Structured skill lists are dropped: the source gives skill names but no level,
 and the platform's level column means something specific (1 = 了解), so writing
 one would fabricate a requirement.
+
+Two different byte limits are easy to confuse here; they are not the same thing:
+
+- :data:`MAX_DESCRIPTION_BYTES` (48 KiB = 49,152 bytes) caps the **final job
+  description** that would be stored, judged in UTF-8 bytes. An over-cap
+  description is a hard 0015A ``description_too_large`` rejection carrying
+  ``limit_bytes``/``actual_bytes``: the observation fails with a diagnostic and
+  nothing is published. It is never truncated, and the row is never published
+  with the description silently dropped.
+- ``fetch.DEFAULT_MAX_RESPONSE_BYTES`` (2 MiB) is the **raw response-body**
+  safety budget for the 0012 fetch path. It is an independent, much larger
+  limit and is deliberately left alone.
 """
 
 from __future__ import annotations
@@ -53,7 +65,16 @@ FETCH_MODE = "text"
 MAX_COMPANY_BYTES = 128
 MAX_TITLE_BYTES = 128
 MAX_LOCATION_BYTES = 64
-MAX_DESCRIPTION_BYTES = 65535
+#: 0015A decision 5 / docs/04 section 5.1: the FINAL description (after
+#: ``html_to_text``) is capped at 48 KiB of UTF-8 **bytes**, judged with
+#: ``len(value.encode("utf-8"))``. This is NOT the raw-page safety budget:
+#: that one is ``fetch.DEFAULT_MAX_RESPONSE_BYTES`` (2 MiB, an unrelated
+#: response-body limit) and must never be lowered to match this number.
+#: Over-cap content is rejected with ``description_too_large`` plus
+#: ``limit_bytes``/``actual_bytes`` and nothing is published - it is never
+#: truncated and never silently dropped field-by-field.
+MAX_DESCRIPTION_BYTES = 48 * 1024
+DESCRIPTION_TOO_LARGE_CODE = "description_too_large"
 
 _TITLE_KEYS = ("title", "jobTitle", "jobName", "positionName", "name")
 _URL_KEYS = (
@@ -287,9 +308,7 @@ def _jobs_from_feed(
                 company=fallback_company,
                 external_id=entry.identifier,
                 published_at=entry.published,
-                description=_bounded_text(
-                    entry.summary, MAX_DESCRIPTION_BYTES
-                ),
+                description=_bounded_description(entry.summary),
             )
         )
 
@@ -383,11 +402,10 @@ def _build(
         first_present(*(fields.get(key) for key in _EXPERIENCE_KEYS))
     )
 
-    description = _bounded_text(
+    description = _bounded_description(
         html_to_text(
             first_present(*(fields.get(key) for key in _DESCRIPTION_KEYS))
-        ),
-        MAX_DESCRIPTION_BYTES,
+        )
     )
 
     return build_job(
@@ -425,6 +443,41 @@ def _build(
     )
 
 
+def _bounded_description(value: Any) -> str | None:
+    """Bound the final description in UTF-8 bytes, or reject the observation.
+
+    Missing/blank stays absent (the description is optional). Over the 48 KiB
+    cap is a hard 0015A ``description_too_large`` rejection: the caller gets the
+    stable code plus ``limit_bytes``/``actual_bytes`` and no jobs are published,
+    because publishing the row without its description would silently drop the
+    posting's body text - exactly what the contract forbids.
+    """
+
+    if not isinstance(value, str):
+        return None
+
+    cleaned = value.strip()
+
+    if not cleaned:
+        return None
+
+    size = len(cleaned.encode("utf-8"))
+
+    if size > MAX_DESCRIPTION_BYTES:
+        raise ProviderError(
+            "description_too_large: description is "
+            f"{size} bytes, over the {MAX_DESCRIPTION_BYTES} byte cap "
+            f"(limit_bytes={MAX_DESCRIPTION_BYTES}, actual_bytes={size}); "
+            "the posting is rejected, not truncated",
+            code=DESCRIPTION_TOO_LARGE_CODE,
+            field="description",
+            limit_bytes=MAX_DESCRIPTION_BYTES,
+            actual_bytes=size,
+        )
+
+    return cleaned
+
+
 def _bounded_text(value: Any, max_bytes: int) -> str | None:
     """Keep a text value only when it fits the column byte limit."""
 
@@ -443,7 +496,9 @@ def _bounded_text(value: Any, max_bytes: int) -> str | None:
 
 
 __all__ = [
+    "DESCRIPTION_TOO_LARGE_CODE",
     "FETCH_MODE",
+    "MAX_DESCRIPTION_BYTES",
     "PROVIDER",
     "board_url",
     "parse_board",

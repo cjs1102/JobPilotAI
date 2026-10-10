@@ -686,6 +686,21 @@ Stop and report to the Lead (do not widen scope) if:
   - [x] Phase A complete (A1+A2 profile candidate data, A3 explicit PDF text contract).
 - [ ] Phase B: contract (B0) → candidate components (B1) → reasons (B2) →
       deal-breakers/urgency (B3) → writers + docs (B4)
+  - [x] B0: `docs/04` §5.1 additive keys + `with_match`/`strict` + the `rule_v1`-only authority
+        statement; `docs/03` §10.5 records the index decision (no new index).
+  - [x] B1: `match_explanation.h/.cpp` — deadline urgency, deal-breakers as data, reasons;
+        NULL on either side never vetoes (advisory reason instead); weights untouched
+        (decision 5). `RankedJob` carries the projection; `/recommended` exposes it.
+  - [x] B2: reasons[] on the list payload via `JobRankingService::ExplainJobs` (same seam as
+        `/recommended`).
+  - [~] B3/B4 writers: `with_match=true` on `GET /api/v1/jobs` is landed (7 additive keys,
+        total/page/ordering parity, byte-identical when absent, session required).
+        **`strict=true` is NOT landed**: pre-pagination exclusion needs the candidate window
+        in the list's ordering, while `SearchRankingCandidates` hardcodes
+        `create_time DESC, id DESC` and ignores `sort=` (evidence: `job_dao.cpp:537-579`), so
+        the parameter returns `400` today (never silently ignored). Resolution options: add a
+        `sort`-honouring window query (shared ORDER BY), or contract `strict` as
+        default-ordering-only.
 - [ ] Phase C: decision 2 (C1) → implement (C2) → docs (C3)
 - [ ] Phase D: decisions 1/3 (D0) → contract (D1) → `tailor_rule_v1` (D2) →
       artifact persistence (D3) → fact gate (D4) → confirmation boundary (D5) →

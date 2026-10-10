@@ -105,7 +105,6 @@ namespace jobpilot::service
                 userId,
                 20,
                 0);
-
         ASSERT_EQ(resumes.size(), 1U);
         EXPECT_EQ(resumes.front().id, resumeId);
         EXPECT_EQ(resumes.front().title, "C++ backend");
@@ -130,6 +129,27 @@ namespace jobpilot::service
         ASSERT_EQ(versions.size(), 1U);
         EXPECT_EQ(versions.front().id, versionId);
         EXPECT_EQ(versions.front().version, 1);
+
+        // 0015 D5: the single ownership-checked version row (text included) the
+        // artifact path uses instead of reading a whole version list.
+        const std::optional<ResumeVersionRecord> ownedVersion =
+            resumeDao->FindOwnedVersion(userId, versionId);
+
+        ASSERT_TRUE(ownedVersion.has_value());
+        EXPECT_EQ(ownedVersion->resumeId, resumeId);
+        EXPECT_EQ(ownedVersion->version, 1);
+        ASSERT_TRUE(ownedVersion->content.has_value());
+        EXPECT_EQ(ownedVersion->content.value(), "resume text");
+
+        // Another user's version is invisible through the same seam.
+        EXPECT_FALSE(
+            resumeDao->FindOwnedVersion(
+                userId + 9999999ULL,
+                versionId)
+                .has_value());
+        EXPECT_FALSE(
+            resumeDao->FindOwnedVersion(userId, 999999999ULL)
+                .has_value());
         ASSERT_TRUE(
             versions.front().content.has_value());
         EXPECT_EQ(

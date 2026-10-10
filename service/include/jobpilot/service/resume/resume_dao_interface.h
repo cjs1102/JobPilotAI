@@ -76,6 +76,13 @@ namespace jobpilot::service
         virtual std::vector<ResumeVersionRecord> ListVersions(
             std::uint64_t userId,
             std::uint64_t resumeId) = 0;
+
+        // 0015 D5: one ownership-checked version row (its stored text included),
+        // so the artifact path never has to read a whole version list to find one
+        // row. Returns nullopt when the version does not exist or is not owned.
+        virtual std::optional<ResumeVersionRecord> FindOwnedVersion(
+            std::uint64_t userId,
+            std::uint64_t resumeVersionId) = 0;
     };
 
 } // namespace jobpilot::service

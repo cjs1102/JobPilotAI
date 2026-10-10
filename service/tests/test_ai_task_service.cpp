@@ -390,6 +390,13 @@ namespace jobpilot::service
         class FakeResumeDao final : public IResumeDao
         {
         public:
+            std::optional<ResumeVersionRecord> FindOwnedVersion(
+                std::uint64_t,
+                std::uint64_t) override
+            {
+                return std::nullopt;
+            }
+
             std::optional<std::uint64_t> CreateResume(
                 jobpilot::core::ConnectionPool::Transaction &,
                 std::uint64_t,

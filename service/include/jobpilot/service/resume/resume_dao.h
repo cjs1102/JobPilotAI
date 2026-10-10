@@ -57,6 +57,10 @@ namespace jobpilot::service
             std::uint64_t userId,
             std::uint64_t resumeId) override;
 
+        std::optional<ResumeVersionRecord> FindOwnedVersion(
+            std::uint64_t userId,
+            std::uint64_t resumeVersionId) override;
+
     private:
         jobpilot::core::ConnectionPool &pool_;
     };

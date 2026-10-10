@@ -304,6 +304,57 @@ namespace jobpilot::service
         return result.rowCount() == 1;
     }
 
+    std::optional<ResumeVersionRecord> ResumeDao::FindOwnedVersion(
+        std::uint64_t userId,
+        std::uint64_t resumeVersionId)
+    {
+        const jobpilot::core::Result result =
+            pool_.Query(
+                "SELECT v.id, v.resume_id, v.version, "
+                "v.file_path, v.content, v.create_time "
+                "FROM resume_versions v "
+                "JOIN resumes r ON r.id = v.resume_id "
+                "WHERE v.id = ? AND r.user_id = ? LIMIT 1",
+                {resumeVersionId, userId});
+
+        if (result.rowCount() == 0)
+        {
+            return std::nullopt;
+        }
+
+        const auto &values = result.row(0);
+
+        if (values.size() != 6)
+        {
+            throw std::runtime_error(
+                "resume version query returned an unexpected "
+                "column count");
+        }
+
+        ResumeVersionRecord version;
+        version.id =
+            ParseUint64(values[0], "resume_versions.id");
+        version.resumeId =
+            ParseUint64(values[1], "resume_versions.resume_id");
+        version.version =
+            ParseInt32(values[2], "resume_versions.version");
+
+        if (values[3].has_value())
+        {
+            version.filePath = values[3].value();
+        }
+
+        if (values[4].has_value())
+        {
+            version.content = values[4].value();
+        }
+
+        version.createTime =
+            RequireValue(values[5], "resume_versions.create_time");
+
+        return version;
+    }
+
     std::vector<ResumeVersionRecord> ResumeDao::ListVersions(
         std::uint64_t userId,
         std::uint64_t resumeId)

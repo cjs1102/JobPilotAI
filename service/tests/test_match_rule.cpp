@@ -399,7 +399,9 @@ namespace jobpilot::service
         EXPECT_EQ(
             ClassifyDeadlineUrgency(std::nullopt, std::nullopt, now),
             DeadlineUrgency::kUnknown);
-        EXPECT_EQ(
+        // ToString returns const char *, so this must compare contents (the
+        // literal is not guaranteed to be pooled), as elsewhere in the suite.
+        EXPECT_STREQ(
             ToString(DeadlineUrgency::kUnknown),
             "unknown");
 

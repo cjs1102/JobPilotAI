@@ -184,7 +184,9 @@ namespace
             "applications",
             "ai_tasks",
             "interview_records",
-            "notifications"};
+            "notifications",
+            // 0015 phase D (the only new table in 0015).
+            "resume_artifacts"};
 
         EXPECT_EQ(tables, expected);
     }
@@ -325,6 +327,81 @@ namespace
         EXPECT_EQ(types["education_level"], "tinyint");
         EXPECT_EQ(types["graduation_year"], "smallint");
         EXPECT_EQ(types["campus_status"], "tinyint");
+    }
+
+    // 0015 D3: the tailored-artifact table with its key columns and indexes.
+    // Asserted on the live (migrated) database, the fresh-DDL database and the
+    // migrated pre-0015 database.
+    TEST_F(SchemaTest, Creates0015ResumeArtifactTable)
+    {
+        const jobpilot::core::Result columns =
+            pool.Query(
+                "SELECT column_name, column_type, is_nullable "
+                "FROM information_schema.columns "
+                "WHERE table_schema = ? AND table_name = 'resume_artifacts'",
+                {database});
+
+        ASSERT_EQ(columns.rowCount(), 17U);
+
+        std::map<std::string, std::string> types;
+        std::set<std::string> nullable;
+
+        for (std::size_t row = 0;
+             row < columns.rowCount();
+             ++row)
+        {
+            const std::string name =
+                RequireValue(columns.value(row, 0));
+            types[name] = RequireValue(columns.value(row, 1));
+
+            if (RequireValue(columns.value(row, 2)) == "YES")
+            {
+                nullable.insert(name);
+            }
+        }
+
+        EXPECT_EQ(types["base_version_id"], "bigint unsigned");
+        EXPECT_EQ(types["artifact_type"], "varchar(16)");
+        EXPECT_EQ(types["content"], "mediumtext");
+        EXPECT_EQ(types["content_bytes"], "int unsigned");
+        EXPECT_EQ(types["generator"], "varchar(32)");
+        EXPECT_EQ(types["source_version"], "varchar(32)");
+        EXPECT_EQ(types["fact_check_status"], "tinyint");
+        EXPECT_EQ(types["fact_check_report"], "json");
+        EXPECT_EQ(types["confirmed_at"], "datetime");
+
+        // Draft/confirmation and the optional anchors are nullable; the
+        // provenance and generator columns are not.
+        EXPECT_EQ(nullable.count("confirmed_at"), 1U);
+        EXPECT_EQ(nullable.count("job_id"), 1U);
+        EXPECT_EQ(nullable.count("application_id"), 1U);
+        EXPECT_EQ(nullable.count("fact_check_report"), 1U);
+        EXPECT_EQ(nullable.count("base_version_id"), 0U);
+        EXPECT_EQ(nullable.count("fact_check_status"), 0U);
+        EXPECT_EQ(nullable.count("generator"), 0U);
+        EXPECT_EQ(nullable.count("content"), 1U);
+
+        const jobpilot::core::Result indexes =
+            pool.Query(
+                "SELECT DISTINCT index_name "
+                "FROM information_schema.statistics "
+                "WHERE table_schema = ? AND table_name = 'resume_artifacts'",
+                {database});
+
+        std::set<std::string> names;
+
+        for (std::size_t row = 0;
+             row < indexes.rowCount();
+             ++row)
+        {
+            names.insert(RequireValue(indexes.value(row, 0)));
+        }
+
+        EXPECT_NE(names.find("PRIMARY"), names.end());
+        EXPECT_NE(names.find("idx_user_job"), names.end());
+        EXPECT_NE(names.find("idx_application"), names.end());
+        EXPECT_NE(names.find("idx_base_version"), names.end());
+        EXPECT_NE(names.find("idx_user_type_created"), names.end());
     }
 
     TEST_F(SchemaTest, CreatesRequiredUniqueIndexes)

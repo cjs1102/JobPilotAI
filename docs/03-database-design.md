@@ -736,6 +736,8 @@ CREATE TABLE IF NOT EXISTS resume_artifacts (
   可选 worker 措辞润色只能**增加措辞**，不得改动事实、分数或生命周期。
 - `content` 与 `content_bytes` 一致；`content` 为 UTF-8 纯文本（ATS 优先），本阶段不渲染
   PDF/DOCX（`file_path` 为后续可选路径）。
+- `fact_check_report` 是 **JSON 列**：MySQL 会规范化其文本（例如 `{"status":"pass"}` 读回为
+  `{"status": "pass"}`），消费者必须按 JSON 语义解析，不得按字节比较。
 
 **既有库升级（新表，不是 ALTER）**：在既有库上执行上面的 `CREATE TABLE IF NOT EXISTS`
 即可，幂等；不需要回填、不改既有列。全新安装走 `database/schema/07_resume_artifact.sql`

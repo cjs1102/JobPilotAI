@@ -571,6 +571,12 @@ X-Internal-Token: <environment secret>
   `review_status = 0`，行仍然可见。
 - 判定是 service 层的纯函数（`EvaluateJobQuality` + `MarkDuplicateContentInBatch`），
   无 I/O、无时钟、无随机；`source_url` 必须是绝对 `http(s)` URL。
+- **`employer_is_platform`（0015A option B）**：只有**两个确定性信号同时成立**才判定 ——
+  规范化 `company` 精确命中注册表平台名，且 `source_url` 主机名经注册表 `platform_hosts:`
+  映射出**同一个**平台。主机名未知或指向别的平台时**不下结论**，只返回 advisory
+  `platform_host_unverified`，行仍然可见。真实雇主不从标题等自由文本推断。
+- **`company_missing`**：缺失雇主是**可修复**问题 → `needs_review`（存库、隐藏、进复核队列），
+  不再整单 `400`；`reject`（`400` + 零写入）只用于无法安全处理的输入。
 - **`description` 契约（权威）**：可选，缺失不是异常；上限为 **49,152 字节（48 KiB）
   UTF-8 字节**，按字节判定（C++ `std::string::size()`、Python
   `len(value.encode("utf-8"))`），**从不截断**：超限返回 `400` + `description_too_large`，

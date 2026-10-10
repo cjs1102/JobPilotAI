@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -10,6 +11,7 @@
 #include <unistd.h>
 
 #include "jobpilot/database/mysql_pool.h"
+#include "jobpilot/service/job/job_quality.h"
 
 namespace jobpilot::test
 {
@@ -122,5 +124,45 @@ namespace jobpilot::test
         pool->Execute(
             "DELETE FROM jobs WHERE id = ?",
             {jobId});
+    }
+} // namespace jobpilot::test
+
+namespace jobpilot::test
+{
+    // 0015A option B: loads the shipped platform-name registry (names + the
+    // deterministic hostname mapping) through the documented repo-relative
+    // default. ctest runs from the build directory and a direct run may be
+    // from the repo root or service/, so each depth is tried; an unresolvable
+    // file yields an empty registry and the caller asserts on Size().
+    inline jobpilot::service::PlatformNameRegistry
+    LoadShippedPlatformRegistry()
+    {
+        const std::string candidates[] = {
+            jobpilot::service::kDefaultPlatformNamesFile,
+            "../" +
+                std::string(
+                    jobpilot::service::kDefaultPlatformNamesFile),
+            "../../../../" +
+                std::string(
+                    jobpilot::service::kDefaultPlatformNamesFile),
+            "../../../" +
+                std::string(
+                    jobpilot::service::kDefaultPlatformNamesFile)};
+
+        for (const std::string &candidate : candidates)
+        {
+            std::ifstream probe(candidate);
+
+            if (probe.is_open())
+            {
+                std::string warning;
+
+                return jobpilot::service::PlatformNameRegistry::Load(
+                    candidate,
+                    &warning);
+            }
+        }
+
+        return jobpilot::service::PlatformNameRegistry::FromNames({});
     }
 } // namespace jobpilot::test

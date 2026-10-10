@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -60,6 +62,16 @@ namespace jobpilot::service
         bool Contains(
             const std::string &company) const;
 
+        // Deterministic hostname mapping (plan §6.1 code 2): true when `host`
+        // resolves to exactly `normalizedPlatform` (an already-normalized
+        // platform name) through the registered host suffixes, exact or
+        // subdomain. Alias-safe: several registry names may share one host.
+        bool HostConfirmsPlatform(
+            const std::string &host,
+            const std::string &normalizedPlatform) const;
+
+        std::size_t HostMappingCount() const;
+
         std::size_t Size() const;
 
         static std::string Normalize(
@@ -67,6 +79,7 @@ namespace jobpilot::service
 
     private:
         std::set<std::string> names_;
+        std::map<std::string, std::vector<std::string>> hosts_;
     };
 
     // Pure, deterministic, no I/O: same payload -> same findings.

@@ -346,14 +346,14 @@ default claim in the documentation.
 
 | Aspect | Contract |
 |---|---|
-| Presence | non-empty after trim (whitespace-only = missing) |
+| Presence | non-empty after trim; whitespace-only = **`needs_review`** (`company_missing`, option B 2026-10-10) — stored hidden so a reviewer can supply the employer; **never** a whole-item reject |
 | Length | ≤ 128 bytes (existing cap); over-cap → **reject** (`400`), never truncated |
-| Platform-name rule (decision 4) | must not normalise (trim, lowercase, strip 网/官网/招聘/招聘网/人才网 suffixes) to an entry in the **single** platform-name registry file, unless a contradicting employer signal exists (JSON-LD `hiringOrganization.name`, or `page_title` naming a different employer) |
+| Platform-name rule (decision 4, option B) | the `employer_is_platform` verdict is asserted **only** when the normalised company exactly matches a registry entry **and** the `source_url` host resolves to that same platform through the registry's `platform_hosts:` mapping (exact/subdomain). An unknown, unmapped or different host records the advisory `platform_host_unverified` and asserts **no** verdict |
 | Determinism | employer identity is judged primarily from **deterministic signals** — the source platform identity (`source`/`source_scope`/registry host) and the normalised company name; fuzzy keyword matching is at most a secondary advisory signal and **never** a queue trigger by itself |
 | Plausibility | length ≥ 2; not all digits/punctuation; not the `source_url` host without its TLD |
-| On failure | missing/over-cap → **`reject`** (diagnostic); platform-name match without a contradicting signal → **`needs_review`** (`employer_is_platform`); degenerate but storable (`title_equals_company`, implausible-but-present) → **`needs_review`** (`title_equals_company`) or **clean + advisory** (`employer_implausible`) |
-| Provenance | the accepted employer is whatever the payload declares; the plan never invents an employer from the platform name |
-| **Acceptance criteria** | (1) empty/whitespace → `400` diagnostic, nothing written; (2) exact platform match without a contradicting signal → hidden + queued; (3) same match **with** a contradicting signal → queued for a one-field fix (the wrong employer would otherwise be shown); (4) over-cap → `400`, row unchanged; (5) unknown platform names never queue (fail-open); (6) the registry file is the only place a platform name is listed — a test asserts no hard-coded platform list exists in either language |
+| On failure | missing/whitespace → **`needs_review`** (`company_missing`, stored hidden); over-cap → **`reject`** (diagnostic); platform-name match **with** a confirming host → **`needs_review`** (`employer_is_platform`); platform-name match with an unknown/other host → **clean + advisory** (`platform_host_unverified`); degenerate but storable (`title_equals_company`, implausible-but-present) → **`needs_review`** (`title_equals_company`) or **clean + advisory** (`employer_implausible`) |
+| Provenance | the accepted employer is whatever the payload declares; the plan never invents an employer from the platform name or from the title |
+| **Acceptance criteria** | (1) empty/whitespace → hidden + queued (`company_missing`), **nothing rejected and the row is stored**; (2) exact platform match with a confirming host → hidden + queued; (3) platform match with an unknown/other host → visible + advisory, never guessed; (4) over-cap → `400`, row unchanged; (5) unknown platform names never queue (fail-open); (6) the registry file (names **and** host mapping) is the only place a platform is listed — a test asserts no hard-coded platform list exists in either language |
 
 #### 5.5.3 `description` (decision 5)
 
@@ -399,12 +399,12 @@ no LLM). There are **three outcomes** (decision 1):
 
 | # | Stable code | Deterministic condition + threshold | Outcome | Why |
 |---|---|---|---|---|
-| 1 |`company_missing`| `company` empty/whitespace after trim | **reject** | Cannot be safely normalised; a job with no employer is unusable |
+| 1 |`company_missing`| `company` empty/whitespace after trim | **needs_review** (option B, 2026-10-10) | A missing employer is a **fixable** data-quality problem: store it hidden and let a reviewer supply the employer instead of discarding the posting |
 | 1b |`company_too_large` / `title_too_large` / `location_too_large` / `source_url_too_large` / `skill_too_large` | existing byte caps `job_ingestion_service.cpp:20-28` exceeded (128/128/64/255/64 B) | **reject** (`400`) | Existing behaviour, now with a diagnostic code per field |
 | 1c |`source_url_unusable`| not absolute http(s) or unparsable | **reject** | Cannot be stored or opened at all |
 | 1d |`description_too_large`| description > 48 KiB UTF-8 bytes (§5.5.3) | **reject** (never truncate) | Decision 5; a whole-page grab is an upstream defect the caller must fix |
-| 2 |`employer_is_platform`| normalised `company` equals a registry platform entry **and** no contradicting employer signal | **needs_review** | Showing the platform as the employer is misleading; exact match only, curated list |
-| 3 |`employer_is_platform_contradicted`| same match **with** a contradicting signal (different `hiringOrganization` / `page_title` employer) | **needs_review** | The field is demonstrably wrong; a one-field fix makes it correct (not clean, because the wrong employer would be published) |
+| 2 |`employer_is_platform`| normalised `company` equals a registry platform entry **and** the `source_url` host resolves to that **same** platform via the registry's deterministic `platform_hosts:` mapping (exact/subdomain) | **needs_review** | Showing the platform as the employer is misleading; both signals must agree, exact match only, curated list |
+| 3 |`platform_host_unverified`| normalised `company` matches a registry platform entry but the host is unknown, unmapped, or resolves to a **different** platform | **clean + advisory** (option B, 2026-10-10) | The host does not confirm the platform; the rule must not guess, so no verdict is asserted and the row stays visible |
 | 4 |`source_url_not_detail`| absolute http(s), ≤255 B, but path is empty/`/`, in the list/search set, query-only, or has no id-like segment and no detail marker | **needs_review** | The "open original posting" affordance would be wrong (the 实习僧-homepage case) |
 | 5 |`title_equals_company`| normalised `title == company` | **needs_review** | The employer is unknown/degenerate; a human decides the real employer |
 | 6 |`description_polluted`| ≥ 3 distinct markers **and** marker byte-share ≥ 20 % (or exact known navigation-block match) | **needs_review** | Above this conjunctive threshold the text would visibly mislead; below it → advisory only |
@@ -687,6 +687,12 @@ Stop and report to the Lead (do not widen scope) if:
   locally.
 - `reject` codes are returned per item; a batched import containing a rejected item writes
   none of that item's data (the batch response reports per-item outcomes).
+- **Test database isolation (0015A, 2026-10-10):** the review backfill `apply`/`revert`
+  cases (`test_job_review_http`) must never run implicitly against the shared dev database.
+  They require an explicit scratch database (`MYSQL_DATABASE` == `JOBPILOT_TEST_REVIEW_DB`,
+  e.g. `jobpilot_review_scratch` loaded from `database/schema/*.sql`), assert the connected
+  schema via `SELECT DATABASE()`, skip explicitly when the variable is absent, and fail loudly
+  if the dev database is targeted.
 
 ## 15. Closed Decisions (owner, 2026-10-10)
 

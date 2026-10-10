@@ -48,6 +48,34 @@ namespace
         return false;
     }
 
+    // Loads the shipped registry through the documented default path.
+    // ctest runs from the build directory; a direct run may be from the repo
+    // root or service/, so each depth is tried (returns an empty registry when
+    // none resolves, and the caller asserts).
+    PlatformNameRegistry LoadShippedRegistry()
+    {
+        const std::string candidates[] = {
+            kDefaultPlatformNamesFile,
+            "../" + std::string(kDefaultPlatformNamesFile),
+            "../../../../" + std::string(kDefaultPlatformNamesFile),
+            "../../../" + std::string(kDefaultPlatformNamesFile)};
+
+        for (const std::string &candidate : candidates)
+        {
+            std::ifstream probe(candidate);
+
+            if (probe.is_open())
+            {
+                std::string warning;
+                return PlatformNameRegistry::Load(
+                    candidate,
+                    &warning);
+            }
+        }
+
+        return PlatformNameRegistry::FromNames({});
+    }
+
     TEST(JobQualityTest, CleanJobHasNoFindingsAndStaysVisible)
     {
         const JobQualityReport report =
@@ -60,7 +88,7 @@ namespace
         EXPECT_TRUE(report.findings.empty());
     }
 
-    TEST(JobQualityTest, MissingCompanyIsRejectedWithDiagnostic)
+    TEST(JobQualityTest, MissingCompanyGoesToReviewNotReject)
     {
         JobImportData job = MakeJob();
         job.company = "   ";
@@ -68,8 +96,11 @@ namespace
         const JobQualityReport report =
             EvaluateJobQuality(job, PlatformNameRegistry{});
 
-        EXPECT_TRUE(report.rejected);
-        EXPECT_EQ(report.diagnosticCode, "company_missing");
+        // 0015A option B: a missing employer is fixable, so it is queued for a
+        // reviewer instead of rejecting the whole batch (nothing is lost).
+        EXPECT_FALSE(report.rejected);
+        EXPECT_EQ(report.reviewStatus, 1);
+        EXPECT_TRUE(HasCode(report, "company_missing"));
     }
 
     TEST(JobQualityTest, NonHttpSourceUrlIsRejected)
@@ -114,18 +145,59 @@ namespace
         EXPECT_TRUE(HasCode(report, "source_url_not_detail"));
     }
 
-    TEST(JobQualityTest, PlatformNameAsEmployerGoesToReview)
+    // 0015A option B (plan section 6.1 code 2/3): the verdict is asserted only
+    // when the deterministic hostname mapping confirms the SAME platform; an
+    // unknown or mismatching host degrades to advisory and the row stays
+    // visible. Uses the shipped registry so the real mapping is exercised.
+    TEST(JobQualityTest, PlatformEmployerWithConfirmingHostGoesToReview)
     {
+        const PlatformNameRegistry platforms =
+            LoadShippedRegistry();
+
+        ASSERT_GT(platforms.HostMappingCount(), 0U);
+
         JobImportData job = MakeJob();
         job.company = "牛客网";
+        job.sourceUrl = "https://www.nowcoder.com/job/123456";
 
-        const JobQualityReport report =
-            EvaluateJobQuality(
-                job,
-                PlatformNameRegistry::FromNames({"牛客"}));
+        const JobQualityReport confirmed =
+            EvaluateJobQuality(job, platforms);
 
-        EXPECT_EQ(report.reviewStatus, 1);
-        EXPECT_TRUE(HasCode(report, "employer_is_platform"));
+        EXPECT_FALSE(confirmed.rejected);
+        EXPECT_EQ(confirmed.reviewStatus, 1);
+        EXPECT_TRUE(HasCode(confirmed, "employer_is_platform"));
+
+        // Unknown host: no verdict, advisory, still visible.
+        JobImportData unknownHost = job;
+        unknownHost.sourceUrl = "https://example.invalid/job/123456";
+
+        const JobQualityReport advisory =
+            EvaluateJobQuality(unknownHost, platforms);
+
+        EXPECT_EQ(advisory.reviewStatus, 0);
+        EXPECT_FALSE(HasCode(advisory, "employer_is_platform"));
+        EXPECT_TRUE(HasCode(advisory, "platform_host_unverified"));
+
+        // A different platform's own host: still never guessed, advisory only.
+        JobImportData otherHost = job;
+        otherHost.sourceUrl = "https://www.zhipin.com/job/123456";
+
+        const JobQualityReport mismatch =
+            EvaluateJobQuality(otherHost, platforms);
+
+        EXPECT_EQ(mismatch.reviewStatus, 0);
+        EXPECT_FALSE(HasCode(mismatch, "employer_is_platform"));
+        EXPECT_TRUE(HasCode(mismatch, "platform_host_unverified"));
+
+        // A real employer is never queued by the platform rule.
+        JobImportData realEmployer = job;
+        realEmployer.company = "Acme Robotics";
+
+        const JobQualityReport real =
+            EvaluateJobQuality(realEmployer, platforms);
+
+        EXPECT_EQ(real.reviewStatus, 0);
+        EXPECT_FALSE(HasCode(real, "employer_is_platform"));
     }
 
     TEST(JobQualityTest, UnknownPlatformNameStaysCleanFailOpen)
@@ -287,36 +359,12 @@ namespace
 
     TEST(JobQualityTest, ShippedRegistryNormalizesToTheCanonicalSet)
     {
-        // ctest runs from the build directory; a direct run may be from the
-        // repo root or service/. Try the documented default at each depth.
-        const std::string candidates[] = {
-            kDefaultPlatformNamesFile,
-            "../" + std::string(kDefaultPlatformNamesFile),
-            "../../../../" + std::string(kDefaultPlatformNamesFile),
-            "../../../" + std::string(kDefaultPlatformNamesFile)};
+        const PlatformNameRegistry registry =
+            LoadShippedRegistry();
 
-        std::string loadedPath;
-
-        for (const std::string &candidate : candidates)
-        {
-            std::ifstream probe(candidate);
-
-            if (probe.is_open())
-            {
-                loadedPath = candidate;
-                break;
-            }
-        }
-
-        ASSERT_FALSE(loadedPath.empty())
+        ASSERT_GT(registry.Size(), 0U)
             << "platform_names.yaml not found at "
             << kDefaultPlatformNamesFile;
-
-        std::string warning;
-        const PlatformNameRegistry registry =
-            PlatformNameRegistry::Load(loadedPath, &warning);
-
-        EXPECT_TRUE(warning.empty());
 
         // The canonical normalized set (18 entries) — the Python parity test
         // asserts the identical set.
@@ -327,6 +375,10 @@ namespace
             "lagou", "liepin", "zhaopin"};
 
         EXPECT_EQ(registry.Size(), expected.size());
+
+        // The deterministic hostname mapping is part of the same single source
+        // of truth (0015A option B).
+        EXPECT_GT(registry.HostMappingCount(), 0U);
 
         for (const std::string &name : expected)
         {

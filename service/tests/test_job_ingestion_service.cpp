@@ -480,10 +480,14 @@ namespace jobpilot::service
         JobIngestionService service(
             dao,
             *pool,
-            PlatformNameRegistry::FromNames({"牛客"}));
+            jobpilot::test::LoadShippedPlatformRegistry());
 
         const std::string cleanUrl = UniqueUrl("quality-clean");
-        const std::string platformUrl = UniqueUrl("quality-platform");
+        // Host-confirmed platform verdict (0015A option B): the registry's
+        // hostname mapping must confirm the declared platform.
+        const std::string platformUrl =
+            "https://www.nowcoder.com/job/" +
+            jobpilot::test::UniqueJobToken("quality-platform");
 
         JobIngestionItem clean = MakeItem(cleanUrl);
         JobIngestionItem platform = MakeItem(platformUrl);
@@ -577,34 +581,49 @@ namespace jobpilot::service
 
     TEST_F(JobIngestionServiceTest, RejectsUnusableInputWithADiagnostic)
     {
-        RecordingJobIngestionDao dao;
+        JobIngestionDao ingestionDao;
+        RecordingJobIngestionDao dao(&ingestionDao);
         JobIngestionService service(dao, *pool);
 
+        // 0015A option B: a missing employer is a FIXABLE quality problem, so
+        // it is stored hidden (needs_review), never rejected.
         JobIngestionItem missingCompany =
-            MakeItem(UniqueUrl("reject-company"));
+            MakeItem(UniqueUrl("queued-company"));
         missingCompany.job.company = "   ";
 
-        const ServiceResult<JobIngestionResult> companyRejected =
+        const ServiceResult<JobIngestionResult> companyQueued =
             service.Import({missingCompany});
 
-        ASSERT_EQ(companyRejected.code, ErrorCode::kInvalidParam);
+        ASSERT_EQ(companyQueued.code, ErrorCode::kSuccess);
         EXPECT_EQ(
-            companyRejected.value.quality.rejected,
+            companyQueued.value.quality.rejected,
+            0U);
+        EXPECT_EQ(
+            companyQueued.value.quality.needsReview,
             1U);
-        EXPECT_EQ(
-            companyRejected.value.quality.diagnosticCode,
-            "company_missing");
-        EXPECT_EQ(
-            companyRejected.value.quality.diagnosticField,
-            "company");
-        EXPECT_FALSE(
-            companyRejected.value.quality.diagnosticReason.empty());
         ASSERT_EQ(
-            companyRejected.value.quality.items.size(),
+            companyQueued.value.quality.items.size(),
             1U);
-        EXPECT_TRUE(
-            companyRejected.value.quality.items[0].rejected);
+        EXPECT_FALSE(
+            companyQueued.value.quality.items[0].rejected);
+        EXPECT_EQ(
+            companyQueued.value.quality.items[0].reviewStatus,
+            1);
+        EXPECT_EQ(
+            companyQueued.value.quality.items[0].findings[0].code,
+            "company_missing");
 
+        const jobpilot::core::Result queuedRow =
+            pool->Query(
+                "SELECT review_status FROM jobs "
+                "WHERE source_url = ?",
+                {missingCompany.job.sourceUrl});
+
+        ASSERT_EQ(queuedRow.rowCount(), 1U);
+        EXPECT_EQ(queuedRow.value(0, 0).value(), "1");
+        EXPECT_EQ(dao.upsertCalls, 1U);
+
+        // The remaining rejects still fail the request and write nothing.
         JobIngestionItem unusableUrl =
             MakeItem("not-a-url");
         const ServiceResult<JobIngestionResult> urlRejected =
@@ -635,6 +654,12 @@ namespace jobpilot::service
         EXPECT_EQ(
             descriptionRejected.value.quality.diagnosticField,
             "description");
+        EXPECT_EQ(
+            descriptionRejected.value.quality.diagnosticLimitBytes,
+            kMaxDescriptionBytes);
+        EXPECT_EQ(
+            descriptionRejected.value.quality.diagnosticActualBytes,
+            kMaxDescriptionBytes + 1);
 
         JobIngestionItem hugeCompany =
             MakeItem(UniqueUrl("reject-company-large"));
@@ -651,8 +676,9 @@ namespace jobpilot::service
             companyCapRejected.value.quality.diagnosticField,
             "company");
 
-        EXPECT_EQ(dao.upsertCalls, 0U);
-        EXPECT_EQ(dao.replaceCalls, 0U);
+        // Only the queued company_missing item reached the DAO.
+        EXPECT_EQ(dao.upsertCalls, 1U);
+        EXPECT_EQ(dao.replaceCalls, 1U);
 
         const jobpilot::core::Result written =
             pool->Query(

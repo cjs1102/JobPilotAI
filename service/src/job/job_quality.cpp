@@ -18,6 +18,8 @@ namespace jobpilot::service
         constexpr const char *kSourceUrlUnrecognised =
             "source_url_shape_unrecognised";
         constexpr const char *kEmployerIsPlatform = "employer_is_platform";
+        constexpr const char *kPlatformHostUnverified =
+            "platform_host_unverified";
         constexpr const char *kEmployerImplausible = "employer_implausible";
         constexpr const char *kTitleEqualsCompany = "title_equals_company";
         constexpr const char *kDescriptionPolluted = "description_polluted";
@@ -212,6 +214,74 @@ namespace jobpilot::service
                 report->reviewStatus = 1;
             }
         }
+
+        // Host matching is exact/subdomain on a lower-cased, port-less,
+        // www-less host; never fuzzy.
+        std::string NormalizeHost(
+            const std::string &value)
+        {
+            std::string normalized;
+
+            for (const char character : Trim(value))
+            {
+                normalized.push_back(
+                    static_cast<char>(
+                        std::tolower(
+                            static_cast<unsigned char>(character))));
+            }
+
+            while (!normalized.empty() &&
+                   normalized.back() == '.')
+            {
+                normalized.pop_back();
+            }
+
+            if (StartsWith(normalized, "www."))
+            {
+                normalized = normalized.substr(4);
+            }
+
+            return normalized;
+        }
+
+        // Authority of an absolute URL, without userinfo/port.
+        std::string HostOf(
+            const std::string &url)
+        {
+            const std::size_t scheme = url.find("://");
+
+            if (scheme == std::string::npos)
+            {
+                return std::string();
+            }
+
+            const std::size_t start = scheme + 3;
+            const std::size_t end =
+                url.find_first_of("/?#", start);
+
+            std::string authority =
+                url.substr(
+                    start,
+                    end == std::string::npos
+                        ? std::string::npos
+                        : end - start);
+
+            const std::size_t at = authority.find('@');
+
+            if (at != std::string::npos)
+            {
+                authority = authority.substr(at + 1);
+            }
+
+            const std::size_t colon = authority.find(':');
+
+            if (colon != std::string::npos)
+            {
+                authority = authority.substr(0, colon);
+            }
+
+            return NormalizeHost(authority);
+        }
     } // namespace
 
     const char *ToString(
@@ -308,8 +378,17 @@ namespace jobpilot::service
         }
 
         std::vector<std::string> collected;
-        bool inList = false;
+        std::map<std::string, std::vector<std::string>> hosts;
         std::string line;
+
+        enum class Section
+        {
+            kNone,
+            kNames,
+            kHosts
+        };
+
+        Section section = Section::kNone;
 
         while (std::getline(stream, line))
         {
@@ -320,46 +399,111 @@ namespace jobpilot::service
                 continue;
             }
 
-            if (!inList)
+            if (trimmed == "platform_names:")
             {
-                if (StartsWith(trimmed, "platform_names:"))
-                {
-                    inList = true;
-                }
-
+                section = Section::kNames;
                 continue;
             }
 
-            if (trimmed.size() >= 2 &&
-                trimmed[0] == '-' &&
-                (trimmed[1] == ' ' || trimmed[1] == '\t'))
+            if (trimmed == "platform_hosts:")
             {
-                std::string value = Trim(trimmed.substr(2));
-
-                if (value.size() >= 2 &&
-                    ((value.front() == '"' && value.back() == '"') ||
-                     (value.front() == '\'' && value.back() == '\'')))
-                {
-                    value = value.substr(1, value.size() - 2);
-                }
-
-                if (!value.empty())
-                {
-                    collected.push_back(value);
-                }
-
+                section = Section::kHosts;
                 continue;
             }
 
-            if (trimmed[0] != '-')
+            if (section == Section::kNames)
             {
-                // The list ended (another top-level key).
-                if (!collected.empty())
+                if (trimmed.size() >= 2 &&
+                    trimmed[0] == '-' &&
+                    (trimmed[1] == ' ' || trimmed[1] == '\t'))
                 {
-                    break;
+                    std::string value = Trim(trimmed.substr(2));
+
+                    if (value.size() >= 2 &&
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\'')))
+                    {
+                        value = value.substr(1, value.size() - 2);
+                    }
+
+                    if (!value.empty())
+                    {
+                        collected.push_back(value);
+                    }
+
+                    continue;
                 }
 
-                inList = false;
+                section = Section::kNone;
+            }
+
+            if (section == Section::kHosts)
+            {
+                const std::size_t colon = trimmed.find(':');
+
+                if (colon == std::string::npos)
+                {
+                    section = Section::kNone;
+                    continue;
+                }
+
+                std::string key = Trim(trimmed.substr(0, colon));
+
+                if (key.size() >= 2 &&
+                    ((key.front() == '"' && key.back() == '"') ||
+                     (key.front() == '\'' && key.back() == '\'')))
+                {
+                    key = key.substr(1, key.size() - 2);
+                }
+
+                const std::string list =
+                    Trim(trimmed.substr(colon + 1));
+
+                if (key.empty() || list.empty())
+                {
+                    continue;
+                }
+
+                std::vector<std::string> entries;
+                std::size_t start = 0;
+
+                while (start <= list.size())
+                {
+                    const std::size_t comma = list.find(',', start);
+                    const std::size_t end =
+                        comma == std::string::npos
+                            ? list.size()
+                            : comma;
+
+                    std::string entry =
+                        Trim(list.substr(start, end - start));
+
+                    if (entry.size() >= 2 &&
+                        ((entry.front() == '"' && entry.back() == '"') ||
+                         (entry.front() == '\'' && entry.back() == '\'')))
+                    {
+                        entry = entry.substr(1, entry.size() - 2);
+                    }
+
+                    if (!entry.empty())
+                    {
+                        entries.push_back(NormalizeHost(entry));
+                    }
+
+                    if (comma == std::string::npos)
+                    {
+                        break;
+                    }
+
+                    start = comma + 1;
+                }
+
+                if (!entries.empty())
+                {
+                    hosts[Normalize(key)] = std::move(entries);
+                }
+
+                continue;
             }
         }
 
@@ -370,9 +514,11 @@ namespace jobpilot::service
                 path;
         }
 
-        return FromNames(std::move(collected));
+        PlatformNameRegistry registry =
+            FromNames(std::move(collected));
+        registry.hosts_ = std::move(hosts);
+        return registry;
     }
-
     PlatformNameRegistry PlatformNameRegistry::LoadFromEnvironment(
         std::string *warning)
     {
@@ -486,6 +632,56 @@ namespace jobpilot::service
         return names_.size();
     }
 
+    std::size_t PlatformNameRegistry::HostMappingCount() const
+    {
+        return hosts_.size();
+    }
+
+    bool PlatformNameRegistry::HostConfirmsPlatform(
+        const std::string &host,
+        const std::string &normalizedPlatform) const
+    {
+        const std::string normalized = NormalizeHost(host);
+
+        if (normalized.empty() || normalizedPlatform.empty())
+        {
+            return false;
+        }
+
+        const auto mapping = hosts_.find(normalizedPlatform);
+
+        if (mapping == hosts_.end())
+        {
+            return false;
+        }
+
+        for (const std::string &candidate : mapping->second)
+        {
+            if (candidate.empty())
+            {
+                continue;
+            }
+
+            if (normalized == candidate)
+            {
+                return true;
+            }
+
+            if (normalized.size() > candidate.size() &&
+                normalized.compare(
+                    normalized.size() - candidate.size(),
+                    candidate.size(),
+                    candidate) == 0 &&
+                normalized[normalized.size() -
+                           candidate.size() - 1] == '.')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     JobQualityReport EvaluateJobQuality(
         const JobImportData &job,
         const PlatformNameRegistry &platforms)
@@ -496,11 +692,16 @@ namespace jobpilot::service
 
         if (company.empty())
         {
+            // 0015A option B: a missing employer is a FIXABLE data-quality
+            // problem, not unusable input: the row is stored hidden and a
+            // reviewer supplies the real employer. Reject is reserved for input
+            // that cannot be handled safely at all.
             AddFinding(
                 &report,
                 kCompanyMissing,
-                "employer is missing after normalisation",
-                JobQualityOutcome::kReject);
+                "employer is missing after normalisation; a reviewer must "
+                "supply the real employer",
+                JobQualityOutcome::kNeedsReview);
         }
 
         if (job.description.has_value())
@@ -618,12 +819,46 @@ namespace jobpilot::service
             if (platforms.Size() > 0 &&
                 platforms.Contains(company))
             {
-                AddFinding(
-                    &report,
-                    kEmployerIsPlatform,
-                    "employer equals a registered platform name (\"" +
-                        company + "\"); the platform is not the employer",
-                    JobQualityOutcome::kNeedsReview);
+                // 0015A option B (plan section 6.1 code 2/3): the verdict is
+                // asserted ONLY when the deterministic hostname mapping
+                // confirms the same platform. Company, host and registry are
+                // exact-matched; the real employer is never inferred from the
+                // title or any other free text.
+                const std::string host = HostOf(job.sourceUrl);
+                const std::string normalizedCompany =
+                    PlatformNameRegistry::Normalize(company);
+                const bool hostConfirms =
+                    platforms.HostConfirmsPlatform(
+                        host,
+                        normalizedCompany);
+
+                if (hostConfirms)
+                {
+                    AddFinding(
+                        &report,
+                        kEmployerIsPlatform,
+                        "employer equals a registered platform name (\"" +
+                            company +
+                            "\") and the source host (\"" + host +
+                            "\") is that platform's own domain; the "
+                            "platform is not the employer",
+                        JobQualityOutcome::kNeedsReview);
+                }
+                else
+                {
+                    // Ambiguous/unknown host, or a different platform's host:
+                    // do not assert a verdict. Recorded as advisory and the
+                    // row stays visible (fail-open).
+                    AddFinding(
+                        &report,
+                        kPlatformHostUnverified,
+                        "employer equals a registered platform name (\"" +
+                            company +
+                            "\") but the source host (\"" + host +
+                            "\") does not confirm it; no verdict asserted, "
+                            "kept advisory",
+                        JobQualityOutcome::kAdvisory);
+                }
             }
 
             const std::string normalized =

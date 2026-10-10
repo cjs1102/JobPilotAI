@@ -29,3 +29,30 @@ platform_names:
   - lagou
   - liepin
   - zhaopin
+
+# Deterministic hostname mapping (0015A option B, plan section 6.1 code 2).
+# The `employer_is_platform` verdict is asserted ONLY when the normalized
+# company matches a registered platform name AND the source_url host is that
+# same platform's own domain (exact or subdomain match). A registered platform
+# without a mapping here is never asserted: the finding degrades to the
+# advisory `platform_host_unverified` and the row stays visible (fail-open).
+# Maintainer-curated; the single source of truth for both languages.
+platform_hosts:
+  牛客: nowcoder.com, niuke.com
+  实习僧: shixiseng.com
+  国聘: iguopin.com
+  智联招聘: zhaopin.com
+  前程无忧: 51job.com
+  中华英才网: chinahr.com
+  应届生求职网: yingjiesheng.com
+  大街网: dajie.com
+  猎聘: liepin.com
+  拉勾: lagou.com
+  看准: kanzhun.com
+  职友集: jobui.com
+  nowcoder: nowcoder.com
+  boss直聘: zhipin.com
+  51job: 51job.com
+  lagou: lagou.com
+  liepin: liepin.com
+  zhaopin: zhaopin.com

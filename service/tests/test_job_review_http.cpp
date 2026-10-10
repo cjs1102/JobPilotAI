@@ -262,7 +262,7 @@ namespace jobpilot::service
             reviewDao = std::make_unique<JobReviewDao>(*pool);
             reviewService = std::make_unique<JobReviewService>(
                 *reviewDao,
-                PlatformNameRegistry::FromNames({"牛客"}));
+                jobpilot::test::LoadShippedPlatformRegistry());
 
             internalToken =
                 jobpilot::test::UniqueJobToken(
@@ -912,7 +912,7 @@ namespace jobpilot::service
         const std::uint64_t jobId = AddJob(
             "牛客",
             token,
-            "https://example.invalid/job/backfill-" + token,
+            "https://www.nowcoder.com/job/backfill-" + token,
             0);
 
         const auto dryRun =

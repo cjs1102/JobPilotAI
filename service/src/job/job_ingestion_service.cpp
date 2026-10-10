@@ -79,10 +79,13 @@ namespace jobpilot::service
         {
             const JobImportData &job = item.job;
 
+            // 0015A option B: an empty employer is a fixable needs_review, so
+            // only the byte cap is enforced here; the quality gate owns the
+            // missing-employer verdict.
             if (!HasValueWithin(
                     job.company,
                     kMaxCompanyBytes,
-                    true) ||
+                    false) ||
                 !HasValueWithin(
                     job.title,
                     kMaxTitleBytes,

@@ -411,7 +411,9 @@ namespace jobpilot::service
         observation.jobs.clear();
 
         SourceObservationJob invalid = MakeObservedJob("invalid");
-        invalid.job.company = "   ";
+        // 0015A option B: company_missing is now a fixable needs_review, so
+        // this batch uses a reject that is still unsafely normalisable.
+        invalid.job.sourceUrl = "not-a-url";
         observation.jobs.push_back(invalid);
 
         SourceObservationJob colliding = MakeObservedJob("collide");
@@ -425,10 +427,10 @@ namespace jobpilot::service
         EXPECT_EQ(rejected.value.quality.rejected, 1U);
         EXPECT_EQ(
             rejected.value.quality.diagnosticCode,
-            "company_missing");
+            "source_url_unusable");
         EXPECT_EQ(
             rejected.value.quality.diagnosticField,
-            "company");
+            "source_url");
 
         // No transaction was opened and nothing was written.
         EXPECT_EQ(dao.applyCalls, 0U);
@@ -457,7 +459,7 @@ namespace jobpilot::service
 
         const jobpilot::core::Result invalidRow = pool->Query(
             "SELECT COUNT(*) FROM jobs WHERE source_url = ?",
-            {Url("invalid")});
+            {"not-a-url"});
 
         ASSERT_EQ(invalidRow.rowCount(), 1U);
         EXPECT_EQ(

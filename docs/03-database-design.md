@@ -517,14 +517,16 @@ CREATE TABLE job_review_items(...)              -- 异常与复核审计（reaso
 - **入库即写判定**：人工导入与来源观测都在**同一个 upsert 事务**内写
   `review_status` 与 `job_review_items`（`resolution='open'`，重复观测刷新未决条目）；
   `reject` 的 item 不写任何行，整个请求返回 `400`（`docs/04` §5.4/§5.5）。
-- **`employer_is_platform` 的已实现规则（相对 ExecPlan §6.1 code 3 的偏差）**：引擎只实现
-  code 2（规范化公司名命中注册表 → `needs_review`）。计划中的 code 3
-  `employer_is_platform_contradicted`（存在相反雇主信号时降级为「已接受并标记」）**未实现**：
-  `JobImportData` 目前不携带结构化雇主信号（`hiringOrganization` / `page_title`），
-  没有确定性输入可判定「相反信号」，用模糊关键词猜测会违反 §5.5.2 的确定性要求。
-  为避免计划与代码长期分歧，该偏差记录在此；计划文件需由 owner 同步修订。
-  在此之前，命中注册表的公司名一律进入复核队列（fail-safe：人工一键 `approve` 即可放行，
-  不会静默隐藏真实雇主）。
+- **`employer_is_platform` 的已实现规则（0015A option B）**：判定需要两个**确定性**信号同时
+  成立 —— (1) 规范化后的 `company` 精确命中注册表平台名；(2) `source_url` 的**主机名**经注册表
+  `platform_hosts:` 映射解析出**同一个**平台（精确或子域匹配，取主机时去掉 userinfo/端口/`www.`）。
+  两条同时成立 → `needs_review` / `employer_is_platform`。主机名未知、未映射或指向**另一个**
+  平台 → **不作判定**，只记 advisory `platform_host_unverified`，行保持可见（fail-open）。
+  真实雇主**永不**从标题或其他自由文本推断；未登记的平台名不触发任何复核。
+- **`company_missing` 的重新分类（0015A option B）**：缺失雇主是**可修复**的数据质量问题，
+  默认进入 `needs_review`（存库、隐藏，由复核人补全雇主），**不再整单 reject**；`reject` 只保留
+  给无法安全处理的输入（非 http(s)/超长 URL、超过 48 KiB 的描述、超长字段等），且被拒绝的输入
+  仍然**一个字节都不写**。
 - **描述上限的唯一权威**：应用/入库层的硬上限是 `kMaxDescriptionBytes = 49,152` 字节
   （`job_quality.h`，`description_too_large` 拒绝并给出 `limit_bytes`/`actual_bytes`）；
   `jobs.description` 的 `TEXT` 65,535 字节只是**列存储容量**，不是应用上限。代码中两者

@@ -180,6 +180,7 @@ namespace
             "resume_versions",
             "jobs",
             "job_requirements",
+            "job_review_items",
             "applications",
             "ai_tasks",
             "interview_records",
@@ -228,6 +229,68 @@ namespace
         EXPECT_NE(
             columns["notifications"].find("status"),
             columns["notifications"].end());
+        // 0015A: quality status on jobs plus the review audit table.
+        EXPECT_NE(
+            columns["jobs"].find("review_status"),
+            columns["jobs"].end());
+        EXPECT_NE(
+            columns["jobs"].find("reviewed_at"),
+            columns["jobs"].end());
+        EXPECT_NE(
+            columns["job_review_items"].find("reason_code"),
+            columns["job_review_items"].end());
+        EXPECT_NE(
+            columns["job_review_items"].find("outcome"),
+            columns["job_review_items"].end());
+        EXPECT_NE(
+            columns["job_review_items"].find("resolution"),
+            columns["job_review_items"].end());
+    }
+
+    // 0015A (2026-10-10): the outcome vocabulary includes accepted_advisory
+    // (17 bytes), so the column is VARCHAR(24) on fresh DDL and after the
+    // section 9.4 widening ALTER. Before the widening it was VARCHAR(16) and
+    // could not store the documented value.
+    TEST_F(SchemaTest, StoresTheFullReviewOutcomeVocabulary)
+    {
+        const jobpilot::core::Result result =
+            pool.Query(
+                "SELECT column_type, character_maximum_length "
+                "FROM information_schema.columns "
+                "WHERE table_schema = ? AND table_name = ? "
+                "AND column_name = 'outcome'",
+                {database, "job_review_items"});
+
+        ASSERT_EQ(result.rowCount(), 1U);
+        EXPECT_EQ(RequireValue(result.value(0, 0)), "varchar(24)");
+        EXPECT_EQ(RequireValue(result.value(0, 1)), "24");
+    }
+
+    // 0015A Step 2: the two evidence-backed indexes. idx_nature_education is
+    // deliberately absent (the optimizer does not select it at the real
+    // distribution; see docs/03 section 9.2).
+    TEST_F(SchemaTest, Creates0015AReviewAndDeadlineIndexes)
+    {
+        const jobpilot::core::Result result =
+            pool.Query(
+                "SELECT index_name FROM information_schema.statistics "
+                "WHERE table_schema = ? AND table_name = 'jobs' "
+                "AND index_name IN ('idx_review_status', 'idx_deadline', "
+                "'idx_nature_education')",
+                {database});
+
+        std::set<std::string> indexes;
+
+        for (std::size_t row = 0;
+             row < result.rowCount();
+             ++row)
+        {
+            indexes.insert(RequireValue(result.value(row, 0)));
+        }
+
+        EXPECT_NE(indexes.find("idx_review_status"), indexes.end());
+        EXPECT_NE(indexes.find("idx_deadline"), indexes.end());
+        EXPECT_EQ(indexes.find("idx_nature_education"), indexes.end());
     }
 
     TEST_F(SchemaTest, CreatesRequiredUniqueIndexes)

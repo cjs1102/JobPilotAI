@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     job_nature           TINYINT   DEFAULT NULL COMMENT '岗位性质:1校招/2社招/3实习(0014)',
     deadline             DATETIME  DEFAULT NULL COMMENT '投递截止时间(UTC瞬时;格式约定见docs/03 §9.1,0014)',
     deadline_date_only   TINYINT   DEFAULT NULL COMMENT 'deadline是否仅来源日期:1是/0否/NULL未知(0014)',
+    review_status        TINYINT   NOT NULL DEFAULT 0 COMMENT '0015A 质量状态:0 clean/1 needs_review/2 quarantined',
+    reviewed_at          DATETIME  DEFAULT NULL COMMENT '0015A 最近一次复核时间',
+    review_note          VARCHAR(255) DEFAULT NULL COMMENT '0015A 复核备注',
     create_time      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_source_url (source_url),
@@ -33,7 +36,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     KEY idx_title (title),
     KEY idx_location (location),
     KEY idx_status (status),
-    KEY idx_source_scope_status (source, source_scope, status)
+    KEY idx_source_scope_status (source, source_scope, status),
+    KEY idx_review_status (review_status, id),
+    KEY idx_deadline (deadline)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='岗位';
 
 CREATE TABLE IF NOT EXISTS job_requirements (
@@ -45,3 +50,18 @@ CREATE TABLE IF NOT EXISTS job_requirements (
     UNIQUE KEY uk_job_skill (job_id, skill),
     KEY idx_job (job_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='岗位技能要求';
+
+CREATE TABLE IF NOT EXISTS job_review_items (
+    id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    job_id      BIGINT UNSIGNED NOT NULL COMMENT '岗位ID',
+    reason_code VARCHAR(64)  NOT NULL COMMENT '0015A 稳定机器码',
+    reason_text VARCHAR(255) DEFAULT NULL COMMENT '0015A 人类可读原因',
+    outcome     VARCHAR(24)  NOT NULL COMMENT 'rejected/needs_review/accepted_advisory',
+    resolution  VARCHAR(16)  NOT NULL DEFAULT 'open' COMMENT 'open/approved/fixed/rejected',
+    resolved_by VARCHAR(64)  DEFAULT NULL COMMENT '复核人标签(内部 token 审计用)',
+    resolved_at DATETIME     DEFAULT NULL COMMENT '复核时间',
+    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_job (job_id),
+    KEY idx_reason (reason_code),
+    KEY idx_resolution (resolution)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='0015A 岗位质量异常与复核记录';

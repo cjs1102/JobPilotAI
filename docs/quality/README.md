@@ -65,6 +65,34 @@ Record the command, scope, result count, failures, and environment. On success,
 report a concise summary instead of replaying the complete log. On failure,
 preserve the first causal error and the relevant failing output.
 
+## Cross-cutting checkers (0017)
+
+Two offline, stdlib-only tools carry guarantees a stage cannot express as a CTest
+case. Neither needs a database or a network; the coverage map needs a configured
+`ctest` directory.
+
+```bash
+python3 tools/checks/test_coverage_map.py \
+  --test-dir build/presets/release --map docs/quality/test-merge-map.json
+python3 tools/checks/release_preflight.py            # release commit: clean tree required
+python3 tools/checks/release_preflight.py --allow-dirty   # preparation only
+```
+
+- `test_coverage_map.py` (0017-B) is the executable half of
+  [`test-overlap-audit.md`](test-overlap-audit.md). That audit proved no test case
+  is removable (k = 0, 66 candidates, each failing a clause of the strict merge
+  rule), so the map is empty; the checker fails when a removed name is still
+  live, a survivor is absent, the counts drift from the live `ctest -N` list, or
+  the report's `audit-counts` marker disagrees with the map, and the negative
+  controls in report §7.2 show each of those exits non-zero. It runs in the CI
+  `integration` job right after the suite.
+- `release_preflight.py` (0017-D) is the automated half of
+  [`../RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md): licence, the
+  `service/conanfile.txt` dependency list against `THIRD_PARTY_NOTICES.md`, secret
+  and private-address scans, the README-for-outsiders checks, relative links,
+  actionlint on every workflow, and repository hygiene. A `SKIP` (for example
+  actionlint is not installed) is never reported as green.
+
 ## Open-source MVP Quality Gates
 
 - Core tests must pass without an LLM or external AI provider.
@@ -209,6 +237,34 @@ TSan initially found a race in `test_thread_pool.cpp`: the completion counter
 was updated before `condition.notify_one()` while the test could leave scope
 and destroy the condition variable. The fix updates completion state and
 signals while holding the same mutex. No P1 production code was changed.
+
+### 0017 (2026-10-10) — environment-limited L4, not green
+
+0017 changed no production code and no test code (its overlap audit concluded
+k = 0), so the 0016 L4 remains the evidence for that code per
+[`../ai/agent-workflow.md`](../ai/agent-workflow.md) §2.1 rule 1. The stage's own
+L4 was still attempted, against its isolated compose stack (`jobpilot-l4-0017`,
+MySQL `:13399` / Redis `:16399`, its own volumes; raw logs in `build/l4-0017/`),
+and it is **not green**:
+
+| Check | Result |
+|---|---|
+| debug / asan / ubsan configure + build | rc=0 |
+| service release, root release configure + build | rc=0 |
+| Debug CTest | `97% tests passed, 9 tests failed out of 309` (267.68 s) |
+| ASan / UBSan CTest | not run (the run was stopped once the cause was established) |
+| Python source adapter suite | `Ran 446 tests` + `OK` |
+| Python ai_worker suite | `Ran 190 tests` + `OK` |
+| Review-backfill isolation | not obtained (the harness EXIT trap had already torn the stack down) |
+
+All nine failures are the HTTP cases whose client socket timeout is 2 seconds
+(`UserHttpTest.*`, `ResumeHttpTest.*`, `"registration failed"`). The host was
+3.7× slower than during the 0016 L4 on the same pure-CPU binary and preset:
+`bcrypt_test` `Passed 7.13 sec` (0016) → `elapsed=26.58 user=26.05` (probe in
+`build/l4-0017/probe-bcrypt.log`). The health probe before a re-run is
+`/usr/bin/time ./build/presets/debug/backend/test_bcrypt` (healthy ≈ 7.1 s); the
+re-run is `bash build/l4-0017/run.sh`. Until that has been done on a healthy
+host, describe this L4 as environment-limited, never as green.
 
 ## 0013 AI Task Tests
 

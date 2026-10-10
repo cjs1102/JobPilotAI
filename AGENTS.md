@@ -5,23 +5,38 @@
 C++17 Linux backend for an AI-assisted job application platform. `service/` is
 the canonical runnable entry; root CMake is the unified developer entry.
 
-Current phase: **0016 open-source packaging is complete and archived with its L4
-green** (`docs/exec-plans/completed/0016-open-source-packaging.md`: HEAD
-`0a6e59e`, frozen and clean tree; Debug / ASan / UBSan `100% tests passed, 0
-tests failed out of 309`, sanitizer diagnostics 0). **No plan is active** and the
-recorded MVP roadmap is complete through packaging — 0013-0016 and the 0015A
-hardening are all archived under `docs/exec-plans/completed/`. Carried forward,
-not done:
+Current phase: **0017 ops hardening and acceptance closure is complete and
+archived** (`docs/exec-plans/completed/0017-ops-hardening-and-acceptance-closure.md`)
+— CI now compiles the tree once (the `build` job uploads the release build tree
+and `integration` consumes it; the container job moved to
+`.github/workflows/image.yml` with path/branch filtering), the 309-case suite was
+audited by assertion target and proved to contain **no removable case** (k = 0,
+machine-checked by `tools/checks/test_coverage_map.py` and enforced in CI),
+`tools/dev/capture-acceptance.sh` runs the bookmarklet publish/read-back
+acceptance in one command and prints the ExecPlan 0014 §19.5 evidence block, and
+`docs/RELEASE_CHECKLIST.md` + `tools/checks/release_preflight.py` make the release
+gate checkable. **Its single L4 is environment-limited, not green**: the host was
+3.7× slower than at 0016 (`bcrypt_test` 7.13 s → 26.58 s), so the nine HTTP cases
+with a 2-second client timeout failed; builds and both Python suites were green
+and 0017 changed no production or test code, so the 0016 L4 remains the evidence
+for that code (plan §10.2; re-run `bash build/l4-0017/run.sh` on a healthy host).
+**No plan is active** and the recorded MVP roadmap is complete through
+packaging — 0013-0017 and the 0015A hardening are all archived under
+`docs/exec-plans/completed/`. Carried forward, not done:
 - 0014's Step 5 (first real China source) is **environment-limited**: no
   compliant, reusable China list contract could be verified, so no China source
   adapter is implemented and no China `source` identifier is registered (only
   `greenhouse`/`lever`/`ashby`).
-- The bookmarklet's **publish/read-back acceptance is still open**: only the
-  extraction step was run by the product owner on a real login-walled posting
-  (0014 §19.6, 【用户报告】), while `publish-capture` and backend persistence were
-  not executed (§19.5).
+- The bookmarklet's **publish/read-back acceptance** now has a one-command
+  scaffold (`tools/dev/capture-acceptance.sh`, green end to end against the
+  synthetic sample); only the extraction step has been run on a real login-walled
+  posting so far (0014 §19.6, 【用户报告】), so the owner still has to run the
+  scaffold once against a real capture JSON.
 - 0015's D6 (`ai_worker` `resume_optimize` wording pass) remains **deferred by
   owner decision** (0015 plan §17).
+- 0017 found one real contract gap: `publish-capture` sends `published_at`, but
+  `POST /internal/jobs/import` neither documents nor parses it, so a manual row's
+  public `posted_at` stays null (0017 plan §11 / project-state).
 - 0016's CI **`image` job is confirmed green**, and the first real CI run exposed
   and fixed four things it was meant to expose: the workflow ran for the first
   time on 2026-10-10 (`clean build` ✓ and `container image and the end-to-end
@@ -31,7 +46,9 @@ not done:
   directory, and the registry default moved to the official ConanCenter. Run
   `38057642118` (`9238b97`) is then green on all three jobs, including the suite
   job's first genuine execution. The repository being **private** is still the one
-  thing that keeps the packaging work from being open source in practice.
+  thing that keeps the packaging work from being open source in practice:
+  making it public, filling About/description and rotating the old PAT are owner
+  actions collected in `docs/RELEASE_CHECKLIST.md`.
 
 Product direction is China-first per
 `docs/adr/0011-china-first-sourcing-and-compliance.md` (public sources plus

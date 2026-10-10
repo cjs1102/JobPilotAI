@@ -1,7 +1,14 @@
 # ExecPlan 0017: 运维硬化 + 验收闭环（OPS HARDENING AND ACCEPTANCE CLOSURE）
 
-> Status: **ACTIVE — 起草于 2026-10-10，等待按 §7 分单元实施。**
-> 基线 HEAD：`a8dd333`（= `origin/main`，工作区干净，无进行中计划）。
+> Status: **Completed and archived**（2026-10-10）。四个单元全部落地，各自定点验证后提交
+> （`e6cae75` A、`4a7995e` B、`38f29fd` C+D、`b2a55be` D 的修红），计划本身见 `a4d1f5f`。
+> 阶段收口的单次 L4 **环境受限（environment-limited）**：宿主机当时比 0016 那次 L4 慢约
+> 3.7 倍（纯 CPU 的 `test_bcrypt` 7.13 s → 26.58 s），debug 阶段有 9 个 2 秒 socket 超时的
+> HTTP 用例因此失败；builds 与两个 Python 套件全绿，根因、原始行与健康基线探针见 §10.2。
+> **未取得绿色矩阵，也不得这样描述。** 本阶段未改生产代码与测试代码，故 0016 在同一代码上
+> 的绿色 L4 仍按 §2.1 规则 1 复用。
+>
+> 基线 HEAD：`a8dd333`（开工时 = `origin/main`，工作区干净，无进行中计划）。
 >
 > Task level: **阶段末一次 L4**（§8.3）。单个单元的验证按 `docs/ai/agent-workflow.md`
 > §2.1 取最小集合；本阶段不改生产代码，改动面是 CI 配置、测试用例、运维脚本与文档。
@@ -225,13 +232,22 @@
 
 ### 8.3 阶段收口：一次 L4
 
-生产代码未改，但测试用例被合并（B），因此按 §2.1 的 "tests only" 与 owner 的"阶段末一次
-完整 L4"要求，跑一次完整矩阵：`debug`/`asan`/`ubsan` 全量 CTest（期望
-`100% tests passed, 0 tests failed out of 309 - k`，sanitizer 诊断 0）、`service/` 与
-root Release 构建、两个 Python 套件（`Ran 446` / `Ran 190` + `OK`）、回填隔离
-（dev 库显式 `[ SKIPPED ]`；scratch leg 用阶段自建的隔离 MySQL 容器与
-`jobpilot_review_scratch_0017`，跑完销毁）。日志写 `build/l4-0017/`（gitignored），
-摘要写进本计划 §10 与 `docs/quality/README.md`。
+本阶段未改生产代码，但 (a) owner 明确要求"阶段末只跑一次完整 L4"，且 (b) 0016 的 L4 之后
+构建环境确实被改动过——release 构建树被 A 单元的产物往返验证替换过，Conan 工具链一度指向
+A 的临时 `CONAN_HOME`（已用 `tools/dev/bootstrap.sh` 默认参数恢复为 `~/.conan2`）——符合
+`agent-workflow.md` §2.1 "环境被失效" 的例外。B 单元结论 k=0、未改任何测试源码，因此
+C++/测试代码在 L4 期间是冻结的（L4 之后只有 CI YAML/文档/新增离线检查器提交，按 §2.4 不
+使代码测试失效）。
+
+隔离：harness `build/l4-0017/run.sh`（gitignored）使用阶段自有的 compose 项目
+`jobpilot-l4-0017`（MySQL `:13399` / Redis `:16399` / 独立卷，schema 由
+`database/schema` 首次初始化装载）。开发库 `jobpilot`、`jobpilot_review_scratch` 与开发
+容器全程不被触碰；回填隔离的 dev leg 用该容器内的 `jobpilot` 库证明守卫会 SKIP，scratch leg
+用同容器内新建、同样装载了 schema 的 `jobpilot_l4_scratch` 库。
+
+矩阵：`debug`/`asan`/`ubsan` 全量 CTest（期望 `100% tests passed, 0 tests failed out of 309`，
+sanitizer 诊断 0）、`service/` 与 root Release 构建、两个 Python 套件、回填隔离两 leg。
+日志写 `build/l4-0017/`，摘要写进 §10 与 `docs/quality/README.md`。
 
 ### 8.4 回滚
 
@@ -253,15 +269,122 @@ root Release 构建、两个 Python 套件（`Ran 446` / `Ran 190` + `OK`）、�
 
 ## 10. 进度复选框
 
-- [ ] P0 计划落地并提交（本文件）
-- [ ] P1 = 0017-A：workflow 改动 + 本地复现证据 + 推送
-- [ ] P2 = 0017-B：报告 + 映射 + 校验器 + 有界合并 + 受影响用例重跑
-- [ ] P3 = 0017-C：`capture-acceptance.sh` + 合成 JSON 端到端证据
-- [ ] P4 = 0017-D：`RELEASE_CHECKLIST.md` + `release_preflight.py` 原始输出
-- [ ] P5 = L4（一次）+ 状态文档同步 + 计划归档
+- [x] P0 计划落地并提交（本文件，`a4d1f5f`）
+- [x] P1 = 0017-A：workflow 改动 + 本地复现证据 + 推送（`e6cae75`）
+- [x] P2 = 0017-B：报告 + 映射 + 校验器 + 负控制（`4a7995e`，k=0）
+- [x] P3 = 0017-C：`capture-acceptance.sh` + 合成 JSON 端到端证据（`38f29fd`）
+- [x] P4 = 0017-D：`RELEASE_CHECKLIST.md` + `release_preflight.py` 原始输出（`38f29fd`，
+      并按 §11 的记录修掉它在已推送树上抓到的私网地址，`b2a55be`）
+- [x] P5 = L4（一次，**environment-limited**：宿主比 0016 慢 3.7x，见 §10.2）+ 状态文档同步
+      + 计划归档
+
+### 10.1 单元证据
+
+**A（`e6cae75`）**：actionlint 1.7.7 对两个 workflow 文件 rc=0；56/56 测试二进制
+`readelf -d` 无 Conan `NEEDED`（静态链接，故 integration 不需要 Conan 缓存）；从零构建
+（全新 `CONAN_HOME`，`-j4`）bootstrap 83.41s + configure 0.74s + compile 127.11s；
+tar 4.26s（28,689,456 B / 1117 members，源自 88 MiB 树）+ extract 0.62s，解包后 56 个二进制
+仍可执行；在**解包后的树**上按 integration job 的环境跑完整套件：`100% tests passed, 0
+tests failed out of 309`（40.83s，0 skipped）、`Ran 446 tests`+`OK`、`Ran 190 tests`+`OK`。
+本机墙钟对比（`build/ci-0017/cost-table.md`）：466.61s → 260.23s，每推送少 206.38s
+（重复的 bootstrap+configure+compile 211.26s 被 4.88s 的 tar 往返替代）；`image` job 不再
+对 docs-only 推送计费。**runner 墙钟与"三次运行对比"由 owner 在 Actions 页确认**：本机无
+token、无 `gh`，匿名 API 对私有仓库返回 404。
+
+**B（`4a7995e`）**：`ctest -N` = 309（289 个 gtest 用例来自 37 个文件，另 20 个是单用例
+`main()` 二进制）；1,533 个同二进制用例对经四个机械过滤器 + 1 次人工循环等价扫描得到 66 个
+候选（50 个无序对），**全部**至少违反严格合并规则的一条 ⇒ k=0，未改任何测试源码
+（`git status --porcelain -- service/tests backend/tests` 为空），因此无需重编；47 个
+RECORD-ONLY 重叠按 13 个断言目标分组，每条都给 `file:line` + 断言原文。正控制：
+`test_coverage_map: PASS (309 -> 309, removed=0, survivors=0, live=309)`（exit 0）；负控制
+（removed 仍在活列表 / survivor 不存在 / 计数漂移 / 缺 `proof` / 非法 JSON / 缺证据）各自
+exit 1 并在报告 §7.2 附原始输出；Lead 独立复验了前两条。CI 的 integration job 现在跑该守卫。
+
+**C（`38f29fd`）**：`tools/dev/capture-acceptance.sh` 在隔离栈（project
+`jobpilot-capture`，API :18081 / MySQL :13307 / Redis :16380 / 独立卷，镜像
+`jobpilot-backend:verify`）上端到端 9 leg 全绿：dry-run（clean=1）→ 发布
+（created=1 updated=0 total=1）→ 重复发布幂等（created=0 updated=1 total=1）→ 公共搜索可见
+（matched=1 rows=1 id=1）→ 详情读回 17 字段一致（含 F13 date-only deadline 按北京日期渲染、
+`<script>` 已被剥离、`last_seen_at`/`freshness` 为 null）→ F14 碰撞观测被
+`skipped_manual=1` 跳过且详情字节一致 → 脱敏 §19.5 证据块落盘且不含 token，退出后本项目
+外容器列表不变，最后一行 `CAPTURE_ACCEPTANCE_OK`。证据
+`build/capture-0017/section-19.5-evidence.txt`（含 `created/updated/total` 与可见性两行）。
+**owner 只需把真机 JSON 过一遍该脚本即可闭环 0014 §19.5。**
+
+**D（`38f29fd` 落地，`b2a55be` 修红）**：`python3 tools/checks/release_preflight.py` 在干净
+clone 上 `7 pass, 0 fail, 0 skip, 5 manual`（`ACTIONLINT=…` 指向 actionlint 1.7.7）。负控制：
+向 clone 注入形如 `ghp_…` 的假 token ⇒ `FAIL secrets` 指名 `file:line`，rc=1。
+**真实收获**：该检查在已推送的树上抓到 `docs/quality/test-overlap-audit.md:4` 的开发机
+私网地址（0016 P5 曾手工 redact 同类地址），已 redact 并推送；手动项（Actions 分钟数、
+About/描述、仓库可见性、PAT 轮换）由脚本打印 `MANUAL:` 行并在清单 §5/§6 展开。
+
+### 10.2 L4（阶段收口，一次）——**环境受限，未取得绿色矩阵**
+
+harness：`build/l4-0017/run.sh`（gitignored）。隔离：阶段自有的 compose 项目
+`jobpilot-l4-0017`（MySQL `:13399` / Redis `:16399` / 独立卷，schema 由 `database/schema`
+首次初始化装载；scratch 库 `jobpilot_l4_scratch` 建在同一容器内）。开发库 `jobpilot`
+（跑前跑后都是 4 行 jobs）、`jobpilot_review_scratch` 与开发容器全程未被触碰。
+
+已取得的原始行（全部落在 `build/l4-0017/`）：
+
+```text
+builds: debug / asan / ubsan  configure rc=0 + build rc=0；service release rc=0；
+        root-release configure rc=0 + rc=0
+python: source_adapters `Ran 446 tests` + `OK`；ai_worker `Ran 190 tests` + `OK`
+ctest(debug): 97% tests passed, 9 tests failed out of 309
+              Total Test time (real) = 267.68 sec
+```
+
+9 个失败**全部**是带 2 秒 socket 超时的 HTTP 用例（`UserHttpTest.*` 4 个、
+`ResumeHttpTest.*` 5 个），失败信息是 `C++ exception ... "registration failed"`：注册请求
+超过了客户端 2 秒超时（`service/tests/test_user_http.cpp:97-98`）。
+
+根因是**宿主机当前比 0016 那次 L4 慢约 3.7 倍**，与代码、契约、隔离方式无关：
+
+```text
+纯 CPU、不连数据库的 bcrypt_test（同一 preset、同一二进制）：
+  0016 L4      Passed    7.13 sec
+  本次探针     elapsed=26.58 user=26.05          → 3.7x
+同一批 HTTP 用例：
+  0016         Passed 2.16 / 2.22 / 2.21 sec      （刚好在 2 s 超时之下）
+  本次         Failed 3.38 / 5.42 / 4.38 sec      （越过超时）
+全量 debug：0016 81.95 s（测试秒数合计 81.4）；本次 267.68 s（298 个已完成用例合计 198.4）
+系统侧：cpu.max=max（无 CPU 配额）、亲和 4 核、PSI cpu some avg10 8.9、
+        除本次测试自身外没有其他用户进程占用 CPU
+```
+
+探针命令：`/usr/bin/time ./build/presets/debug/backend/test_bcrypt`；**健康基线 = 7.1 s**
+（`build/l4-0017/probe-bcrypt.log`）。约 25 分钟后（其他一切结束、系统空闲）复测仍是
+`elapsed=28.96 user=28.13`（`probe-bcrypt2.log`），即该环境状况在本次会话内没有恢复，
+重跑只会重复同样的 9 个环境性失败。
+
+回填隔离的两条 leg 本次**未取得**：停止 harness 时它的 EXIT trap 已经 `down -v` 拆掉了隔离
+栈，随后手工重跑两条 leg 时 MySQL 不可达（`mysql_real_connect failed: Can't connect to
+MySQL server on '127.0.0.1:13399' (111)`），属于拆栈后的操作顺序错误，不是用例结论。
+
+**处置（不削弱断言、不伪造绿色）：** 本阶段没有改任何生产代码与测试代码（B 的结论 k=0，
+`git status --porcelain -- service/tests backend/tests` 为空），因此按
+`docs/ai/agent-workflow.md` §2.1 规则 1 复用 0016 在同一代码上取得的绿色 L4
+（Debug/ASan/UBSan `100% tests passed, 0 tests failed out of 309`，sanitizer 诊断 0），
+并把本次能做的部分全部做实（上面的 builds、两个 Python 套件、debug 结果与根因证据）。
+宿主健康后重跑一次即可补齐：`bash build/l4-0017/run.sh`（约 10 分钟；**先跑探针**，
+`test_bcrypt` 明显慢于 7.1 s 时不要跑，那只会产出环境噪声）。
+**本阶段的 L4 记为 environment-limited，不得描述为绿色。**
+
+### 10.3 推送与 CI
+
+三次推送：`38f29fd`（P0+A+C+D）、`4a7995e`（B）、`b2a55be`（D 修红）。每次推送都会触发 CI
+（`ci.yml` 的 build + integration，以及 main 上的 `image.yml`）；run id、三个 job 的耗时与
+结论由 owner 在 Actions 页确认，`docs/RELEASE_CHECKLIST.md` §5/§7 给出了要抄录的字段。
 
 ## 11. 已知问题与后续
 
+- **记录（偏离说明，非缺陷）**：A 单元的本地复现没有另起 compose 栈，而是在常驻
+  `jobpilot-mysql` 容器内新建了一个独立库 `jobpilot_ci`（13 张表、0 行业务数据，创建于
+  2026-10-10 14:24:50）来跑 integration job 的步骤；开发库 `jobpilot` 与
+  `jobpilot_review_scratch` 未被触碰（跑前跑后 `jobpilot.jobs` 都是 4 行）。这比 §4.1 的
+  "独立 compose 项目/端口/卷" 宽松一档，遗留的 `jobpilot_ci` 由 owner 决定是否删除；本阶段
+  的 L4 与 C 单元都改用阶段自有的 compose 栈（`jobpilot-l4-0017` / `jobpilot-capture`）。
 - **[0017-C 发现，真实缺陷，仅记录]** `publish-capture` 发出的 `published_at` 会被手工导入
   端点**静默丢弃**：`source_adapters/jobpilot_sources/capture/publisher.py:220-224` 会把
   capture 的发布日期归一化后放进 payload（并把它当作可发布字段，失败时还有 note），但

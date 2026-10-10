@@ -115,9 +115,16 @@ compose()
     docker compose -p "$PROJECT" --profile app "$@"
 }
 
+STACK_STARTED=0
+
 cleanup()
 {
     local rc=$?
+    # A usage error exits before anything was started; there is nothing to tear
+    # down and the empty teardown messages would only be noise.
+    if [ "$STACK_STARTED" != 1 ]; then
+        return 0
+    fi
     if [ "$rc" != 0 ]; then
         echo "--- backend logs before teardown (exit $rc) ---" >&2
         compose logs --tail=60 backend >&2 || true
@@ -174,7 +181,7 @@ print("version=1 title_bytes=%d company_bytes=%d host=%s" % (
     len(job["title"].encode()), len(job["company"].encode()),
     host if host.endswith(".invalid") else "<redacted host>"))
 PY
-)" || fail "capture file rejected by the shape check"
+)" || usage_error "capture file rejected by the shape check: $CAPTURE"
 
 echo "capture: $CAPTURE"
 echo "capture shape: $CAPTURE_SUMMARY"
@@ -200,6 +207,7 @@ pass "configure: prerequisites, capture shape, ports free, image available"
 say "start"
 compose down -v >/dev/null 2>&1 || true
 compose up -d
+STACK_STARTED=1
 HEALTHY=0
 for attempt in $(seq 1 60); do
     if curl -fsS --max-time 2 "$API/health" >/dev/null 2>&1; then
@@ -464,7 +472,7 @@ EVIDENCE_TMP="$WORK/section-19.5.txt"
     printf '经 publish-capture 发布的结果行: %s\n' "$PUBLISH_TOTALS"
     printf '公共搜索可见性（GET /api/v1/jobs?keyword=…）: 可见（matched=1 rows=%s keyword=<redacted>）\n' "$SEARCH_ROWS"
     printf 'robots/登录墙判定: 未绕过登录、未提交表单（人工确认）: <owner 填写>\n'
-    printf '断言: %s 项通过（publish/dry-run/search/read-back/F14），token 未出现在任何输出中\n' "$legs_passed"
+    printf '断言: %s 项通过（publish/dry-run/search/read-back/F14）+ 证据完整性检查通过，token 未出现在任何输出中\n' "$legs_passed"
 } > "$EVIDENCE_TMP"
 
 # Credential guard: the generated token must not appear in anything we keep.

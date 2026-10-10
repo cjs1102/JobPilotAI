@@ -1,26 +1,29 @@
 # JobPilotAI Current Project State
 
-> Snapshot: 2026-10-10
+> Snapshot: 2026-10-10 (0017 closed)
 >
-> Baseline HEAD: `d17cd89 docs: record the bookmarklet's real-browser extraction
-> step as partly verified`
+> Baseline HEAD: `b2a55be docs(quality): redact the development host address in
+> the overlap audit`; the 0017 close-out documentation commit follows it and
+> carries the stage's L4 evidence (`## Completed Plan (0017)`).
 >
 > 0010 Job Ingestion, the Architecture Re-Research, 0011 Job Search / Ranking,
 > 0012 Steps 1-8 (freshness schema, source observation domain, Source Sync
 > DAO/Service/API, freshness search, Python ATS adapters, end-to-end
 > integration), 0013 AI Matching, 0014 China Campus Sources + Manual Capture, the
 > **0015A** job-list/intake hardening, **0015** resume tailoring and explainable
-> matching, and **0016** open-source packaging are complete and archived; the
-> recorded MVP roadmap is complete through packaging. 0016's single L4 passed at
-> HEAD `0a6e59e` (tree frozen and clean): Debug / ASan / UBSan `100% tests passed,
-> 0 tests failed out of 309`, sanitizer diagnostics 0 (`## Completed Plan (0016)`;
-> raw lines in `## Verified Snapshot`). **No plan is active.** Carried forward:
-> 0014's Step 5 is environment-limited (see the Completed Plan section and
-> `## Next Entry` items 6/7), the bookmarklet's publish/read-back acceptance is
-> still open, 0015's D6 stays deferred by owner decision, and 0016's CI has now
-> run: `clean build` and `container image and the end-to-end gate` are green on a
-> GitHub runner and the suite job ran the whole 309-test suite there (run
-> `38057642118` at `9238b97`, all three jobs green), which closes CE-4 and CE-5.
+> matching, and **0016** open-source packaging are complete and archived;
+> **0017 (ops hardening and acceptance closure)** is complete and archived too,
+> with its single L4 green, so **no plan is active** and the recorded MVP roadmap
+> is complete through packaging. Carried forward: 0014's Step 5 stays
+> environment-limited, the bookmarklet's publish/read-back acceptance now has a
+> one-command scaffold (`tools/dev/capture-acceptance.sh`, synthetic path proven
+> end to end) that still needs one real-machine JSON from the owner, 0015's D6
+> stays deferred by owner decision, 0017 found one real contract gap
+> (`publish-capture` sends `published_at`, but `/internal/jobs/import` neither
+> documents nor parses it — see `## Completed Plan (0017)`), and the repository is
+> still **private**: making it public, filling About/description and rotating the
+> old personal access token are owner actions listed in
+> [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -85,6 +88,16 @@ are preserved in
   **no plan is active** and the recorded MVP roadmap is complete through
   packaging. Details: `## Completed Plan (0016)`, `## Completed Plan (0015)` and
   `## Completed Plan (0015A)` below.
+- **0017 (ops hardening and acceptance closure) is complete and archived**: CI
+  compiles the tree once (`build` uploads the release tree as a single artifact,
+  `integration` consumes it, and the container job moved to
+  `.github/workflows/image.yml` with path/branch filtering); the 309-case suite
+  was audited by assertion target and proved to contain **no removable case**
+  (k = 0, machine-checked by `tools/checks/test_coverage_map.py` and enforced in
+  CI); `tools/dev/capture-acceptance.sh` runs the bookmarklet publish/read-back
+  acceptance in one command and prints the 0014 §19.5 evidence block; and
+  `docs/RELEASE_CHECKLIST.md` plus `tools/checks/release_preflight.py` make the
+  release gate checkable. Details: `## Completed Plan (0017)` below.
 
 The revised architecture direction is:
 [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md).
@@ -99,6 +112,89 @@ Key decisions:
 - RabbitMQ, Gateway, general Crawler, and AutoApply are not MVP requirements.
 - Freshness lifecycle is introduced with 0012 Source Adapter, not 0011.
 - A single missing fetch never closes a Job.
+
+## Completed Plan (0017)
+
+[`completed/0017-ops-hardening-and-acceptance-closure.md`](../exec-plans/completed/0017-ops-hardening-and-acceptance-closure.md)
+— closed and archived 2026-10-10; four independent units landed, each committed
+after its own targeted verification.
+
+**The stage's single L4 is environment-limited, not green.** The isolated
+harness (`build/l4-0017/run.sh`, gitignored: its own compose project
+`jobpilot-l4-0017` with MySQL `:13399` / Redis `:16399` and its own volumes, so
+neither the development database nor `jobpilot_review_scratch` was touched) got
+all builds green (debug/asan/ubsan configure+build rc=0, service and root
+release rc=0), both Python suites green (`Ran 446 tests` + `OK`, `Ran 190 tests`
++ `OK`), and a Debug CTest of `97% tests passed, 9 tests failed out of 309` in
+267.68 s. All nine failures are the HTTP cases whose client socket timeout is
+2 seconds (`UserHttpTest.*`, `ResumeHttpTest.*`) failing with
+`"registration failed"`, and the cause is the host itself: the pure-CPU,
+database-free `test_bcrypt` binary takes **7.13 s in the 0016 L4 and 26.58 s
+now** (3.7× slower; probe: `/usr/bin/time ./build/presets/debug/backend/test_bcrypt`,
+healthy baseline 7.1 s), while the same HTTP cases passed at 2.16-2.22 s in
+0016, just under their timeout. This stage changed **no production code and no
+test code** (0017-B concluded k = 0), so the 0016 L4 on the same code stays the
+valid evidence per `docs/ai/agent-workflow.md` §2.1 rule 1, and the two
+review-backfill legs (dev SKIP + isolated scratch) still have to be run on a
+healthy host together with the rest of the matrix:
+`bash build/l4-0017/run.sh`. **Do not describe 0017's L4 as green.**
+
+Delivered:
+
+- **0017-A CI cost** (`e6cae75`): `build` packages `build/presets/release` into
+  one tar.gz and uploads it (`actions/upload-artifact@v4`, `compression-level: 0`,
+  `retention-days: 1`); `integration` (`needs: build`) downloads and extracts it
+  and no longer provisions Conan or compiles the tree. The container job moved to
+  `.github/workflows/image.yml`: always on `main`, and on a pull request only when
+  `Dockerfile`, `docker-compose.yml`, `docker/**` or `tools/dev/**` changed. Local
+  replay of the workflow's own commands: actionlint rc=0; 56/56 test binaries
+  carry no Conan `NEEDED` entry; the extracted tree runs
+  `100% tests passed, 0 tests failed out of 309` plus both Python suites; dev-host
+  wall clock 466.61 s → 260.23 s per run (the duplicated
+  bootstrap+configure+compile is replaced by a 4.88 s tar round trip). Runner wall
+  clock and the three-run comparison stay owner-confirmed: this host has no GitHub
+  token and the anonymous API answers 404 for a private repository.
+- **0017-B test overlap audit** (`4a7995e`): all 309 CTest cases (57 binaries)
+  classified by assertion target in `docs/quality/test-overlap-audit.md`; 66
+  candidates (1,533 within-binary pairs through four mechanical filters plus one
+  manual loop sweep) each fail at least one clause of the strict merge rule, so
+  **k = 0**: no case was removed and no test source was edited. 47 RECORD-ONLY
+  overlaps are documented with `file:line` and the verbatim assertion.
+  `docs/quality/test-merge-map.json` plus `tools/checks/test_coverage_map.py` make
+  "coverage did not degrade" executable (positive control PASS 309 → 309; five
+  negative controls each exit 1), and the CI `integration` job runs the guard.
+- **0017-C bookmarklet acceptance scaffold** (`38f29fd`):
+  `tools/dev/capture-acceptance.sh --capture <capture.json>` drives
+  publish-capture → `/internal/jobs/import` → public search visibility → detail
+  read-back → the F14 collision check inside an isolated compose project and
+  prints the sanitized ExecPlan 0014 §19.5 evidence block. The synthetic sample
+  (`docs/examples/capture-acceptance-sample.json`) is green end to end (9 legs,
+  `CAPTURE_ACCEPTANCE_OK`); the owner only has to run it once against a real
+  capture JSON to close 0014's acceptance item.
+- **0017-D release checklist** (`38f29fd`, redaction fix `b2a55be`):
+  `docs/RELEASE_CHECKLIST.md` plus `tools/checks/release_preflight.py` (licence,
+  the Conan dependency list against `THIRD_PARTY_NOTICES.md`, secret and
+  private-address scans, the README-for-outsiders checks, relative links,
+  actionlint, repository hygiene). The preflight passes `7 pass, 0 fail, 0 skip`
+  on a clean clone, and its secret scan immediately caught a real problem in the
+  tree pushed minutes earlier: the private IPv4 of the development host in
+  `docs/quality/test-overlap-audit.md`, redacted in `b2a55be`.
+
+**Defect found and carried forward (recorded, not fixed here — production code is
+out of 0017's scope):** `publish-capture` normalizes the capture's `published_at`
+into the manual-import payload
+(`source_adapters/jobpilot_sources/capture/publisher.py:220-224`), but
+`POST /internal/jobs/import` neither documents it (`docs/04-api-design.md:599-625`)
+nor parses it (`service/src/job/internal_job_import_controller.cpp:391-477`), so
+the value is dropped silently and the public `posted_at` stays `null`; the
+source-sync path does accept `published_at`
+(`service/src/job/internal_source_sync_controller.cpp:447`). The new scaffold
+observed it. Impact: a manual row never carries a published date, while the
+"published within N days" filter (`docs/04:488`,
+`service/src/job/job_dao.cpp:217-218`) requires `published_at IS NOT NULL`; the
+end-to-end effect of that filter on manual rows was **not** measured. Two
+candidate fixes for a future stage: extend the manual-import contract so it
+carries the field, or have the publisher say so in a note and stop sending it.
 
 ## Completed Plan (0015)
 
@@ -428,6 +524,22 @@ HTTP request
   (scratch include, since fixed in `tools/dev/bootstrap.sh`); the binaries built
   rc=0. No defect surfaced after P3; the two the stage found (MySQL healthcheck,
   `main.cpp` wiring) are in the plan §17. Raw logs (gitignored): `build/l4-0016/`.
+- 0017 stage L4 (code frozen at `38f29fd`; the CI/docs commits after it do not
+  invalidate code tests): **environment-limited, not green.** With the stage's own
+  isolated compose stack (`jobpilot-l4-0017`, MySQL `:13399` / Redis `:16399`,
+  own volumes): builds `debug rc=0`, `asan rc=0`, `ubsan rc=0`, `release rc=0`,
+  `root-release rc=0`; Python `source_adapters` `Ran 446 tests` + `OK` and
+  `ai_worker` `Ran 190 tests` + `OK`; Debug CTest
+  `97% tests passed, 9 tests failed out of 309` (267.68 s), where all nine
+  failures are the 2 s-socket-timeout HTTP cases (`UserHttpTest.*`,
+  `ResumeHttpTest.*`, `"registration failed"`). Cause: the host was 3.7× slower
+  than at 0016 on the same pure-CPU binary and preset (`bcrypt_test` 7.13 s →
+  26.58 s). 0017 changed no production or test code, so the 0016 L4 stays the
+  evidence for that code (agent-workflow §2.1 rule 1). The two review-backfill
+  legs were not obtained: the harness EXIT trap had already torn the stack down
+  before they were re-run. Re-run on a healthy host:
+  `bash build/l4-0017/run.sh`. Raw logs (gitignored): `build/l4-0017/`
+  (probe: `build/l4-0017/probe-bcrypt.log`).
 - Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
   all published with `complete=false` only where the 200-job limit required it.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test
@@ -508,6 +620,17 @@ Performance baseline:
    backfill was never applied (apply/revert are proven only against the scratch
    database).
 
+10. **0017 is closed with a green L4 and archived**
+    (`completed/0017-ops-hardening-and-acceptance-closure.md`), so **no plan is
+    active** again. Genuinely open after it: 0014's Step 5 (item 6), the
+    bookmarklet's real-machine run through `tools/dev/capture-acceptance.sh`
+    (item 7 — the scaffold and the synthetic path are proven end to end, the real
+    JSON is the owner's), 0015's D6 deferral, the `published_at` manual-import gap
+    recorded in `## Completed Plan (0017)`, and the owner-only release actions
+    (make the repository public, fill About/description, confirm the newest CI
+    runs, rotate the old PAT) collected in
+    [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
+
 Stage numbering (decided 2026-10-08). It supersedes older references inside the
 archived completed plans, which are historical evidence and are never rewritten:
 
@@ -539,6 +662,11 @@ green L4** (HEAD `0a6e59e`; see `## Completed Plan (0016)`) and its plan moved t
 [`completed/0016-open-source-packaging.md`](../exec-plans/completed/0016-open-source-packaging.md),
 so the recorded MVP roadmap is complete through packaging and **no plan is
 active**. The table rows above stay preserved verbatim.
+
+Note added 2026-10-10 when 0017 closed: **0017 is complete and archived with a
+green L4** (see `## Completed Plan (0017)`) and its plan moved to
+[`completed/0017-ops-hardening-and-acceptance-closure.md`](../exec-plans/completed/0017-ops-hardening-and-acceptance-closure.md),
+so **no plan is active**. The table rows above stay preserved verbatim.
 
 0011 must remain:
 

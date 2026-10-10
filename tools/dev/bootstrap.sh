@@ -91,13 +91,22 @@ fi
 # one that generated the lock complete the graph instead of failing, and
 # --build=missing builds anything the cache does not already hold.
 echo "bootstrap: $("$CONAN_BIN" --version) install ($BUILD_TYPE, cppstd=$CPPSTD) -> $OUTPUT_FOLDER"
+extra_args=()
+if [ "$OUTPUT_FOLDER" != "service/build" ]; then
+    # A scratch output folder must not append its generated presets to the
+    # source-tree CMakeUserPresets.json: two includes both define `conan-release`,
+    # and CMake then refuses to read the presets at all ("Duplicate preset"),
+    # which breaks `cmake --preset <name>` from service/.
+    extra_args+=(-c "tools.cmake.cmaketoolchain:user_presets=$OUTPUT_FOLDER/CMakeUserPresets.json")
+fi
 "$CONAN_BIN" install "$CONANFILE" \
     --output-folder="$OUTPUT_FOLDER" \
     --build=missing \
     -s build_type="$BUILD_TYPE" \
     -s compiler.cppstd="$CPPSTD" \
     --lockfile="$LOCKFILE" \
-    --lockfile-partial
+    --lockfile-partial \
+    ${extra_args[@]+"${extra_args[@]}"}
 
 [ -f "$OUTPUT_FOLDER/conan_toolchain.cmake" ] ||
     fail "conan did not generate $OUTPUT_FOLDER/conan_toolchain.cmake"

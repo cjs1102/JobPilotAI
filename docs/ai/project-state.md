@@ -9,16 +9,16 @@
 > 0012 Steps 1-8 (freshness schema, source observation domain, Source Sync
 > DAO/Service/API, freshness search, Python ATS adapters, end-to-end
 > integration), 0013 AI Matching, 0014 China Campus Sources + Manual Capture, the
-> **0015A** job-list/intake hardening, and **0015** resume tailoring and
-> explainable matching are complete and archived. 0015's Phases A-C are complete,
-> Phase D landed through D5 (L2-verified at `ae85868`; D6 deferred by owner
-> decision) and the stage's single L4 passed at HEAD `26e2069`
-> (`## Completed Plan (0015)`; raw lines in `## Verified Snapshot`). **No plan is
-> approved for implementation**: the **0016 open-source packaging** plan is
-> drafted and awaiting owner review
-> (`../exec-plans/active/0016-open-source-packaging.md`), and no production code
-> may be written before that review. 0014's Step 5 is environment-limited and
-> carried forward (see the Completed Plan section and `## Next Entry` items 6/7).
+> **0015A** job-list/intake hardening, **0015** resume tailoring and explainable
+> matching, and **0016** open-source packaging are complete and archived; the
+> recorded MVP roadmap is complete through packaging. 0016's single L4 passed at
+> HEAD `0a6e59e` (tree frozen and clean): Debug / ASan / UBSan `100% tests passed,
+> 0 tests failed out of 309`, sanitizer diagnostics 0 (`## Completed Plan (0016)`;
+> raw lines in `## Verified Snapshot`). **No plan is active.** Carried forward:
+> 0014's Step 5 is environment-limited (see the Completed Plan section and
+> `## Next Entry` items 6/7), the bookmarklet's publish/read-back acceptance is
+> still open, 0015's D6 stays deferred by owner decision, and 0016's CI `image`
+> job awaits the owner's first GitHub run.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -77,12 +77,12 @@ are preserved in
   capture channel (bookmarklet + local publisher through
   `/internal/jobs/import`). No real China source adapter exists yet and no China
   `source` identifier is registered.
-- **0015 (resume tailoring and explainable matching) is complete and archived**,
-  and **0015A (job-list usability and intake quality) is closed and archived**;
-  0014's Step 5 carry-forward is unchanged. Details: `## Completed Plan (0015)`
-  and `## Completed Plan (0015A)` below. **No plan is approved for
-  implementation**: the **0016 open-source packaging** plan is drafted and awaits
-  owner review (`../exec-plans/active/0016-open-source-packaging.md`).
+- **0016 (open-source packaging) is complete and archived with its L4 green**,
+  and **0015 (resume tailoring and explainable matching)** with **0015A
+  (job-list usability and intake quality)** are complete and archived too, so
+  **no plan is active** and the recorded MVP roadmap is complete through
+  packaging. Details: `## Completed Plan (0016)`, `## Completed Plan (0015)` and
+  `## Completed Plan (0015A)` below.
 
 The revised architecture direction is:
 [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md).
@@ -144,6 +144,46 @@ Debug, ASan and UBSan (rc=0, sanitizer diagnostics 0); Python `source_adapters`
 dev `[  SKIPPED ]` / scratch `[  PASSED  ] 7 tests`. The first full-matrix run at
 `576f436` caught one test-only defect, fixed in `26e2069` with production code
 unchanged (raw lines below).
+
+## Completed Plan (0016)
+
+[`completed/0016-open-source-packaging.md`](../exec-plans/completed/0016-open-source-packaging.md)
+— archived 2026-10-10; P1-P5 landed and the stage's single L4 passed at HEAD
+`0a6e59e` (tree frozen and clean).
+
+Delivered:
+
+- P1 build/run contract: pinned `conan.lock`, `tools/dev/bootstrap.sh`, the TSan
+  target-order fix, the multi-stage `Dockerfile`, the compose `app` profile and
+  the `resume_storage` mount, so a clean machine can configure, build and run;
+  the MySQL healthcheck fix is recorded in the plan §17.
+- P2 database bootstrap/upgrade documentation: `database/schema/README.md`
+  (file→table map, both from-scratch paths, the numbered additive-`ALTER` upgrade
+  table, verification queries, isolation rule), with `docs/03` §6 pointing at it.
+- P3 demo gate: `tools/dev/demo-gate.sh` runs configure → start → import → search
+  → match → tailor → track against an isolated compose project, with a negative
+  control; it found and fixed the `main.cpp` artifact wiring (plan §17).
+- P4 CI: `.github/workflows/ci.yml` with `build`, `integration` (MySQL 8.0 +
+  Redis 7, schema from the committed files, the whole CTest suite, both Python
+  suites) and `image` jobs; the `image` job is not replayable on this host and
+  awaits the owner's first GitHub run.
+- P5 open-source hygiene: English Quick Start in `README.md`,
+  `THIRD_PARTY_NOTICES.md`, dated corrections in `docs/07`/`docs/08`, the
+  `docs/README.md` reading order, and a secret/private-detail scan (two private
+  proxy addresses redacted; link check 55 links, 0 missing).
+
+L4 (HEAD `0a6e59e`, frozen tree, working tree clean): builds `debug build rc=0`,
+`asan build rc=0`, `ubsan build rc=0`, `release rc=0`, `root-release rc=0`; the
+three CTest phases were re-run after the presets fix and report `100% tests
+passed, 0 tests failed out of 309` in Debug (96.12 s), ASan (88.86 s) and UBSan
+(59.93 s), sanitizer diagnostics 0; Python `source_adapters` `Ran 446 tests` +
+`OK` and `ai_worker` `Ran 190 tests` + `OK`; backfill isolation dev
+`[  SKIPPED ]` (rc=0) and scratch `[  PASSED  ] 7 tests` (rc=0). The
+debug/asan/ubsan build logs each also carry a `configure rc=1` from a generated
+`service/CMakeUserPresets.json` (scratch include, since fixed in
+`tools/dev/bootstrap.sh`); the binaries built rc=0. No defect surfaced after P3;
+the two the stage found (MySQL healthcheck, `main.cpp` wiring) are recorded in the
+plan §17.
 
 ## Completed Plan (0015A)
 
@@ -364,6 +404,22 @@ HTTP request
   (`MatchExplanationTest.ClassifiesDeadlineUrgencyWithDateOnlyHandling` compared
   `const char *` with `EXPECT_EQ`); fixed in test-only commit `26e2069` and the
   three CTest phases re-ran green. Raw logs (gitignored): `build/l4-0015/`.
+- 0016 stage L4 (HEAD `0a6e59e`, frozen tree, working tree clean): builds
+  `debug build rc=0`, `asan build rc=0`, `ubsan build rc=0`, `release rc=0`,
+  `root-release rc=0`; the three CTest phases were re-run after the presets fix
+  (`build/l4-0016/test2-*.log`, `test2-summary.txt` rc=0) and report
+  **`100% tests passed, 0 tests failed out of 309`** in Debug (96.12 s), ASan
+  (88.86 s) and UBSan (59.93 s), sanitizer diagnostics 0
+  (`AddressSanitizer` / `LeakSanitizer` / `runtime error:`); Python
+  `source_adapters` `Ran 446 tests` + `OK` and `ai_worker` `Ran 190 tests` + `OK`;
+  backfill isolation dev `REVIEW_DB_ISOLATION connected=jobpilot scratch_env=<unset>`
+  + `[  SKIPPED ]` (rc=0) and scratch
+  `REVIEW_DB_ISOLATION connected=jobpilot_review_scratch scratch_env=jobpilot_review_scratch`
+  + `[  PASSED  ] 7 tests` (rc=0). The debug/asan/ubsan build logs each also
+  carry a `configure rc=1` from a generated `service/CMakeUserPresets.json`
+  (scratch include, since fixed in `tools/dev/bootstrap.sh`); the binaries built
+  rc=0. No defect surfaced after P3; the two the stage found (MySQL healthcheck,
+  `main.cpp` wiring) are in the plan §17. Raw logs (gitignored): `build/l4-0016/`.
 - Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
   all published with `complete=false` only where the 200-job limit required it.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test
@@ -423,14 +479,14 @@ Performance baseline:
    `created/updated/total` and public search-visibility rows are still empty and
    the acceptance as a whole stays open; it is owned by the product owner and is
    not a stage blocker.
-8. **0015 is closed with a green L4** — both plans are archived: 0015 at
-   `completed/0015-resume-tailoring-and-explainable-matching.md` (L4 green at
-   `26e2069`; D6 deferred by owner decision) and 0015A at
-   `completed/0015A-job-list-usability-and-intake-quality.md`. The archival is
-   committed with this snapshot. **0016**: the open-source packaging plan is
-   drafted and awaits owner review
-   (`../exec-plans/active/0016-open-source-packaging.md`); implementation may not
-   start before that review (plan P0).
+8. **0016 is closed with a green L4 and archived**
+   (`completed/0016-open-source-packaging.md`; P1-P5 landed, L4 at HEAD
+   `0a6e59e`, raw lines in `## Verified Snapshot`), so the recorded MVP roadmap is
+   complete through packaging and **no plan is active**. Genuinely open:
+   0014's Step 5 (item 6), the bookmarklet's `publish-capture`/read-back
+   acceptance (item 7), 0015's D6 deferral (0015 plan §17), and 0016's CI `image`
+   job — unconfirmed until the owner sees the first GitHub run. The Lead commits
+   and pushes this archival change.
 9. **Resolved — both plans are archived under `completed/`.** 0015A's §13 step
    boxes remain unticked on purpose (never maintained during the stage); its
    status header now records the closure evidence, and Step 5's real-database
@@ -463,6 +519,12 @@ and
 **No plan is active**; **0016 open-source packaging** is next. The table rows
 above stay preserved verbatim.
 
+Note added 2026-10-10 when 0016 closed: **0016 is complete and archived with a
+green L4** (HEAD `0a6e59e`; see `## Completed Plan (0016)`) and its plan moved to
+[`completed/0016-open-source-packaging.md`](../exec-plans/completed/0016-open-source-packaging.md),
+so the recorded MVP roadmap is complete through packaging and **no plan is
+active**. The table rows above stay preserved verbatim.
+
 0011 must remain:
 
 ```text
@@ -481,8 +543,8 @@ Do not start a new P2 module without its own approved plan.
 ## Key Entry Points
 
 - AI routing: [README.md](README.md)
-- Most recent archived ExecPlan (0015):
-  [../exec-plans/completed/0015-resume-tailoring-and-explainable-matching.md](../exec-plans/completed/0015-resume-tailoring-and-explainable-matching.md)
+- Most recent archived ExecPlan (0016):
+  [../exec-plans/completed/0016-open-source-packaging.md](../exec-plans/completed/0016-open-source-packaging.md)
 - Full historical state:
   [references/project-state-full.md](references/project-state-full.md)
 - Current architecture:

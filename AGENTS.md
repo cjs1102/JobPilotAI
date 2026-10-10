@@ -5,33 +5,30 @@
 C++17 Linux backend for an AI-assisted job application platform. `service/` is
 the canonical runnable entry; root CMake is the unified developer entry.
 
-Current phase: **0015 resume tailoring and explainable matching is complete and
-archived** (`docs/exec-plans/completed/0015-resume-tailoring-and-explainable-matching.md`),
-closing with a green L4 at HEAD `26e2069`: Debug / ASan / UBSan `100% tests
-passed, 0 tests failed out of 309` with sanitizer diagnostics 0 (Phase D landed
-through D5; D6 deferred by owner decision, plan §17). **No plan is approved for
-implementation**: the **0016 open-source packaging** plan is drafted and awaiting
-owner review (`docs/exec-plans/active/0016-open-source-packaging.md`), and no
-production code may be written before that review. The
-0015A job-list usability / intake-quality hardening is also closed and archived
-(`docs/exec-plans/completed/0015A-job-list-usability-and-intake-quality.md`) with a
-clean L4, and 0013 AI Matching (Steps 1-10) and 0014 China Campus Sources + Manual
-Capture (Steps 1-8) are complete and archived under
-`docs/exec-plans/completed/`. 0014's Step 5 (first real China source) is
-**environment-limited** and carried forward, not done: no compliant, reusable
-China list contract could be verified, so no China source adapter is implemented
-and no China `source` identifier is registered — the registered sources remain
-`greenhouse`/`lever`/`ashby`. The real-browser bookmarklet **extraction** step has
-since been run by the product owner on a real login-walled posting (Edge; JSON
-produced; one Network observation saw no request issued by the bookmarklet —
-0014 §19.6, 【用户报告】), but `publish-capture` and backend persistence were
-**not** executed in that run, so the acceptance as a whole is still **not**
-accepted (plan §19.5/§19.6).
+Current phase: **0016 open-source packaging is complete and archived with its L4
+green** (`docs/exec-plans/completed/0016-open-source-packaging.md`: HEAD
+`0a6e59e`, frozen and clean tree; Debug / ASan / UBSan `100% tests passed, 0
+tests failed out of 309`, sanitizer diagnostics 0). **No plan is active** and the
+recorded MVP roadmap is complete through packaging — 0013-0016 and the 0015A
+hardening are all archived under `docs/exec-plans/completed/`. Carried forward,
+not done:
+- 0014's Step 5 (first real China source) is **environment-limited**: no
+  compliant, reusable China list contract could be verified, so no China source
+  adapter is implemented and no China `source` identifier is registered (only
+  `greenhouse`/`lever`/`ashby`).
+- The bookmarklet's **publish/read-back acceptance is still open**: only the
+  extraction step was run by the product owner on a real login-walled posting
+  (0014 §19.6, 【用户报告】), while `publish-capture` and backend persistence were
+  not executed (§19.5).
+- 0015's D6 (`ai_worker` `resume_optimize` wording pass) remains **deferred by
+  owner decision** (0015 plan §17).
+- 0016's CI **`image` job is unconfirmed until the owner sees the first GitHub
+  run** (0016 §14 P4 / §17; Docker Hub is unreachable on this host).
+
 Product direction is China-first per
 `docs/adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
-manual capture import, campus focus, company career pages, never auto-submit);
-**0016 open-source packaging** is next. P1 network/HTTP remains
-behaviorally frozen.
+manual capture import, campus focus, company career pages, never auto-submit).
+P1 network/HTTP remains behaviorally frozen.
 
 Verification and agent workflow rules: `docs/ai/agent-workflow.md`. Read it
 before running any test suite — it defines the levels, when a suite may run, and

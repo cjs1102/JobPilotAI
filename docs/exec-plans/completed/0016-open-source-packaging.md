@@ -1,13 +1,31 @@
 # ExecPlan 0016: Open-source Packaging, Demo Gate and CI
 
-> Status: **APPROVED — P0 closed by the owner (2026-10-10).** All eight §11
-> decisions are ruled and recorded there. Implementation proceeds step by step
-> from P1 (§9); each unit is committed and pushed only after its targeted
-> verification, and the stage closes with the single L4 of §8.3. The plan was
-> regrouped on approval: the former P2 run-story work (Dockerfile, compose
-> service, storage volume) merged into P1 so the `resume_storage` declaration
-> gets its owner and its verification in the same unit; the later steps were
-> renumbered P2-P6 with no change of content.
+> Status: **Completed and archived** (2026-10-10). P1-P5 are landed (§14) and the
+> stage's single L4 passed at HEAD `0a6e59e` (frozen tree, working tree clean) —
+> builds `debug build rc=0`, `asan build rc=0`, `ubsan build rc=0`, `release
+> rc=0`, `root-release rc=0`; the three CTest phases were re-run after the
+> presets fix and report `100% tests passed, 0 tests failed out of 309` in Debug
+> (96.12 s), ASan (88.86 s) and UBSan (59.93 s), sanitizer diagnostics 0;
+> Python `Ran 446 tests` + `OK` (`source_adapters`) and `Ran 190 tests` + `OK`
+> (`ai_worker`); backfill isolation dev `[  SKIPPED ]` + scratch
+> `[  PASSED  ] 7 tests`. The debug/asan/ubsan build logs each also carry a
+> `configure rc=1` from a generated `service/CMakeUserPresets.json` that had
+> accumulated a scratch include; `tools/dev/bootstrap.sh` now writes that file
+> inside a non-default `OUTPUT_FOLDER`, the stale include is removed and configure
+> re-verified rc=0 — the binaries built rc=0 regardless. **No defect surfaced after
+> P3**: the two the stage found
+> were the gate's own — the MySQL healthcheck (P1) and the `main.cpp` artifact
+> wiring (P3) — and both are already recorded in §17. The plan is frozen here as
+> historical evidence.
+>
+> Historical approval status, preserved as written: "Status: **APPROVED — P0
+> closed by the owner (2026-10-10).** All eight §11 decisions are ruled and
+> recorded there. Implementation proceeds step by step from P1 (§9); each unit is
+> committed and pushed only after its targeted verification, and the stage closes
+> with the single L4 of §8.3. The plan was regrouped on approval: the former P2
+> run-story work (Dockerfile, compose service, storage volume) merged into P1 so
+> the `resume_storage` declaration gets its owner and its verification in the
+> same unit; the later steps were renumbered P2-P6 with no change of content."
 >
 > Task level: **L4 at stage close** (the stage touches the build entry, the local
 > run path, the database bootstrap story and CI; the individual slices are
@@ -596,7 +614,28 @@ Stop and report to the owner (do not widen scope) if:
       `docs/ai/references/project-state-full.md`); the remaining private-range
       strings are test fixtures. Evidence: `git diff --check` rc=0; link check 55
       links, 0 missing.
-- [ ] P6 Docs sync + the stage's single L4 + archive
+- [x] P6 Docs sync + the stage's single L4 + archive — **done 2026-10-10**. The
+      stage's single L4 passed at HEAD `0a6e59e` (frozen tree, working tree clean):
+      builds `debug build rc=0`, `asan build rc=0`, `ubsan build rc=0`, `release
+      rc=0`, `root-release rc=0`; the three CTest phases were re-run after the
+      presets fix (`build/l4-0016/test2-*.log`, `test2-summary.txt` rc=0) and
+      report `100% tests passed, 0 tests failed out of 309` in Debug (96.12 s),
+      ASan (88.86 s) and UBSan (59.93 s) with sanitizer diagnostics 0; Python
+      `source_adapters` `Ran 446 tests` + `OK` and
+      `ai_worker` `Ran 190 tests` + `OK`; backfill isolation dev
+      `REVIEW_DB_ISOLATION connected=jobpilot scratch_env=<unset>` + `[  SKIPPED ]`
+      (rc=0) and scratch `connected=jobpilot_review_scratch
+      scratch_env=jobpilot_review_scratch` + `[  PASSED  ] 7 tests` (rc=0).
+      **Note**: the debug/asan/ubsan build logs each also carry a `configure rc=1`
+      from a generated `service/CMakeUserPresets.json` that had accumulated a
+      scratch include; `tools/dev/bootstrap.sh` now writes that file inside a
+      non-default `OUTPUT_FOLDER` and configure re-verified rc=0 — the binaries
+      built rc=0 regardless. README,
+      AGENTS.md and `docs/ai/project-state.md` are synced and this plan is
+      archived under `docs/exec-plans/completed/`. **No defect surfaced after
+      P3**; the two the stage found (MySQL healthcheck, `main.cpp` wiring) are
+      recorded in §17. The CI `image` job remains the owner's to confirm on the
+      first GitHub run.
 
 ## 15. Smallest First Implementable Unit
 
@@ -620,6 +659,23 @@ rewritten (archived/historical text is never rewritten here). This plan is the
 
 ## 17. Known Issues and Follow-ups
 
+- **Fixed in P6, found by the L4's own build logs: the service-entry configure
+  failed with `Duplicate preset: "conan-release"`.** The cause was generated
+  state, not tracked code: `service/CMakeUserPresets.json` (gitignored, written
+  by Conan) had accumulated a second include pointing at the scratch output folder
+  a verification run had used (`build/ce2-out/CMakePresets.json`), and both
+  includes define the same `conan-release` names, so CMake refused to read the
+  presets from `service/` at all. `cmake --build` then auto-reconfigured, which is
+  why the binaries and the suites were unaffected. `tools/dev/bootstrap.sh` now
+  passes
+  `-c tools.cmake.cmaketoolchain:user_presets=$OUTPUT_FOLDER/CMakeUserPresets.json`
+  whenever `OUTPUT_FOLDER` is not the default, so a scratch verification run
+  writes its presets inside the scratch folder and can never append to the source
+  tree again — verified by running it: the source-tree file keeps its single
+  include and the scratch file lands under `service/build/<folder>/`. The stale
+  include was removed; `cmake --preset debug|asan|ubsan` from `service/` and
+  `cmake --preset release` from the root all return rc=0, and the three CTest
+  phases were re-run green afterwards (`build/l4-0016/test2-*.log`).
 - **Fixed in P3, found by the demo gate: the shipped binary never wired the
   artifact endpoints.** `service/src/main.cpp` built `ResumeController` with only
   the resume service, so the controller's `artifactService_` stayed null and the

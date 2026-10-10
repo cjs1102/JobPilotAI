@@ -360,4 +360,182 @@ namespace jobpilot::service
         }
     }
 
+    ServiceResult<ExplainedListPage>
+    JobRankingService::ExplainStrictList(
+        std::uint64_t userId,
+        const JobSearchFilter &filter,
+        std::size_t page,
+        std::size_t pageSize)
+    {
+        if (userId == 0)
+        {
+            return ServiceResult<ExplainedListPage>{
+                ErrorCode::kUnauthorized,
+                {}};
+        }
+
+        if (page == 0 ||
+            pageSize == 0 ||
+            pageSize > kMaxPageSize)
+        {
+            return ServiceResult<ExplainedListPage>{
+                ErrorCode::kInvalidParam,
+                {}};
+        }
+
+        JobSearchFilter normalized;
+
+        if (!NormalizeJobSearchFilter(
+                filter,
+                &normalized))
+        {
+            return ServiceResult<ExplainedListPage>{
+                ErrorCode::kInvalidParam,
+                {}};
+        }
+
+        const std::size_t pageIndex = page - 1;
+
+        if (pageIndex >
+            std::numeric_limits<std::size_t>::max() /
+                pageSize)
+        {
+            return ServiceResult<ExplainedListPage>{
+                ErrorCode::kInvalidParam,
+                {}};
+        }
+
+        try
+        {
+            const std::optional<UserProfile> profile =
+                profileReader_.FindProfile(userId);
+            const std::vector<UserSkill> skills =
+                profileReader_.ListSkills(userId);
+
+            const std::size_t matching =
+                jobRankingDao_.CountRankingCandidates(normalized);
+            const std::size_t window = std::min(
+                matching,
+                kMaxRankingCandidates);
+            const std::vector<JobSummary> candidates =
+                jobRankingDao_.SearchListWindow(
+                    normalized,
+                    window);
+
+            std::vector<std::uint64_t> candidateIds;
+            candidateIds.reserve(candidates.size());
+
+            for (const JobSummary &candidate : candidates)
+            {
+                candidateIds.push_back(candidate.id);
+            }
+
+            const std::vector<JobRequirementsRecord>
+                requirementRecords =
+                    jobRankingDao_.ListRequirementsForJobs(
+                        candidateIds);
+
+            std::unordered_map<
+                std::uint64_t,
+                std::vector<JobRequirement>>
+                requirementsByJob;
+
+            for (const JobRequirementsRecord &record :
+                 requirementRecords)
+            {
+                requirementsByJob.emplace(
+                    record.jobId,
+                    record.requirements);
+            }
+
+            const auto now =
+                std::chrono::system_clock::now();
+
+            std::vector<RankedJob> survivors;
+            survivors.reserve(candidates.size());
+
+            for (const JobSummary &candidate : candidates)
+            {
+                if (!EvaluateMatchDealBreakers(
+                         candidate,
+                         profile,
+                         now)
+                         .empty())
+                {
+                    // `strict=true`: an evidence-backed veto excludes the row.
+                    continue;
+                }
+
+                const auto requirements =
+                    requirementsByJob.find(candidate.id);
+                const std::vector<JobRequirement> empty;
+                const std::vector<JobRequirement> &jobRequirements =
+                    requirements != requirementsByJob.end()
+                        ? requirements->second
+                        : empty;
+
+                survivors.push_back(
+                    ScoreJob(
+                        candidate,
+                        jobRequirements,
+                        profile,
+                        skills,
+                        normalized,
+                        now));
+
+                RankedJob &scored = survivors.back();
+                scored.reasons =
+                    ProjectMatchReasons(
+                        candidate,
+                        profile,
+                        scored.matchedSkills,
+                        scored.missingSkills,
+                        now);
+                scored.dealBreakers.clear();
+                scored.deadlineUrgency =
+                    ClassifyDeadlineUrgency(
+                        candidate.deadline,
+                        candidate.deadlineDateOnly,
+                        now);
+            }
+
+            ExplainedListPage result;
+            result.page = page;
+            result.pageSize = pageSize;
+            result.examined = candidates.size();
+            result.total = survivors.size();
+            // The window cap hid candidates we could not examine: say so rather
+            // than returning a total the caller cannot walk.
+            result.truncated = matching > window;
+
+            const std::size_t offset = pageIndex * pageSize;
+
+            if (offset < survivors.size())
+            {
+                const std::size_t end = std::min(
+                    survivors.size(),
+                    offset + pageSize);
+                result.list.assign(
+                    survivors.begin() +
+                        static_cast<std::ptrdiff_t>(offset),
+                    survivors.begin() +
+                        static_cast<std::ptrdiff_t>(end));
+            }
+
+            return ServiceResult<ExplainedListPage>{
+                ErrorCode::kSuccess,
+                std::move(result)};
+        }
+        catch (const std::exception &error)
+        {
+            jobpilot::core::Logger::Get()->error(
+                "strict list explanation failed: {}",
+                error.what());
+
+            return ServiceResult<ExplainedListPage>{
+                ErrorCode::kDatabaseError,
+                {}};
+        }
+    }
+
 } // namespace jobpilot::service

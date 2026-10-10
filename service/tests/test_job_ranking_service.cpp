@@ -44,6 +44,24 @@ namespace jobpilot::service
                 return total;
             }
 
+            std::vector<JobSummary> SearchListWindow(
+                const JobSearchFilter &,
+                std::size_t limit) override
+            {
+                capturedWindowLimit = limit;
+
+                if (candidates.size() > limit)
+                {
+                    return std::vector<JobSummary>(
+                        candidates.begin(),
+                        candidates.begin() +
+                            static_cast<std::ptrdiff_t>(
+                                limit));
+                }
+
+                return candidates;
+            }
+
             std::vector<JobRequirementsRecord>
             ListRequirementsForJobs(
                 const std::vector<std::uint64_t> &) override
@@ -55,6 +73,7 @@ namespace jobpilot::service
             std::vector<JobRequirementsRecord> requirements;
             std::size_t total = 0;
             std::size_t capturedLimit = 0;
+            std::size_t capturedWindowLimit = 0;
         };
 
         class FakeProfileReader final

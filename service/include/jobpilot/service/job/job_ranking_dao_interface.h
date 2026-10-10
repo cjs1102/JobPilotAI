@@ -23,6 +23,13 @@ namespace jobpilot::service
             const JobSearchFilter &filter,
             std::size_t limit) = 0;
 
+        // 0015 B3: candidate window that shares the PUBLIC LIST's ordering
+        // (including `filter.sort`), so a strict-filtered set can be paginated
+        // consistently with the list page.
+        virtual std::vector<JobSummary> SearchListWindow(
+            const JobSearchFilter &filter,
+            std::size_t limit) = 0;
+
         virtual std::size_t CountRankingCandidates(
             const JobSearchFilter &filter) = 0;
 

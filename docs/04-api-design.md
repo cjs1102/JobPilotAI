@@ -392,13 +392,15 @@ GET /api/v1/jobs
 
 **0015 阶段 B 增量契约（B0，全部可选、默认关闭）**
 
-**落地状态（避免文档与代码分歧）**：`with_match=true` **已落地**（`GET /api/v1/jobs` 每行追加
-下表的匹配键；缺省时载荷与今天**逐字节一致**，并有测试断言）；`with_match=true` **需要会话**
-（解释要用画像/技能，与 `/recommended` 同规则，无 token → `401`）。`strict=true` **尚未落地**：
-它在分页前排除 deal-breaker 行，而这需要**按列表排序**的候选窗口——现有 ranking DAO 窗口固定
-`create_time DESC, id DESC` 且忽略 `sort=`，因此今天传 `strict=true` 会**显式 `400`**（绝不静默
-忽略）；语义确定后（新增按 `sort` 排序的窗口查询，或明确 `strict` 仅支持默认排序）再落地。
-`/recommended` 上的 `reasons[]` / `deal_breakers[]` / `deadline_urgency` 已落地（B1）。
+**落地状态（避免文档与代码分歧）**：`with_match` 与 `strict` **均已落地**：
+- `with_match=true`：每行追加下表的匹配键；缺省时载荷与今天**逐字节一致**（有测试断言）；
+- `strict=true`：在**与列表完全相同排序**的候选窗口上先排除 deal-breaker 行再分页，`total` 是
+  **过滤后**可完整遍历的行数（不是未过滤的总数）；窗口受 `kMaxRankingCandidates = 2000` 封顶时，
+  响应带 `"truncated": true`（未封顶或未使用 `strict` 时为 `false`），**绝不**返回与可遍历行数
+  不一致的 `total`；
+- 两者都需要会话（解释/排除要用画像，与 `/recommended` 同规则；无 token → `401`）；
+- 两个参数只接受 `true|false`，其它值或重复出现 → `400`；
+- 使用 `strict=true` 时响应额外带 `truncated` 键（`with_match`/`strict` 都缺省时响应与今天完全一致）。
 
 | 参数 | 默认 | 语义 |
 |---|---|---|

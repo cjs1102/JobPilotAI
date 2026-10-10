@@ -803,8 +803,17 @@ namespace jobpilot::service
             }
         }
 
-        // `strict` is not honoured yet (B3): rejected loudly, never silently
-        // ignored.
+        // 0015 B3: `strict=true` excludes deal-breaker rows. In this fixture the
+        // profile expects 20-35k while `olderId` pays 50-70k (no intersection),
+        // so that row is vetoed and must disappear from the strict page while
+        // `total` counts only the surviving rows.
+        const std::optional<HttpResponseData> strictUnauthenticated =
+            SendRequest(query + "&strict=true");
+
+        ASSERT_TRUE(strictUnauthenticated.has_value());
+        ASSERT_TRUE(strictUnauthenticated->hasJson);
+        EXPECT_EQ(strictUnauthenticated->statusCode, 401);
+
         const std::optional<HttpResponseData> strict =
             SendRequest(
                 query + "&with_match=true&strict=true",
@@ -812,7 +821,57 @@ namespace jobpilot::service
 
         ASSERT_TRUE(strict.has_value());
         ASSERT_TRUE(strict->hasJson);
-        EXPECT_EQ(strict->statusCode, 400);
+        EXPECT_EQ(strict->statusCode, 200);
+
+        const auto strictTotal =
+            strict->jsonBody["data"]["total"].get<std::size_t>();
+
+        EXPECT_EQ(strictTotal + 1U, baseList.size());
+        EXPECT_EQ(strict->jsonBody["data"]["truncated"], false);
+        ASSERT_EQ(strict->jsonBody["data"]["list"].size(), 1U);
+        EXPECT_EQ(
+            strict->jsonBody["data"]["list"][0]["id"],
+            newerId);
+        EXPECT_NE(
+            strict->jsonBody["data"]["list"][0]["id"],
+            olderId);
+
+        // The surviving row still carries the explanation, and the veto is
+        // visible on the excluded row's own explanation via a non-strict page.
+        ASSERT_TRUE(
+            strict->jsonBody["data"]["list"][0].contains("score"));
+        EXPECT_EQ(
+            strict->jsonBody["data"]["list"][0]["score_version"],
+            "rule_v1");
+
+        // The window shares the LIST ordering, so every supported sort yields
+        // the same strict-filtered total (and a consistent page).
+        for (const char *sort :
+             {"created_desc", "deadline_asc", "education_asc"})
+        {
+            const std::optional<HttpResponseData> sorted =
+                SendRequest(
+                    query + "&with_match=true&strict=true&sort=" +
+                        sort,
+                    "Bearer " + token);
+
+            ASSERT_TRUE(sorted.has_value())
+                << sort;
+            ASSERT_TRUE(sorted->hasJson) << sort;
+            EXPECT_EQ(sorted->statusCode, 200) << sort;
+            EXPECT_EQ(
+                sorted->jsonBody["data"]["total"],
+                strictTotal)
+                << sort;
+            ASSERT_EQ(
+                sorted->jsonBody["data"]["list"].size(),
+                1U)
+                << sort;
+            EXPECT_EQ(
+                sorted->jsonBody["data"]["list"][0]["id"],
+                newerId)
+                << sort;
+        }
 
         // A non-boolean flag value is a 400 like every other parameter.
         const std::optional<HttpResponseData> badFlag =
@@ -821,6 +880,13 @@ namespace jobpilot::service
         ASSERT_TRUE(badFlag.has_value());
         ASSERT_TRUE(badFlag->hasJson);
         EXPECT_EQ(badFlag->statusCode, 400);
+
+        const std::optional<HttpResponseData> badStrict =
+            SendRequest(query + "&strict=maybe");
+
+        ASSERT_TRUE(badStrict.has_value());
+        ASSERT_TRUE(badStrict->hasJson);
+        EXPECT_EQ(badStrict->statusCode, 400);
     }
 
     TEST_F(JobHttpTest, ReturnsDeterministicRecommendations)

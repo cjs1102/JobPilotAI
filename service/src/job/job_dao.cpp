@@ -14,6 +14,42 @@ namespace jobpilot::service
 {
     namespace
     {
+        // 0015 B3: the public list SELECT prefix (projection + FROM) and the
+        // ORDER BY are shared by `SearchJobs`, `SearchRankingCandidates` and the
+        // strict candidate window, so row shape and row order can never diverge
+        // between the page and the strict-filtered window.
+        constexpr const char *kJobSummarySelect =
+            "SELECT j.id, j.company, j.title, j.location, "
+            "j.salary_min, j.salary_max, j.salary_currency, "
+            "j.source, j.create_time, j.update_time, "
+            "j.published_at, j.last_seen_at, j.last_verified_at, "
+            "j.source_status, j.closed_at, "
+            "j.education_required, j.experience_years_min, "
+            "j.experience_years_max, j.job_nature, j.deadline, "
+            "j.deadline_date_only, "
+            "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()), "
+            "j.source_url "
+            "FROM jobs j";
+
+        // Whitelisted sort orders only; never string-interpolated from the
+        // request. kDeadlineAsc is index-backed (docs/03 section 9.2) and
+        // therefore uses the consistent "ASC, ASC" direction (NULLs first).
+        const char *ListOrderBy(
+            JobSort sort)
+        {
+            switch (sort)
+            {
+            case JobSort::kDeadlineAsc:
+                return " ORDER BY j.deadline ASC, j.id ASC ";
+            case JobSort::kEducationAsc:
+                return " ORDER BY j.education_required ASC, j.id ASC ";
+            case JobSort::kCreatedDesc:
+                break;
+            }
+
+            return " ORDER BY j.create_time DESC, j.id DESC ";
+        }
+
         struct JobFilter
         {
             std::string sql;
@@ -455,21 +491,6 @@ namespace jobpilot::service
         const JobFilter sqlFilter =
             BuildJobFilter(filter);
 
-        // 0015A: whitelisted sort orders only; never string-interpolated from
-        // the request. kDeadlineAsc is index-backed (docs/03 section 9.2) and
-        // therefore uses the consistent "ASC, ASC" direction (NULLs first).
-        std::string orderBy =
-            " ORDER BY j.create_time DESC, j.id DESC ";
-
-        if (filter.sort == JobSort::kDeadlineAsc)
-        {
-            orderBy = " ORDER BY j.deadline ASC, j.id ASC ";
-        }
-        else if (filter.sort == JobSort::kEducationAsc)
-        {
-            orderBy = " ORDER BY j.education_required ASC, j.id ASC ";
-        }
-
         std::vector<jobpilot::core::SqlParam> params =
             sqlFilter.params;
         params.emplace_back(
@@ -479,19 +500,9 @@ namespace jobpilot::service
 
         const jobpilot::core::Result result =
             pool_.Query(
-                "SELECT j.id, j.company, j.title, j.location, "
-                "j.salary_min, j.salary_max, j.salary_currency, "
-                "j.source, j.create_time, j.update_time, "
-                "j.published_at, j.last_seen_at, j.last_verified_at, "
-                "j.source_status, j.closed_at, "
-                "j.education_required, j.experience_years_min, "
-                "j.experience_years_max, j.job_nature, j.deadline, "
-                "j.deadline_date_only, "
-                "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()), "
-                "j.source_url "
-                "FROM jobs j" +
+                std::string(kJobSummarySelect) +
                     sqlFilter.sql +
-                    orderBy +
+                    ListOrderBy(filter.sort) +
                     "LIMIT ? OFFSET ?",
                 params);
 
@@ -548,19 +559,46 @@ namespace jobpilot::service
 
         const jobpilot::core::Result result =
             pool_.Query(
-                "SELECT j.id, j.company, j.title, j.location, "
-                "j.salary_min, j.salary_max, j.salary_currency, "
-                "j.source, j.create_time, j.update_time, "
-                "j.published_at, j.last_seen_at, j.last_verified_at, "
-                "j.source_status, j.closed_at, "
-                "j.education_required, j.experience_years_min, "
-                "j.experience_years_max, j.job_nature, j.deadline, "
-                "j.deadline_date_only, "
-                "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()), "
-                "j.source_url "
-                "FROM jobs j" +
+                std::string(kJobSummarySelect) +
                     sqlFilter.sql +
                     " ORDER BY j.create_time DESC, j.id DESC "
+                    "LIMIT ?",
+                params);
+
+        std::vector<JobSummary> jobs;
+        jobs.reserve(result.rowCount());
+
+        for (std::size_t row = 0;
+             row < result.rowCount();
+             ++row)
+        {
+            jobs.push_back(
+                MakeJobSummary(result.row(row), 22));
+        }
+
+        return jobs;
+    }
+
+    // 0015 B3: the strict candidate window. Same predicate and the SAME ORDER BY
+    // as the public list page, so the strict-filtered set and its total describe
+    // exactly the rows a caller can walk.
+    std::vector<JobSummary> JobDao::SearchListWindow(
+        const JobSearchFilter &filter,
+        std::size_t limit)
+    {
+        const JobFilter sqlFilter =
+            BuildJobFilter(filter);
+
+        std::vector<jobpilot::core::SqlParam> params =
+            sqlFilter.params;
+        params.emplace_back(
+            static_cast<std::uint64_t>(limit));
+
+        const jobpilot::core::Result result =
+            pool_.Query(
+                std::string(kJobSummarySelect) +
+                    sqlFilter.sql +
+                    ListOrderBy(filter.sort) +
                     "LIMIT ?",
                 params);
 

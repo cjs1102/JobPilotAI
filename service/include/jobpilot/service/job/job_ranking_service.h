@@ -23,6 +23,19 @@ namespace jobpilot::service
         std::size_t pageSize = 20;
     };
 
+    // 0015 B3: strict list page. `total` counts the strict-FILTERED set (the
+    // rows a caller can actually walk), and `truncated` states whether the
+    // candidate window cap hid unexamined candidates.
+    struct ExplainedListPage
+    {
+        std::vector<RankedJob> list;
+        std::size_t total = 0;
+        std::size_t examined = 0;
+        bool truncated = false;
+        std::size_t page = 1;
+        std::size_t pageSize = 20;
+    };
+
     class JobRankingService
     {
     public:
@@ -48,6 +61,15 @@ namespace jobpilot::service
             std::uint64_t userId,
             const JobSearchFilter &filter,
             const std::vector<JobSummary> &jobs);
+
+        // 0015 B3: the strict (`strict=true`) list page. Candidate window in the
+        // LIST's ordering -> deal-breaker exclusion -> page. `total` is the
+        // strict-filtered count; `truncated` marks a capped window.
+        ServiceResult<ExplainedListPage> ExplainStrictList(
+            std::uint64_t userId,
+            const JobSearchFilter &filter,
+            std::size_t page,
+            std::size_t pageSize);
 
     private:
         IJobRankingDao &jobRankingDao_;

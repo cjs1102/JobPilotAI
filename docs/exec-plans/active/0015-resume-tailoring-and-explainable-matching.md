@@ -693,14 +693,13 @@ Stop and report to the Lead (do not widen scope) if:
         (decision 5). `RankedJob` carries the projection; `/recommended` exposes it.
   - [x] B2: reasons[] on the list payload via `JobRankingService::ExplainJobs` (same seam as
         `/recommended`).
-  - [~] B3/B4 writers: `with_match=true` on `GET /api/v1/jobs` is landed (7 additive keys,
-        total/page/ordering parity, byte-identical when absent, session required).
-        **`strict=true` is NOT landed**: pre-pagination exclusion needs the candidate window
-        in the list's ordering, while `SearchRankingCandidates` hardcodes
-        `create_time DESC, id DESC` and ignores `sort=` (evidence: `job_dao.cpp:537-579`), so
-        the parameter returns `400` today (never silently ignored). Resolution options: add a
-        `sort`-honouring window query (shared ORDER BY), or contract `strict` as
-        default-ordering-only.
+  - [x] B3/B4 writers: `with_match=true` and `strict=true` on `GET /api/v1/jobs` are landed.
+        `SearchJobs`, its count and the new strict candidate window share ONE ordering helper
+        (`ListOrderBy` in `job_dao.cpp`) plus one SELECT prefix, so they can never diverge;
+        the strict window is paginated in the list's ordering, `total` counts the
+        strict-filtered set, and a capped window (2000) is surfaced as `truncated: true`.
+        Both parameters require a session, accept only `true|false`, and `with_match` absent
+        is byte-identical (asserted in `test_job_http`).
 - [ ] Phase C: decision 2 (C1) → implement (C2) → docs (C3)
 - [ ] Phase D: decisions 1/3 (D0) → contract (D1) → `tailor_rule_v1` (D2) →
       artifact persistence (D3) → fact gate (D4) → confirmation boundary (D5) →

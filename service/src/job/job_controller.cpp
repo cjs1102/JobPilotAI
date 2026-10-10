@@ -682,6 +682,44 @@ namespace jobpilot::service
             }
         }
 
+        // 0015 B2/B4: the additive match keys. Shared by the `with_match` list
+        // path and the `strict` list path so both emit the same contract.
+        void AddMatchExplanation(
+            Json *item,
+            const RankedJob &ranked)
+        {
+            Json reasons = Json::array();
+
+            for (const MatchReason &reason : ranked.reasons)
+            {
+                reasons.push_back(
+                    Json{
+                        {"code", reason.code},
+                        {"text", reason.text},
+                        {"evidence", reason.evidence}});
+            }
+
+            Json dealBreakers = Json::array();
+
+            for (const MatchDealBreaker &breaker :
+                 ranked.dealBreakers)
+            {
+                dealBreakers.push_back(
+                    Json{
+                        {"code", breaker.code},
+                        {"text", breaker.text}});
+            }
+
+            (*item)["score"] = ranked.score;
+            (*item)["score_version"] = ranked.scoreVersion;
+            (*item)["matched_skills"] = ranked.matchedSkills;
+            (*item)["missing_skills"] = ranked.missingSkills;
+            (*item)["reasons"] = std::move(reasons);
+            (*item)["deal_breakers"] = std::move(dealBreakers);
+            (*item)["deadline_urgency"] =
+                ToString(ranked.deadlineUrgency);
+        }
+
         Json SummaryToJson(
             const JobSummary &summary)
         {
@@ -816,26 +854,15 @@ namespace jobpilot::service
             return;
         }
 
-        // 0015 B3: `strict` turns the deal-breakers into an exclusion. Excluding
-        // before pagination needs the search-ordered candidate window (the
-        // ranking DAO window ignores `sort=`), which is not wired yet, so the
-        // parameter is rejected loudly instead of being silently ignored.
-        if (query.filter.strict)
-        {
-            WriteResponse(
-                &response,
-                request.KeepAlive(),
-                ErrorCode::kInvalidParam,
-                nullptr);
-            return;
-        }
+        // 0015 B3: `strict` turns the deal-breakers into an exclusion. Both
+        // `strict` and `with_match` need the caller's profile/skills.
+        const bool needsMatch =
+            query.filter.withMatch || query.filter.strict;
 
         std::optional<std::uint64_t> matchUserId;
 
-        if (query.filter.withMatch)
+        if (needsMatch)
         {
-            // The explanation needs the caller's profile/skills, so
-            // `with_match=true` requires a session (same rule as /recommended).
             matchUserId = AuthenticateRequest(
                 request,
                 &response,
@@ -845,6 +872,59 @@ namespace jobpilot::service
             {
                 return;
             }
+        }
+
+        if (query.filter.strict)
+        {
+            // Strict page: the candidate window shares the LIST's ordering, so
+            // the strict-filtered total describes exactly the rows the caller
+            // can walk for every `sort`.
+            const ServiceResult<ExplainedListPage>
+                strictPage =
+                    rankingService_->ExplainStrictList(
+                        matchUserId.value(),
+                        query.filter,
+                        query.page,
+                        query.pageSize);
+
+            if (strictPage.code != ErrorCode::kSuccess)
+            {
+                WriteResponse(
+                    &response,
+                    request.KeepAlive(),
+                    strictPage.code,
+                    nullptr);
+                return;
+            }
+
+            Json strictList = Json::array();
+
+            for (const RankedJob &ranked :
+                 strictPage.value.list)
+            {
+                Json item = SummaryToJson(ranked.job);
+
+                if (query.filter.withMatch)
+                {
+                    AddMatchExplanation(&item, ranked);
+                }
+
+                strictList.push_back(std::move(item));
+            }
+
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kSuccess,
+                Json{
+                    {"list", std::move(strictList)},
+                    {"total", strictPage.value.total},
+                    {"page", strictPage.value.page},
+                    {"page_size", strictPage.value.pageSize},
+                    // Explicit: a capped candidate window never silently drops
+                    // rows from the total.
+                    {"truncated", strictPage.value.truncated}});
+            return;
         }
 
         const ServiceResult<JobPage> result =
@@ -902,39 +982,7 @@ namespace jobpilot::service
             {
                 const RankedJob &ranked = explained[index];
 
-                Json reasons = Json::array();
-
-                for (const MatchReason &reason : ranked.reasons)
-                {
-                    reasons.push_back(
-                        Json{
-                            {"code", reason.code},
-                            {"text", reason.text},
-                            {"evidence", reason.evidence}});
-                }
-
-                Json dealBreakers = Json::array();
-
-                for (const MatchDealBreaker &breaker :
-                     ranked.dealBreakers)
-                {
-                    dealBreakers.push_back(
-                        Json{
-                            {"code", breaker.code},
-                            {"text", breaker.text}});
-                }
-
-                item["score"] = ranked.score;
-                item["score_version"] = ranked.scoreVersion;
-                item["matched_skills"] =
-                    ranked.matchedSkills;
-                item["missing_skills"] =
-                    ranked.missingSkills;
-                item["reasons"] = std::move(reasons);
-                item["deal_breakers"] =
-                    std::move(dealBreakers);
-                item["deadline_urgency"] =
-                    ToString(ranked.deadlineUrgency);
+                AddMatchExplanation(&item, ranked);
             }
 
             list.push_back(std::move(item));

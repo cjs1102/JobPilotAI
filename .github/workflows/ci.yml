@@ -156,6 +156,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The documented local flow, and the reason this step exists: compose
+      # refuses to interpolate the service at all without the variables .env
+      # provides (`required variable MYSQL_PASSWORD is missing`), so building the
+      # image straight from a checkout fails before it can pull anything.
+      - name: Provide the compose environment
+        run: cp .env.example .env
+
       - name: Build the committed image
         run: docker compose --profile app build backend
 

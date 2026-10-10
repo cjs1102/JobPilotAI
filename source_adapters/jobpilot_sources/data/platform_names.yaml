@@ -1,0 +1,31 @@
+# 0015A platform-name registry — SINGLE source of truth.
+#
+# Read by BOTH the Python capture/adapters package
+# (jobpilot_sources/capture/... via jobpilot_sources.registry) and the C++ service
+# (service/src/job/job_quality.cpp). There must never be a second hard-coded
+# platform list in either language (test-asserted).
+#
+# Owner: the project maintainer. Entries are compared after normalisation
+# (trim + lower-case + strip the suffixes 网 / 官网 / 招聘 / 招聘网 / 人才网),
+# so `牛客` also matches `牛客网`. The registry is deliberately small and
+# curated: an unknown name must NEVER trigger a review (fail-open).
+version: 1
+platform_names:
+  - 牛客
+  - 实习僧
+  - 国聘
+  - 智联招聘
+  - 前程无忧
+  - 中华英才网
+  - 应届生求职网
+  - 大街网
+  - 猎聘
+  - 拉勾
+  - 看准
+  - 职友集
+  - nowcoder
+  - boss直聘
+  - 51job
+  - lagou
+  - liepin
+  - zhaopin

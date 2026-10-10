@@ -690,3 +690,54 @@ ALTER TABLE profiles
 `with_match`/`strict` 也不改变 `BuildJobFilter` 的谓词（`strict` 只在已解释的行上做排除）。
 若后续把学历/性质变成 SQL 过滤，再以 `EXPLAIN` 实测决定（`idx_job_nature_education` 仍按
 「无证据不加」处理）。
+
+### 10.6 0015 阶段 D：`resume_artifacts`（0015 唯一新表）
+
+```sql
+CREATE TABLE IF NOT EXISTS resume_artifacts (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id           BIGINT UNSIGNED NOT NULL,
+  job_id            BIGINT UNSIGNED DEFAULT NULL,
+  application_id    BIGINT UNSIGNED DEFAULT NULL,
+  base_version_id   BIGINT UNSIGNED NOT NULL,   -- 派生自哪一条 resume_versions
+  artifact_type     VARCHAR(16)  NOT NULL,      -- 本阶段只用 'resume'
+  language          VARCHAR(8)   NOT NULL DEFAULT 'zh',
+  content           MEDIUMTEXT   DEFAULT NULL,  -- ATS 纯文本草稿
+  file_path         VARCHAR(255) DEFAULT NULL,  -- 可选渲染产物（本阶段不产生）
+  content_bytes     INT UNSIGNED DEFAULT NULL,  -- 存 content 时一并写入
+  generator         VARCHAR(32)  NOT NULL,      -- 'rule_v1' | 'llm' | 'manual'
+  source_version    VARCHAR(32)  DEFAULT NULL,  -- 'tailor_rule_v1'
+  fact_check_status TINYINT      NOT NULL DEFAULT 0, -- 0 未检查 / 1 通过 / 2 失败
+  fact_check_report JSON         DEFAULT NULL,
+  confirmed_at      DATETIME     DEFAULT NULL,  -- **人工**确认时刻（阶段 D 边界）
+  create_time       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_user_job (user_id, job_id),
+  KEY idx_application (application_id),
+  KEY idx_base_version (base_version_id),
+  KEY idx_user_type_created (user_id, artifact_type, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='简历定制产物(草稿/确认)';
+```
+
+**不变量**
+
+- **归属复用既有校验**：写入前 `base_version_id` 必须指向该用户自己的
+  `resume_versions.id`，通过既有接缝 `IResumeDao::OwnedVersionExists` 判定；不存在或非本人
+  按既有 not-found 语义返回（不新增校验路径）。`application_id` 指向 `applications.id` 并沿用其
+  既有 `resume_version_id` 作为「提交了什么」的锚点；`job_id` 指向 `jobs.id`。
+- **不复制事实来源**：本表只存**派生**产物与其来源标注，绝不成为 `resumes`/`resume_versions`
+  正文的第二个真相源（`base_version_id` 永远可回溯）。
+- `artifact_type` 本阶段只写 `'resume'`（owner 决策 1：出简历，不做 cover letter）。
+- `fact_check_status`：`0` 未检查 / `1` 通过 / `2` 失败。**`2` 阻止 `confirmed_at`**，也阻止任何
+  下游使用（本阶段下游仅有读取展示）。
+- `confirmed_at IS NULL` = **草稿**；非空 = 人工确认。确认是**纯状态变更**；0015 不新增任何
+  提交/投递能力（代码与 API 中都不得出现）。
+- `generator='rule_v1'` + `source_version='tailor_rule_v1'` 表示**无需 AI key** 的确定性草稿；
+  可选 worker 措辞润色只能**增加措辞**，不得改动事实、分数或生命周期。
+- `content` 与 `content_bytes` 一致；`content` 为 UTF-8 纯文本（ATS 优先），本阶段不渲染
+  PDF/DOCX（`file_path` 为后续可选路径）。
+
+**既有库升级（新表，不是 ALTER）**：在既有库上执行上面的 `CREATE TABLE IF NOT EXISTS`
+即可，幂等；不需要回填、不改既有列。全新安装走 `database/schema/07_resume_artifact.sql`
+（下一个空号），并由 `backend/tests/test_schema.cpp` 在**fresh DDL 库**与**迁移库**上同时断言
+（0014/0015A 既有纪律）。

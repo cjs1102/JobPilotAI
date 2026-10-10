@@ -50,6 +50,7 @@ add_library(jobpilot_service_core STATIC
     src/resume/resume_dao.cpp
     src/resume/resume_service.cpp
     src/resume/resume_text_status.cpp
+    src/resume/tailor_rule.cpp
     src/user/user_controller.cpp
     src/user/user_dao.cpp
     src/user/user_service.cpp
@@ -459,6 +460,7 @@ if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         test_resume_dao
         test_resume_service
         test_resume_http
+        test_tailor_rule
         test_job_dao
         test_job_ingestion_dao
         test_job_ingestion_service
@@ -518,6 +520,24 @@ gtest_discover_tests(
     test_resume_http
     PROPERTIES
         LABELS "resume;integration;tsan"
+)
+
+add_executable(
+    test_tailor_rule
+    tests/test_tailor_rule.cpp
+)
+
+target_link_libraries(
+    test_tailor_rule
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+gtest_discover_tests(
+    test_tailor_rule
+    PROPERTIES
+        LABELS "resume;tsan"
 )
 
 gtest_discover_tests(

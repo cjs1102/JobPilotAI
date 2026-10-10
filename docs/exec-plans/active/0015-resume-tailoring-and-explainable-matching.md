@@ -714,6 +714,29 @@ Stop and report to the Lead (do not widen scope) if:
 - [ ] Phase D: decisions 1/3 (D0) → contract (D1) → `tailor_rule_v1` (D2) →
       artifact persistence (D3) → fact gate (D4) → confirmation boundary (D5) →
       worker (D6, conditional) → docs + single L4 (D7)
+  - [x] D0 (owner decisions recorded): decision 1 = **RESUME ONLY** — no cover letters in this
+        stage (`artifact_type` only `'resume'`); decision 3 = **deterministic `tailor_rule_v1`**
+        draft with no AI key (ADR-0009), with an optional ai_worker pass allowed only to ADD
+        wording, never facts/scores/lifecycle.
+  - [x] D1 (contract): `docs/03` §10.6 — `resume_artifacts` DDL + invariants (ownership via
+        `OwnedVersionExists`, no fact-source duplication, `fact_check_status` 0/1/2 with 2 blocking
+        `confirmed_at`, `confirmed_at IS NULL` = draft, no submission path) + the new-table
+        migration; `docs/04` §9 — provenance tags, placeholder rule, fact gate, confirmation
+        boundary, ATS formatting.
+  - [x] D2 (`tailor_rule_v1`): pure `BuildTailorDraft` (`tailor_rule.h/.cpp`) — deterministic
+        Chinese ATS plain text from profile + chosen resume version + job requirements, every
+        asserted fact provenance-tagged, anything underivable becomes `【请填写：…】`, no LLM in
+        the path; `test_tailor_rule` 5/5 (determinism, provenance, no-invention, matched/missing
+        requirements, ATS section contract).
+  - [ ] D3: artifact persistence (new `07_resume_artifact.sql` + DAO + ownership checks +
+        `test_schema` on fresh AND migrated DBs, new `test_resume_artifact_dao`).
+  - [ ] D4: mechanical fact-provenance gate + persistence (fail ⇒ `fact_check_status=2` ⇒
+        confirmation blocked).
+  - [ ] D5: human-confirmation boundary + artifact read endpoints (draft vs confirmed; **no
+        submission endpoint exists**).
+  - [ ] D6 (conditional, only if the worker path is chosen): ai_worker `resume_optimize`
+        wording-only pass.
+  - [ ] D7: docs sync (README/AGENTS/project-state) + the stage's single L4.
 
 ## 15. Smallest First Implementable Unit
 

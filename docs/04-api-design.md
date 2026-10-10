@@ -1231,3 +1231,54 @@ python3 tools/job_report/render_report.py \
   不访问数据库，不改任何状态。缺少数据时报告显式留白，绝不触发写路径。
 - 生成方式与内容说明见 `tools/job_report/README.md`；测试见
   `tools/job_report/tests/test_render_report.py`。
+
+---
+
+## 9. 简历定制产物（0015 阶段 D，决策 1 = 仅简历；决策 3 = 确定性草稿优先）
+
+**生成契约（无 AI key 也能出草稿）**
+
+- 草稿由 C++ 侧**确定性**产生：`generator='rule_v1'`、`source_version='tailor_rule_v1'`
+  （ADR-0009：不能因为没有 API key 就没有产物）。
+- 可选 worker/LLM 通道**只允许增加措辞**：不得新增/修改事实、不得影响分数或生命周期，
+  规则草稿在 worker 失败时依然存在（0013 的 `rule_result` 同款约束）。
+- 本阶段只产出**简历**（`artifact_type='resume'`），不做 cover letter。
+
+**事实来源标注（每条断言必须可回溯）**
+
+草稿中每一条被断言的事实都带来源标注，取值集合固定：
+
+| 来源标注 | 含义 |
+|---|---|
+| `profile:<field>` | 画像字段（`target_position` / `location` / `salary` / `education_level` / `graduation_year` / `campus_status` / `summary` / `name` / `email`） |
+| `skill:<name>` | 技能记录（`skills` 表） |
+| `requirement:<skill>` | 岗位要求（`job_requirements`） |
+| `job:<field>` | 岗位字段（`title` / `company`） |
+| `resume_version:content` | 选定简历版本的正文（逐字引用） |
+
+- **无法从来源导出的内容一律是占位符** `【请填写：<字段>】`，由人工补全；**绝不编造**
+  （无姓名就写占位符，不生成假姓名/假电话/假年份）。
+- 缺失的岗位要求技能以「岗位要求待补充」陈述，属**岗位要求**这一来源的事实，不是对候选人的否定。
+
+**机械事实门（D4，尚未落地）**
+
+- 确定性函数：把草稿中每条断言映射回来源事实；无法映射的断言 → 失败。
+- 结果持久化在 `fact_check_status` + `fact_check_report`（见 `docs/03` §10.6）；
+  **`fact_check_status=2` 阻止确认**。
+
+**人工确认边界（硬）**
+
+- `confirmed_at IS NULL` = 草稿；确认后仍是「已关联（岗位/投递）」，**从未被发送**。
+- 0015 **不新增任何提交/投递接口**：没有 POST 到外部、没有自动投递、没有后台代投。
+- 确认只做状态变更，不触发任何发送行为。
+
+**ATS 格式契约（中文）**
+
+- UTF-8 纯文本优先；固定小节顺序与稳定标题（`【个人信息】`/`【求职意向】`/`【技能】`/
+  `【教育背景】`/`【自我评价】`/`【职位匹配说明】`/`【原始简历文本】`）；
+- 不使用表格排版、不使用制表符/竖线分隔、无图片内容；渲染版式（PDF/DOCX）属可选外部工具，
+  不在核心内（Out-of-scope 9）。
+
+**当前落地状态**：D2 已落地为**纯函数** `BuildTailorDraft`
+（`service/include/jobpilot/service/resume/tailor_rule.h`，测试 `test_tailor_rule`）；
+持久化（D3）、事实门（D4）、确认边界与读取接口（D5）**尚未落地**，契约如上。

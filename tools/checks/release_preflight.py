@@ -47,6 +47,13 @@ PRIVATE_IPV4 = re.compile(
     r"\b(?:10\.\d{1,3}|192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}\b"
 )
 
+# A developer-machine path is not a secret, but it has no business in a public
+# release: the tree keeps its evidence reproducible without naming anybody's
+# home directory (the 0017 overlap audit was caught by this).
+LOCAL_ABSOLUTE_PATH = re.compile(
+    r"(?:/home/[A-Za-z0-9._-]+/|/Users/[A-Za-z0-9._-]+/|[A-Za-z]:\\\\Users\\\\[A-Za-z0-9._-]+\\\\)"
+)
+
 # A private address inside a test source is a fixture (the SSRF/guard tests need
 # one), not leaked infrastructure. Anything else is a finding.
 TEST_PATH = re.compile(r"(^|/)tests?/|(^|/)test_[^/]*$")
@@ -173,6 +180,26 @@ def check_secrets(root: Path) -> tuple[str, list[str]]:
     if findings:
         return FAIL, evidence + [f"  {entry}" for entry in findings]
     evidence.append("no secret shape and no non-test private address found")
+    return PASS, evidence
+
+
+def check_local_paths(root: Path) -> tuple[str, list[str]]:
+    """Absolute developer-machine paths must not reach a public release."""
+    findings: list[str] = []
+    scanned = 0
+    for name in tracked_files(root):
+        text = read_text(root / name)
+        if text is None:
+            continue
+        scanned += 1
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            match = LOCAL_ABSOLUTE_PATH.search(line)
+            if match:
+                findings.append(f"{name}:{line_number}: {match.group(0)}<...>")
+    evidence = [f"scanned {scanned} tracked text files"]
+    if findings:
+        return FAIL, evidence + [f"  {entry}" for entry in findings]
+    evidence.append("no absolute developer-machine path found")
     return PASS, evidence
 
 
@@ -310,6 +337,7 @@ def main(argv: list[str] | None = None) -> int:
         ("license", lambda: check_license(root)),
         ("notices", lambda: check_notices(root)),
         ("secrets", lambda: check_secrets(root)),
+        ("local-paths", lambda: check_local_paths(root)),
         ("readme", lambda: check_readme(root)),
         ("links", lambda: check_links(root)),
         ("workflows", lambda: check_workflows(root)),

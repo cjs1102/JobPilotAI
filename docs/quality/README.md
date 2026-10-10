@@ -86,12 +86,14 @@ python3 tools/checks/release_preflight.py --allow-dirty   # preparation only
   the report's `audit-counts` marker disagrees with the map, and the negative
   controls in report §7.2 show each of those exits non-zero. It runs in the CI
   `integration` job right after the suite.
-- `release_preflight.py` (0017-D) is the automated half of
+- `release_preflight.py` (0017-D, extended in 0017A) is the automated half of
   [`../RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md): licence, the
   `service/conanfile.txt` dependency list against `THIRD_PARTY_NOTICES.md`, secret
-  and private-address scans, the README-for-outsiders checks, relative links,
-  actionlint on every workflow, and repository hygiene. A `SKIP` (for example
-  actionlint is not installed) is never reported as green.
+  and private-address scans, an absolute-developer-path scan, the
+  README-for-outsiders checks, relative links, actionlint on every workflow, and
+  repository hygiene. A `SKIP` (for example actionlint is not installed) is never
+  reported as green. The checklist's section 7 records the one-off
+  *history* scan, which is too slow for every run.
 - `../dev/ci-status.sh` (0017, added when the owner supplied a read-only token)
   reads GitHub Actions runs, per-job durations and conclusions without `gh`. The
   token comes from `$GITHUB_TOKEN`/`$GH_TOKEN` or

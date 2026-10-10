@@ -1,7 +1,7 @@
 # Test Overlap Audit — 0017-B
 
 Deliverable of ExecPlan 0017 §5.2 / §7 unit B. Remote workspace
-`dev@<dev-host>:/home/dev/projects/JobPilotAI` (the private host address is redacted, as
+`dev@<dev-host>:<repo>` (the private host address is redacted, as
 `tools/checks/release_preflight.py` requires of every tracked file), release preset
 `build/presets/release`.
 The audit was computed against HEAD `a4d1f5f`; the test sources are unchanged at the current HEAD
@@ -664,7 +664,7 @@ test_coverage_map: FAIL (309 -> 308, removed=1, survivors=1, live=309)
 --- exit code: 1
 
 ### control c1_counts_vs_live_ctest
-$ python3 tools/checks/test_coverage_map.py --test-dir build/presets/release --map /tmp/audit17/neg/c1_counts_vs_live_ctest.json --report /home/dev/projects/JobPilotAI/docs/quality/test-overlap-audit.md
+$ python3 tools/checks/test_coverage_map.py --test-dir build/presets/release --map /tmp/audit17/neg/c1_counts_vs_live_ctest.json --report <repo>/docs/quality/test-overlap-audit.md
 --- stdout ---
 OK   map: /tmp/audit17/neg/c1_counts_vs_live_ctest.json (schema_version 1)
 OK   live: 309 cases in build/presets/release (ctest -N, exit 0)
@@ -692,7 +692,7 @@ test_coverage_map: FAIL (309 -> 309, removed=0, survivors=0, live=309)
 --- exit code: 1
 
 ### control d_missing_proof_block
-$ python3 tools/checks/test_coverage_map.py --test-dir build/presets/release --map /tmp/audit17/neg/d_missing_proof_block.json --report /home/dev/projects/JobPilotAI/docs/quality/test-overlap-audit.md
+$ python3 tools/checks/test_coverage_map.py --test-dir build/presets/release --map /tmp/audit17/neg/d_missing_proof_block.json --report <repo>/docs/quality/test-overlap-audit.md
 --- stdout ---
 OK   map: /tmp/audit17/neg/d_missing_proof_block.json (schema_version 1)
 FAIL structure: removed[0] missing key 'proof'
@@ -701,7 +701,7 @@ FAIL test_coverage_map: invalid map structure
 --- exit code: 1
 
 ### control e_invalid_json
-$ python3 tools/checks/test_coverage_map.py --test-dir build/presets/release --map /tmp/audit17/neg/e_invalid_json.json --report /home/dev/projects/JobPilotAI/docs/quality/test-overlap-audit.md
+$ python3 tools/checks/test_coverage_map.py --test-dir build/presets/release --map /tmp/audit17/neg/e_invalid_json.json --report <repo>/docs/quality/test-overlap-audit.md
 --- stdout ---
 FAIL map: invalid JSON in /tmp/audit17/neg/e_invalid_json.json: Expecting property name enclosed in double quotes: line 1 column 34 (char 33)
 FAIL test_coverage_map: /tmp/audit17/neg/e_invalid_json.json could not be loaded
@@ -719,7 +719,7 @@ claims to guard, and to pass on the frozen tree (§7.1).
 ## 8. Reproduce
 
 ```bash
-cd /home/dev/projects/JobPilotAI
+cd <repo>
 ctest --test-dir build/presets/release -N | tail -2          # Total Tests: 309
 python3 tools/checks/test_coverage_map.py \
   --test-dir build/presets/release \

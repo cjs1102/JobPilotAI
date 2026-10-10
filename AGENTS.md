@@ -9,7 +9,10 @@ Current phase: **0015 resume tailoring and explainable matching is complete and
 archived** (`docs/exec-plans/completed/0015-resume-tailoring-and-explainable-matching.md`),
 closing with a green L4 at HEAD `26e2069`: Debug / ASan / UBSan `100% tests
 passed, 0 tests failed out of 309` with sanitizer diagnostics 0 (Phase D landed
-through D5; D6 deferred by owner decision, plan §17). **No plan is active.** The
+through D5; D6 deferred by owner decision, plan §17). **No plan is approved for
+implementation**: the **0016 open-source packaging** plan is drafted and awaiting
+owner review (`docs/exec-plans/active/0016-open-source-packaging.md`), and no
+production code may be written before that review. The
 0015A job-list usability / intake-quality hardening is also closed and archived
 (`docs/exec-plans/completed/0015A-job-list-usability-and-intake-quality.md`) with a
 clean L4, and 0013 AI Matching (Steps 1-10) and 0014 China Campus Sources + Manual

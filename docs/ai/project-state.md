@@ -2,8 +2,8 @@
 
 > Snapshot: 2026-10-10
 >
-> Baseline HEAD: `ae85868 feat(resume): expose the human-confirmed
-> tailored-artifact endpoints`
+> Baseline HEAD: `d17cd89 docs: record the bookmarklet's real-browser extraction
+> step as partly verified`
 >
 > 0010 Job Ingestion, the Architecture Re-Research, 0011 Job Search / Ranking,
 > 0012 Steps 1-8 (freshness schema, source observation domain, Source Sync
@@ -14,9 +14,11 @@
 > Phase D landed through D5 (L2-verified at `ae85868`; D6 deferred by owner
 > decision) and the stage's single L4 passed at HEAD `26e2069`
 > (`## Completed Plan (0015)`; raw lines in `## Verified Snapshot`). **No plan is
-> active.** 0014's Step 5 is environment-limited and carried forward (see the
-> Completed Plan section and `## Next Entry` items 6/7). **0016 open-source
-> packaging** is next.
+> approved for implementation**: the **0016 open-source packaging** plan is
+> drafted and awaiting owner review
+> (`../exec-plans/active/0016-open-source-packaging.md`), and no production code
+> may be written before that review. 0014's Step 5 is environment-limited and
+> carried forward (see the Completed Plan section and `## Next Entry` items 6/7).
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -78,8 +80,9 @@ are preserved in
 - **0015 (resume tailoring and explainable matching) is complete and archived**,
   and **0015A (job-list usability and intake quality) is closed and archived**;
   0014's Step 5 carry-forward is unchanged. Details: `## Completed Plan (0015)`
-  and `## Completed Plan (0015A)` below. **No plan is active**; **0016
-  open-source packaging** is next.
+  and `## Completed Plan (0015A)` below. **No plan is approved for
+  implementation**: the **0016 open-source packaging** plan is drafted and awaits
+  owner review (`../exec-plans/active/0016-open-source-packaging.md`).
 
 The revised architecture direction is:
 [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md).
@@ -424,7 +427,10 @@ Performance baseline:
    `completed/0015-resume-tailoring-and-explainable-matching.md` (L4 green at
    `26e2069`; D6 deferred by owner decision) and 0015A at
    `completed/0015A-job-list-usability-and-intake-quality.md`. The archival is
-   committed with this snapshot; **0016** open-source packaging is next.
+   committed with this snapshot. **0016**: the open-source packaging plan is
+   drafted and awaits owner review
+   (`../exec-plans/active/0016-open-source-packaging.md`); implementation may not
+   start before that review (plan P0).
 9. **Resolved — both plans are archived under `completed/`.** 0015A's §13 step
    boxes remain unticked on purpose (never maintained during the stage); its
    status header now records the closure evidence, and Step 5's real-database

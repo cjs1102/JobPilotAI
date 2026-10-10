@@ -50,4 +50,24 @@ namespace jobpilot::service
         const std::string &resumeContent,
         const JobSummary &job,
         const std::vector<JobRequirement> &requirements);
+
+    // 0015 D4: the mechanical fact-provenance gate. Every asserted claim in the
+    // draft must map to a source fact; an unsourced claim, an unknown
+    // provenance prefix, a fact absent from the content or a broken placeholder
+    // makes the check FAIL. Status: 1 pass / 2 fail (persisted verbatim into
+    // `resume_artifacts.fact_check_status`); a failed check can never be
+    // confirmed.
+    struct FactCheckResult
+    {
+        std::int32_t status = 1;
+        bool passed = true;
+        std::vector<std::string> unsourcedClaims;
+        std::vector<std::string> unknownSources;
+        std::vector<std::string> missingFacts;
+        std::vector<std::string> missingPlaceholders;
+        std::string reportJson;
+    };
+
+    FactCheckResult FactCheck(
+        const TailorDraft &draft);
 }

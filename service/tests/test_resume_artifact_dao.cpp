@@ -15,6 +15,7 @@
 
 #include "jobpilot/database/mysql_pool.h"
 #include "jobpilot/service/resume/resume_dao.h"
+#include "jobpilot/service/resume/tailor_rule.h"
 #include "jobpilot/service/user/user_dao.h"
 #include "test_job_support.h"
 #include "test_user_support.h"
@@ -378,6 +379,105 @@ namespace jobpilot::service
         ASSERT_EQ(after.rowCount(), 1U);
         EXPECT_EQ(after.value(0, 0).value(), versionContent);
         EXPECT_EQ(versionContent, "resume text v1");
+    }
+
+    // 0015 D4 + D5 boundary: the gate's verdict is persisted with the artifact
+    // and a FAILING gate (status 2) blocks confirmation.
+    TEST_F(ResumeArtifactDaoTest, PersistedGateFailureBlocksConfirmation)
+    {
+        UserProfile profile;
+        profile.userId = userId;
+        profile.targetPosition = "C++后端开发";
+        profile.location = "Remote";
+        profile.summary = "熟悉 Linux";
+
+        UserSkill skill;
+        skill.name = "C++";
+        skill.level = 3;
+
+        JobSummary job;
+        job.id = jobId;
+        job.title = "Artifact Job";
+        job.company = "Artifact Co";
+
+        JobRequirement requirement;
+        requirement.skill = "C++";
+        requirement.level = 3;
+
+        const TailorDraft draft =
+            BuildTailorDraft(
+                "张三",
+                "zhang@example.invalid",
+                profile,
+                {skill},
+                "resume text v1",
+                job,
+                {requirement});
+
+        const FactCheckResult passed = FactCheck(draft);
+        ASSERT_TRUE(passed.passed);
+        EXPECT_EQ(passed.status, 1);
+
+        // An invented claim makes the very same draft fail mechanically.
+        TailorDraft tampered = draft;
+        tampered.content += "\n精通 Kubernetes\n";
+        const FactCheckResult failed = FactCheck(tampered);
+        ASSERT_FALSE(failed.passed);
+        EXPECT_EQ(failed.status, 2);
+
+        std::uint64_t cleanId = 0;
+        std::uint64_t tamperedId = 0;
+
+        {
+            auto transaction = pool->BeginTransaction();
+
+            ResumeArtifactWrite clean = MakeWrite(passed.status);
+            clean.content = draft.content;
+            clean.factCheckReport = passed.reportJson;
+            cleanId = artifactDao->Create(transaction, clean).value();
+
+            ResumeArtifactWrite bad = MakeWrite(failed.status);
+            bad.content = tampered.content;
+            bad.factCheckReport = failed.reportJson;
+            tamperedId = artifactDao->Create(transaction, bad).value();
+
+            transaction.Commit();
+        }
+
+        const std::optional<ResumeArtifactRecord> stored =
+            artifactDao->Find(userId, tamperedId);
+        ASSERT_TRUE(stored.has_value());
+        EXPECT_EQ(stored->factCheckStatus, 2);
+        ASSERT_TRUE(stored->factCheckReport.has_value());
+        // JSON column: assert values, never the raw byte layout.
+        EXPECT_NE(
+            stored->factCheckReport.value().find("fail"),
+            std::string::npos);
+        EXPECT_NE(
+            stored->factCheckReport.value().find("Kubernetes"),
+            std::string::npos);
+
+        {
+            auto transaction = pool->BeginTransaction();
+
+            // FAILING gate -> confirmation is blocked.
+            EXPECT_FALSE(
+                artifactDao->Confirm(transaction, userId, tamperedId));
+            // Passing gate -> confirmation is a pure state change.
+            EXPECT_TRUE(
+                artifactDao->Confirm(transaction, userId, cleanId));
+
+            transaction.Commit();
+        }
+
+        EXPECT_FALSE(
+            artifactDao->Find(userId, tamperedId)
+                .value()
+                .confirmedAt.has_value());
+        EXPECT_TRUE(
+            artifactDao->Find(userId, cleanId)
+                .value()
+                .confirmedAt.has_value());
     }
 
 } // namespace jobpilot::service

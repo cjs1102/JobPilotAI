@@ -217,7 +217,10 @@ namespace jobpilot::service
             draft.content.find("岗位要求已具备：C++"),
             std::string::npos);
         EXPECT_NE(
-            draft.content.find("岗位要求待补充：Kafka"),
+            draft.content.find("岗位要求待补充"),
+            std::string::npos);
+        EXPECT_NE(
+            draft.content.find("\nKafka\n"),
             std::string::npos);
 
         bool krakenFact = false;
@@ -297,6 +300,139 @@ namespace jobpilot::service
         EXPECT_NE(
             draft.content.find("应届状态：应届"),
             std::string::npos);
+    }
+
+    // 0015 D4: the mechanical fact gate.
+    TEST(TailorRuleTest, FactGatePassesTheEnginesOwnDraft)
+    {
+        const TailorDraft draft =
+            BuildTailorDraft(
+                "张三",
+                "zhang@example.invalid",
+                MakeProfile(),
+                MakeSkills(),
+                "原始简历正文\n第二行",
+                MakeJob(),
+                MakeRequirements());
+
+        const FactCheckResult check = FactCheck(draft);
+
+        EXPECT_TRUE(check.passed);
+        EXPECT_EQ(check.status, 1);
+        EXPECT_TRUE(check.unsourcedClaims.empty());
+        EXPECT_TRUE(check.unknownSources.empty());
+        EXPECT_TRUE(check.missingFacts.empty());
+        EXPECT_TRUE(check.missingPlaceholders.empty());
+        EXPECT_NE(
+            check.reportJson.find("\"status\": \"pass\""),
+            std::string::npos);
+
+        // Deterministic: same draft -> same report.
+        EXPECT_EQ(FactCheck(draft).reportJson, check.reportJson);
+    }
+
+    TEST(TailorRuleTest, FactGateFailsAnInjectedUnsourcedClaim)
+    {
+        TailorDraft draft =
+            BuildTailorDraft(
+                "张三",
+                "zhang@example.invalid",
+                MakeProfile(),
+                MakeSkills(),
+                "原始简历正文",
+                MakeJob(),
+                MakeRequirements());
+
+        // An LLM wording pass that invents a claim instead of only adding
+        // wording: the gate must reject it.
+        draft.content += "\n精通 Kubernetes 与深度学习\n";
+
+        const FactCheckResult check = FactCheck(draft);
+
+        EXPECT_FALSE(check.passed);
+        EXPECT_EQ(check.status, 2);
+        ASSERT_EQ(check.unsourcedClaims.size(), 1U);
+        EXPECT_EQ(
+            check.unsourcedClaims.front(),
+            "精通 Kubernetes 与深度学习");
+        EXPECT_NE(
+            check.reportJson.find("\"status\": \"fail\""),
+            std::string::npos);
+        EXPECT_NE(
+            check.reportJson.find("Kubernetes"),
+            std::string::npos);
+    }
+
+    TEST(TailorRuleTest, FactGateFailsUnknownProvenanceAndDanglingFacts)
+    {
+        TailorDraft draft =
+            BuildTailorDraft(
+                "张三",
+                "zhang@example.invalid",
+                MakeProfile(),
+                MakeSkills(),
+                "原始简历正文",
+                MakeJob(),
+                MakeRequirements());
+
+        draft.facts.push_back(
+            TailorFact{"某条断言", "llm:invented"});
+        draft.content += "\n某条断言\n";
+
+        const FactCheckResult unknown = FactCheck(draft);
+        EXPECT_FALSE(unknown.passed);
+        ASSERT_EQ(unknown.unknownSources.size(), 1U);
+        EXPECT_EQ(unknown.unknownSources.front(), "llm:invented");
+
+        // A fact whose text is absent from the content is a broken provenance
+        // link (the claim cannot be traced to what the draft shows).
+        TailorDraft dangling =
+            BuildTailorDraft(
+                "张三",
+                "zhang@example.invalid",
+                MakeProfile(),
+                MakeSkills(),
+                "原始简历正文",
+                MakeJob(),
+                MakeRequirements());
+        dangling.facts.push_back(
+            TailorFact{"不存在于正文的事实", "skill:Ghost"});
+
+        const FactCheckResult missing = FactCheck(dangling);
+        EXPECT_FALSE(missing.passed);
+        ASSERT_EQ(missing.missingFacts.size(), 1U);
+        EXPECT_EQ(
+            missing.missingFacts.front(),
+            "不存在于正文的事实");
+    }
+
+    TEST(TailorRuleTest, FactGateTreatsPlaceholdersAsNonClaims)
+    {
+        // Nothing derivable: every slot is a placeholder, so there is no claim
+        // to prove and the gate passes.
+        const TailorDraft placeholderOnly =
+            BuildTailorDraft(
+                "",
+                "",
+                UserProfile{},
+                {},
+                "",
+                JobSummary{},
+                {});
+
+        const FactCheckResult check = FactCheck(placeholderOnly);
+        EXPECT_TRUE(check.passed);
+        EXPECT_EQ(check.status, 1);
+        EXPECT_TRUE(check.unsourcedClaims.empty());
+
+        // If a recorded placeholder is not actually rendered, the slot is
+        // broken and the gate fails.
+        TailorDraft broken = placeholderOnly;
+        broken.content = "姓名：张三\n";
+
+        const FactCheckResult brokenCheck = FactCheck(broken);
+        EXPECT_FALSE(brokenCheck.passed);
+        EXPECT_FALSE(brokenCheck.missingPlaceholders.empty());
     }
 
 } // namespace jobpilot::service

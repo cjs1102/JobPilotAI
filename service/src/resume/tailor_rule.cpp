@@ -273,12 +273,13 @@ namespace jobpilot::service
 
         if (!missing.empty())
         {
-            // 缺失技能是"岗位要求"这一来源陈述的事实，不是对候选人的否定。
-            content << "岗位要求待补充：" << Join(missing, "、")
-                    << "（请确认后再写入简历）\n";
+            // 岗位要求待补充：这是"岗位要求"来源的事实，不是对候选人的断言；
+            // 括号说明留在标签里，缺失技能各自成行（事实门按行校验）。
+            content << "岗位要求待补充（以下为岗位要求，请在简历中确认后再体现）：\n";
 
             for (const std::string &name : missing)
             {
+                content << name << "\n";
                 AddFact(
                     &draft,
                     std::string(kTailorSourceRequirement) + name,
@@ -384,7 +385,328 @@ namespace jobpilot::service
                     "原始简历文本（逐字引用）");
         }
 
+        // Explicit terminator: everything between the marker and this line is
+        // the verbatim quote; anything AFTER it must be sourced again (so a
+        // wording pass cannot append unchecked claims behind the quote).
+        content << "【原始简历文本结束】\n";
+
         draft.content = content.str();
         return draft;
+    }
+} // namespace jobpilot::service
+
+namespace jobpilot::service
+{
+    namespace
+    {
+        constexpr const char *kQuotedBlockMarker =
+            "原始简历文本（逐字引用）：";
+        constexpr const char *kQuotedBlockEnd =
+            "【原始简历文本结束】";
+        constexpr const char *kPlaceholderPrefix = "【请填写：";
+        constexpr const char *kPlaceholderSuffix = "】";
+
+        bool StartsWith(
+            const std::string &value,
+            const char *prefix)
+        {
+            const std::string head(prefix);
+            return value.size() >= head.size() &&
+                   value.compare(0, head.size(), head) == 0;
+        }
+
+        bool EndsWith(
+            const std::string &value,
+            const char *suffix)
+        {
+            const std::string tail(suffix);
+            return value.size() >= tail.size() &&
+                   value.compare(
+                       value.size() - tail.size(),
+                       tail.size(),
+                       tail) == 0;
+        }
+
+        bool IsHeading(
+            const std::string &line)
+        {
+            return EndsWith(line, "】") &&
+                   line.find("【请填写：") == std::string::npos;
+        }
+
+        std::string TrimCopy(
+            const std::string &value)
+        {
+            std::size_t begin = 0;
+            std::size_t end = value.size();
+
+            while (begin < end &&
+                   (value[begin] == ' ' || value[begin] == '\r' ||
+                    value[begin] == '\t'))
+            {
+                ++begin;
+            }
+
+            while (end > begin &&
+                   (value[end - 1] == ' ' || value[end - 1] == '\r' ||
+                    value[end - 1] == '\t'))
+            {
+                --end;
+            }
+
+            return value.substr(begin, end - begin);
+        }
+
+        // The claim part of a line: everything after the first full-width colon.
+        std::string ClaimPart(
+            const std::string &line)
+        {
+            const std::size_t colon = line.find("：");
+
+            if (colon == std::string::npos)
+            {
+                return line;
+            }
+
+            return line.substr(colon + 3);
+        }
+
+        void EraseAll(
+            std::string *text,
+            const std::string &needle)
+        {
+            if (needle.empty())
+            {
+                return;
+            }
+
+            std::size_t position = text->find(needle);
+
+            while (position != std::string::npos)
+            {
+                text->erase(position, needle.size());
+                position = text->find(needle);
+            }
+        }
+
+        // Separators and punctuation that may remain once the sourced facts are
+        // removed from a line (labels live before the colon and are exempt).
+        bool IsFiller(
+            const std::string &value)
+        {
+            static const std::string fillers =
+                "、，,;；:：()（）/| ";
+
+            for (const char character : value)
+            {
+                if (fillers.find(character) == std::string::npos)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        bool IsAllowedSource(
+            const std::string &source)
+        {
+            if (source == kTailorSourceResumeContent)
+            {
+                return true;
+            }
+
+            const char *prefixes[] = {
+                kTailorSourceProfile,
+                kTailorSourceSkill,
+                kTailorSourceRequirement,
+                kTailorSourceJob};
+
+            for (const char *prefix : prefixes)
+            {
+                if (StartsWith(source, prefix) &&
+                    source.size() > std::string(prefix).size())
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        std::string JsonStringArray(
+            const std::vector<std::string> &values)
+        {
+            std::string json = "[";
+
+            for (std::size_t index = 0;
+                 index < values.size();
+                 ++index)
+            {
+                if (index > 0)
+                {
+                    json += ", ";
+                }
+
+                json += "\"";
+
+                for (const char character : values[index])
+                {
+                    if (character == '"' || character == '\\')
+                    {
+                        json += '\\';
+                    }
+
+                    if (character == '\n')
+                    {
+                        json += "\\n";
+                        continue;
+                    }
+
+                    json += character;
+                }
+
+                json += "\"";
+            }
+
+            json += "]";
+            return json;
+        }
+    } // namespace
+
+    FactCheckResult FactCheck(
+        const TailorDraft &draft)
+    {
+        FactCheckResult result;
+
+        // 1) Every fact must cite an allowed source and appear in the content.
+        for (const TailorFact &fact : draft.facts)
+        {
+            if (!IsAllowedSource(fact.source))
+            {
+                result.unknownSources.push_back(fact.source);
+            }
+
+            if (fact.text.empty() ||
+                draft.content.find(fact.text) == std::string::npos)
+            {
+                result.missingFacts.push_back(fact.text);
+            }
+        }
+
+        // 2) Every recorded placeholder must actually appear as a slot.
+        for (const std::string &label : draft.placeholders)
+        {
+            const std::string marker =
+                std::string(kPlaceholderPrefix) + label +
+                kPlaceholderSuffix;
+
+            if (draft.content.find(marker) == std::string::npos)
+            {
+                result.missingPlaceholders.push_back(label);
+            }
+        }
+
+        // 3) Every content line must be a heading, an explicit placeholder, a
+        //    quoted resume block, or covered by source facts.
+        std::size_t position = 0;
+        bool inQuotedBlock = false;
+
+        while (position <= draft.content.size())
+        {
+            const std::size_t newline =
+                draft.content.find('\n', position);
+            const std::size_t end =
+                newline == std::string::npos
+                    ? draft.content.size()
+                    : newline;
+            const std::string line = TrimCopy(
+                draft.content.substr(position, end - position));
+
+            position = end + 1;
+
+            if (inQuotedBlock)
+            {
+                if (line == kQuotedBlockEnd)
+                {
+                    inQuotedBlock = false;
+                }
+
+                continue;
+            }
+
+            if (line.empty() || IsHeading(line))
+            {
+                continue;
+            }
+
+            if (line.find(kPlaceholderPrefix) != std::string::npos)
+            {
+                continue;
+            }
+
+            if (line == kQuotedBlockMarker)
+            {
+                inQuotedBlock = true;
+                continue;
+            }
+
+            std::string remainder = ClaimPart(line);
+
+            // Longest-first: a short fact text ("C++") must not erase a part
+            // of a longer sourced claim ("C++后端开发") before it is matched.
+            std::vector<std::string> needles;
+            needles.reserve(draft.facts.size());
+
+            for (const TailorFact &fact : draft.facts)
+            {
+                needles.push_back(fact.text);
+            }
+
+            std::sort(
+                needles.begin(),
+                needles.end(),
+                [](const std::string &left, const std::string &right)
+                {
+                    return left.size() > right.size();
+                });
+
+            for (const std::string &needle : needles)
+            {
+                EraseAll(&remainder, needle);
+            }
+
+            remainder = TrimCopy(remainder);
+
+            if (!remainder.empty() && !IsFiller(remainder))
+            {
+                result.unsourcedClaims.push_back(line);
+            }
+        }
+
+        result.passed =
+            result.unsourcedClaims.empty() &&
+            result.unknownSources.empty() &&
+            result.missingFacts.empty() &&
+            result.missingPlaceholders.empty();
+        result.status = result.passed ? 1 : 2;
+
+        result.reportJson =
+            std::string("{\"status\": \"") +
+            (result.passed ? "pass" : "fail") +
+            "\", \"facts\": " + std::to_string(draft.facts.size()) +
+            ", \"placeholders\": " +
+            std::to_string(draft.placeholders.size()) +
+            ", \"unsourced_claims\": " +
+            JsonStringArray(result.unsourcedClaims) +
+            ", \"unknown_sources\": " +
+            JsonStringArray(result.unknownSources) +
+            ", \"missing_facts\": " +
+            JsonStringArray(result.missingFacts) +
+            ", \"missing_placeholders\": " +
+            JsonStringArray(result.missingPlaceholders) +
+            "}";
+
+        return result;
     }
 } // namespace jobpilot::service

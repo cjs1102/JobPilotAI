@@ -732,6 +732,15 @@ Stop and report to the Lead (do not widen scope) if:
         `test_schema` on fresh AND migrated DBs, new `test_resume_artifact_dao`).
   - [ ] D4: mechanical fact-provenance gate + persistence (fail ⇒ `fact_check_status=2` ⇒
         confirmation blocked).
+  - [x] D4 (fact gate): pure `FactCheck(draft)` — every fact must cite an allowed source AND appear
+        in the content; every content line must be a heading, an explicit `【请填写：…】` slot,
+        inside the delimited verbatim quote block (`原始简历文本（逐字引用）：` …
+        `【原始简历文本结束】`), or fully covered by source facts (longest-first erasure, only
+        labels/separators may remain); recorded placeholders must be rendered. Failure ⇒
+        `fact_check_status=2` + JSON report (values asserted, never byte layout) ⇒ confirmation
+        blocked. `test_tailor_rule` 9/9 (incl. an injected unsourced claim being caught, unknown
+        provenance, a dangling fact, placeholder handling) and `test_resume_artifact_dao` 4/4
+        (the persisted gate verdict blocks `Confirm`).
   - [ ] D5: human-confirmation boundary + artifact read endpoints (draft vs confirmed; **no
         submission endpoint exists**).
   - [ ] D6 (conditional, only if the worker path is chosen): ai_worker `resume_optimize`

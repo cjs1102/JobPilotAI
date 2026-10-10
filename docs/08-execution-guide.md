@@ -11,6 +11,14 @@
 >
 > Do not use this document for new implementation decisions.
 
+> **Correction (2026-10-10).** The walkthrough below is not runnable as written:
+> it assumes an `ai_service/` package with a `requirements.txt`, gateway and
+> RabbitMQ containers, and a `jobpilot_server` binary under `build/bin`, none of
+> which exist here. Use the Quick Start in [`../README.md`](../README.md) for
+> build and run commands, [`../AGENTS.md`](../AGENTS.md) plus
+> [`ai/agent-workflow.md`](ai/agent-workflow.md) for the verification rules, and
+> [`quality/README.md`](quality/README.md) for the test levels.
+
 > Historical / Superseded，不作为当前 MVP 实现依据：本文档曾整合 00–07 设计文档，
 > 并按「写什么文件 / 干什么 / 怎么干 / 不会的补什么 / 怎么验收 / 怎么交给我检查」
 > 组织成阶段清单。现行依据见 `AGENTS.md`、活动 ExecPlan、

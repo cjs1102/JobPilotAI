@@ -389,9 +389,9 @@ The full CTest suites require live MySQL and Redis. `SchemaTest` also requires
 the canonical schema to be applied to the configured database.
 
 ConanCenter diagnosis on 2026-10-06: remote URL `https://center2.conan.io` is
-correct. The environment proxy `192.168.150.1:7897` times out for ConanCenter,
-while direct `curl --noproxy '*'` and a one-off Conan command with proxy
-environment variables removed both succeed. No Conan or system proxy
+correct. The environment's HTTP proxy (a private address, not repeated here)
+times out for ConanCenter, while direct `curl --noproxy '*'` and a one-off Conan
+command with proxy environment variables removed both succeed. No Conan or system proxy
 configuration was changed.
 
 ### CMake Resolution

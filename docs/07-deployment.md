@@ -9,6 +9,16 @@
 >
 > Do not use this document for new implementation decisions.
 
+> **Correction (2026-10-10).** The commands below are not runnable as written.
+> The topology table names gateway / `ai_service` / RabbitMQ, three
+> `docker/…/Dockerfile` files and an `ai_service/requirements.txt` that do not
+> exist in this tree, and it starts a `jobpilot_server` binary under `build/bin`
+> that was never built — the real target is `jobpilot_service`, produced by the
+> CMake presets. For the commands that do work today see the Quick Start in
+> [`../README.md`](../README.md), plus
+> [`../database/schema/README.md`](../database/schema/README.md) for the database
+> and [`quality/README.md`](quality/README.md) for the verification levels.
+
 > 依据架构 V3.0 §11 编写。覆盖：本地开发（WSL）、docker-compose 一键部署、CI、运维要点。
 
 ## 1. 开发环境

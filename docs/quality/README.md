@@ -14,6 +14,13 @@ contains Release dependency packages. The sanitizer presets therefore compile
 project sources with `-O1 -g` while linking the already-verified Release
 Conan packages. They do not pretend to provide Debug dependency builds.
 
+> **Correction (2026-10-10).** The first sentence is out of date: a bounded probe
+> returned HTTP 200 from `center2.conan.io/v1/ping`, and `tools/dev/bootstrap.sh`
+> resolves the pinned graph from a fresh `CONAN_HOME` (see the 0016 plan §8.1 for
+> the recorded evidence). The second half still holds — the cached packages are
+> Release-only, which is exactly why the sanitizer presets keep linking them
+> rather than pretending to have Debug dependencies.
+
 Normal tests keep assertions active because backend test targets append
 `-UNDEBUG` after the Release `-DNDEBUG` flag.
 

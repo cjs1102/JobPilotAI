@@ -368,11 +368,11 @@ the stale "cannot reach Conan Center" record was disproved by a 200 from
 
 **Environment note (2026-10-10, P1).** CE-2 succeeded from a fresh `CONAN_HOME`.
 CE-5 could **not** run for the committed `ubuntu:24.04` base: Docker Hub is
-unreachable from this host — the daemon is bound to the dead proxy
-`192.168.150.1:17897` (`/etc/systemd/system/docker.service.d/http-proxy.conf`),
-`registry-1.docker.io` resolves to `104.244.46.246`, and a direct TCP connect to
-:443 times out, so `docker build` fails at the base-image pull with
-`failed to resolve source metadata for docker.io/library/ubuntu:24.04 ... EOF`.
+unreachable from this host — the daemon is bound to a dead HTTP proxy configured
+in `/etc/systemd/system/docker.service.d/http-proxy.conf` (the address is a local
+environment detail and is deliberately not repeated in this repository), the
+registry name resolves to an address that refuses connections, and the pull fails
+with `failed to resolve source metadata for docker.io/library/ubuntu:24.04 ... EOF`.
 The same commands were therefore verified in a **scratch image built from a
 locally cached base** (`redis:7`, Debian bookworm): bootstrap inside the
 container, `cmake --preset release --target jobpilot_service`, the service
@@ -580,7 +580,22 @@ Stop and report to the owner (do not widen scope) if:
       showed the labels do not mark database dependence (§12.7). The `image` job
       is **not** replayable here (Docker Hub unreachable, §8.1), so CE-5 and the
       first real CI run are the owner's to confirm after the push.
-- [ ] P5 Open-source hygiene (quickstart, orientation note + secret check, notices, dated corrections, index)
+- [x] P5 Open-source hygiene — **done 2026-10-10**. `README.md` gained an English
+      Quick Start (decision 4) built from the commands P1-P4 actually verified,
+      the bookmarklet item now states the user-facing boundary instead of quoting
+      the acceptance record, and a "contributors and AI agents" pointer leads to
+      `AGENTS.md`/`docs/ai/` (decision 6). New `THIRD_PARTY_NOTICES.md` records the
+      vendored `libbcrypt` terms from its PROVENANCE plus the Conan and Python
+      dependencies (fmt=MIT and GoogleTest=BSD-3-Clause taken from the recipe and
+      package metadata; the others point at the upstream licence rather than
+      asserting one). `docs/07` and `docs/08` carry dated corrections naming the
+      parts that cannot work, the `docs/quality` dependency-boundary note is
+      corrected for the now-reachable registry, and `docs/README.md` is the
+      reading order. The secret/private-detail scan over tracked files found and
+      redacted two private proxy addresses (this plan and
+      `docs/ai/references/project-state-full.md`); the remaining private-range
+      strings are test fixtures. Evidence: `git diff --check` rc=0; link check 55
+      links, 0 missing.
 - [ ] P6 Docs sync + the stage's single L4 + archive
 
 ## 15. Smallest First Implementable Unit
@@ -624,12 +639,11 @@ rewritten (archived/historical text is never rewritten here). This plan is the
   isolated stack, while the same request succeeded once MySQL had settled). The
   healthcheck now pings over TCP as the application user, which also proves the
   user and the schema load are finished.
-- **Docker Hub is unreachable on this host** (the daemon is bound to the dead
-  proxy `192.168.150.1:17897` and `registry-1.docker.io` resolves to a poisoned
-  address), so the committed `Dockerfile`'s `ubuntu:24.04` base cannot be pulled
-  here and CE-5 stays open for that base until the P4 CI job builds it. This is
-  an environment condition; the stage deliberately does not "fix" the daemon
-  proxy or the registry.
+- **Docker Hub is unreachable on this host** (the daemon is bound to a dead HTTP
+  proxy and the registry name resolves to an unusable address), so the committed
+  `Dockerfile`'s `ubuntu:24.04` base cannot be pulled here and CE-5 stays open for
+  that base until the P4 CI job builds it. This is an environment condition; the
+  stage deliberately does not "fix" the daemon proxy or the registry.
 - `JP_ENABLE_TSAN` named two targets before they were defined
   (`service/CMakeLists.txt:465-466` vs `:528,:545`): any TSan configure of the
   current tree failed. **Decision 8: fixed in P1, TSan stays out of the required

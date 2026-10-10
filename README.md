@@ -5,6 +5,46 @@ JobPilotAI 是一个基于 C++ 高性能后端架构的 AI 求职自动化平台
 
 > 本页只描述**当前真实能力**。未实现的部分在「未实现 / 非目标」一节明确列出。
 
+## Quick Start (English)
+
+JobPilotAI runs locally with MySQL and Redis only, and **no AI provider key is
+required**: deterministic `rule_v1` matching and `tailor_rule_v1` drafting work
+without one, and a provider is optional and bring-your-own-key.
+
+Prerequisites: Docker with the compose plugin, CMake ≥ 3.22, a C++17 compiler,
+`pkg-config` plus the MySQL client development files, and Python 3 with pip (for
+Conan 2). `tools/dev/bootstrap.sh` checks all of them and names whatever is
+missing.
+
+```bash
+git clone https://github.com/cjs1102/JobPilotAI.git
+cd JobPilotAI
+
+tools/dev/bootstrap.sh                  # resolves the pinned Conan graph (service/conan.lock)
+cmake --preset release                  # debug / asan / ubsan / tsan also work
+cmake --build --preset release -j"$(nproc)"
+
+cp .env.example .env                    # fill MYSQL_ROOT_PASSWORD and MYSQL_PASSWORD
+docker compose up -d                    # MySQL 8.0 + Redis 7
+
+docker compose --profile app build backend   # the service image (needs a registry)
+docker compose --profile app up -d           # ... now also the service on :8080
+curl -fsS http://127.0.0.1:8080/health
+
+tools/dev/demo-gate.sh                  # end-to-end gate: import -> search -> match -> tailor -> track
+```
+
+- The binary is `build/presets/release/service/jobpilot_service` (root entry) or
+  `service/build/presets/release/jobpilot_service` (service entry).
+- `tools/dev/demo-gate.sh` starts an isolated compose project of its own — own
+  container names, host ports, volumes and database — and tears it down
+  afterwards, so it never touches an existing stack or its data.
+- Database bootstrap and upgrades: [`database/schema/README.md`](database/schema/README.md).
+- Contributors and AI agents: start at [`AGENTS.md`](AGENTS.md), then
+  [`docs/ai/`](docs/ai/) (workflow rules, current state) and the executed plans
+  under [`docs/exec-plans/`](docs/exec-plans/); [`docs/README.md`](docs/README.md)
+  is a short reading order.
+
 ## 当前能力
 
 ### C++ 服务（`service/`，P1 网络层行为冻结）
@@ -103,10 +143,13 @@ JobPilotAI 是一个基于 C++ 高性能后端架构的 AI 求职自动化平台
   是唯一生成器，不需要 AI key。
 - **截止时间不驱动生命周期**：`deadline` 只是展示字段，本阶段没有「过期自动关闭」
   或过期提示；过期的岗位仍然可见（已知可见性限制）。
-- **书签小工具：真机提取已执行，发布与读回仍未验收**：离线（node + fixture）已验证提取
-  逻辑；产品负责人已在 Edge 的真实登录墙岗位页运行书签并成功生成 JSON，一次 Network
-  观察未发现书签触发的新请求（【用户报告】，0014 §19.6）。`publish-capture`、后端导入与
-  MySQL 持久化**尚未在真机验收中执行**，§19.5 模板中的结果行仍空缺，整体验收因此仍未通过。
+- **书签小工具：浏览器端提取可用，发布链路尚未端到端验收**。离线测试（node + fixture）
+  覆盖提取逻辑；在真实登录墙岗位页（Edge）运行可生成 JSON，且未观察到书签发起的网络
+  请求——该请求侧观察是**一次运行的结果**，不构成形式化安全证明，「无网络请求、无凭据」
+  以代码与离线测试为准。`publish-capture`、后端导入与 MySQL 持久化这条发布链路**尚未**
+  做过真机端到端验收。验证范围与限制见
+  [`docs/exec-plans/completed/0014-china-campus-sources-and-manual-capture.md`](docs/exec-plans/completed/0014-china-campus-sources-and-manual-capture.md)
+  §19.6。
 
 ## 技术栈
 
@@ -147,8 +190,10 @@ JobPilotAI
 
 ## 构建与验证
 
+依赖先由 `tools/dev/bootstrap.sh` 解析（完整流程见上面的英文 Quick Start）：
+
 ```bash
-# C++（service 与 root 两套 preset）
+tools/dev/bootstrap.sh                 # 生成 service/build/conan_toolchain.cmake（已忽略提交）
 cmake --preset debug      && cmake --build --preset debug
 ctest --preset release -L job          # 受影响标签；L4 见 docs/ai/agent-workflow.md
 

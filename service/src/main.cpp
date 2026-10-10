@@ -24,6 +24,7 @@
 #include "jobpilot/service/job/internal_source_sync_controller.h"
 #include "jobpilot/service/job/source_sync_dao.h"
 #include "jobpilot/service/job/source_sync_service.h"
+#include "jobpilot/service/resume/resume_artifact_dao.h"
 #include "jobpilot/service/resume/resume_controller.h"
 #include "jobpilot/service/resume/resume_dao.h"
 #include "jobpilot/service/resume/resume_service.h"
@@ -152,11 +153,29 @@ int main(int argc, char *argv[])
             authenticator,
             config.storage.maxFileBytes);
 
-        jobpilot::service::ResumeController resumeController(
-            resumeService);
-
         jobpilot::service::JobDao jobDao(
             mysqlPool);
+
+        // 0016 P3: the tailored-artifact routes only exist when the controller
+        // receives the service. Without this wiring the four
+        // /api/v1/resumes/artifacts routes answer 500 in the shipped binary,
+        // while the HTTP tests stay green because they construct the controller
+        // with the service themselves. The demo gate caught it; this is the
+        // whole fix.
+        jobpilot::service::ResumeArtifactDao resumeArtifactDao(
+            mysqlPool,
+            resumeDao);
+
+        jobpilot::service::ResumeArtifactService resumeArtifactService(
+            resumeArtifactDao,
+            resumeDao,
+            userDao,
+            jobDao,
+            mysqlPool);
+
+        jobpilot::service::ResumeController resumeController(
+            resumeService,
+            &resumeArtifactService);
 
         jobpilot::service::JobService jobService(
             jobDao);

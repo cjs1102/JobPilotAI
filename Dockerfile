@@ -31,11 +31,15 @@ RUN python3 -m venv /opt/conan \
     && /opt/conan/bin/pip install --no-cache-dir "conan>=2,<3"
 
 WORKDIR /src
-COPY . .
 
-# Exactly the documented local path: bootstrap writes service/build, which both
-# CMake entries' presets read.
+# The dependency layer depends only on the lock, the conanfile and the bootstrap
+# script, so editing application sources reuses it instead of re-resolving the
+# graph. `COPY . .` below cannot clobber service/build: .dockerignore excludes it.
+COPY service/conanfile.txt service/conan.lock ./service/
+COPY tools/dev/bootstrap.sh ./tools/dev/bootstrap.sh
 RUN CONAN=/opt/conan/bin/conan ./tools/dev/bootstrap.sh
+
+COPY . .
 
 # Only the service target: the test targets are built and run by CI and by the
 # stage's L4, not inside the image.

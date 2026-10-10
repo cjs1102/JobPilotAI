@@ -41,6 +41,27 @@
           "level": 2
         }
       ]
+    },
+    {
+      "company": "Northwind Studio",
+      "title": "Product Designer (UI)",
+      "location": "Beijing",
+      "salary_min": 15,
+      "salary_max": 25,
+      "salary_currency": "CNY",
+      "description": "Design user interfaces for a hiring product. This role exists in the sample set to show a posting whose requirements do not overlap the sample candidate's skills.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/product-designer-1",
+      "requirements": [
+        {
+          "skill": "Figma",
+          "level": 3
+        },
+        {
+          "skill": "User Research",
+          "level": 2
+        }
+      ]
     }
   ]
 }

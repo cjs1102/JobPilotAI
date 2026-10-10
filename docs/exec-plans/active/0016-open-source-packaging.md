@@ -537,7 +537,21 @@ Stop and report to the owner (do not widen scope) if:
       whose three columns were dropped (all three nullable, default NULL) and
       reports `ERROR 1060 Duplicate column name` when re-run, which is what the
       documents promise; the developer's database was 4/4/0/0 before and after.
-- [ ] P3 Demo gate script + extended sample dataset (CE-3, negative control)
+- [x] P3 Demo gate — **done 2026-10-10**. `tools/dev/demo-gate.sh` runs
+      configure → start → import → search → match → tailor → track against an
+      isolated compose project, and `docs/examples/job-import.json` grew a third
+      posting so search and match have contrast. Evidence: `gate_rc=0` with
+      `DEMO_GATE_OK` and all eight legs passing — import `created=3 updated=0
+      total=3 rejected=0 needs_review=0`; search returned `C++ Backend Engineer`;
+      the match leg saw a scored row (`score=8.75 version=rule_v1 reasons=2`);
+      tailor produced `fact_check_status=1 confirmed=False generator=rule_v1
+      source_version=tailor_rule_v1` and confirmation flipped it to
+      `confirmed=true`; track advanced the application one lifecycle step
+      (`status 0 -> 1`). The negative control exits 1 with
+      `FAIL: search returned no rows`, so the gate cannot report success falsely.
+      No AI key and no outbound network were used, and the developer's database
+      was 4/4/0/0 before and after. The run found and fixed the `main.cpp` wiring
+      defect recorded in §17.
 - [ ] P4 CI workflow (CE-4; first GitHub run confirmed by the owner)
 - [ ] P5 Open-source hygiene (quickstart, orientation note + secret check, notices, dated corrections, index)
 - [ ] P6 Docs sync + the stage's single L4 + archive
@@ -564,6 +578,16 @@ rewritten (archived/historical text is never rewritten here). This plan is the
 
 ## 17. Known Issues and Follow-ups
 
+- **Fixed in P3, found by the demo gate: the shipped binary never wired the
+  artifact endpoints.** `service/src/main.cpp` built `ResumeController` with only
+  the resume service, so the controller's `artifactService_` stayed null and the
+  four `/api/v1/resumes/artifacts` routes answered 500 — while `test_resume_http`
+  stayed green, because that test constructs the controller with the artifact
+  service itself. This is exactly the gap the D5 tests could not see and the
+  reason the gate runs the real binary. The artifact DAO and service are now
+  constructed after `JobDao` (which they need) and the controller receives the
+  service; `ResumeHttpTest`, `ResumeArtifactDaoTest` and `ResumeServiceTest` were
+  re-run afterwards (15/15), and the gate's tailor leg is the regression test.
 - **Fixed in P1 while verifying the run story:** the MySQL service's healthcheck
   was `mysqladmin ping -h localhost`, which uses the unix socket and therefore
   succeeds while the entrypoint's first-init server is still running with

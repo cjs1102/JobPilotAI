@@ -30,7 +30,6 @@ namespace jobpilot::service
                 return 200;
             case ErrorCode::kInvalidParam:
             case ErrorCode::kMalformedRequest:
-            case ErrorCode::kInvalidStatusTransition:
                 return 400;
             case ErrorCode::kUnauthorized:
             case ErrorCode::kTokenExpired:
@@ -44,6 +43,12 @@ namespace jobpilot::service
                 return 404;
             case ErrorCode::kEmailExists:
             case ErrorCode::kDuplicateApplication:
+                return 409;
+            // 0015 D5: an artifact that cannot change state (already confirmed,
+            // or blocked by a failed fact check) is a conflict. This code had no
+            // producer in the resume flow before D5; the mapping now matches the
+            // internal review controller's.
+            case ErrorCode::kInvalidStatusTransition:
                 return 409;
             case ErrorCode::kUserNotFound:
             case ErrorCode::kInvalidPassword:
@@ -212,6 +217,97 @@ namespace jobpilot::service
             {
                 return std::nullopt;
             }
+        }
+
+        // 0015 D5: the artifact id is the segment after
+        // `/api/v1/resumes/artifacts/`, optionally followed by a fixed suffix
+        // (`/confirm`). A static route is registered before the `{id}` route.
+        std::optional<std::uint64_t> ParseArtifactId(
+            const std::string &path,
+            const std::string &suffix)
+        {
+            constexpr const char *kPrefix =
+                "/api/v1/resumes/artifacts/";
+
+            const std::string pathOnly =
+                PathWithoutQuery(path);
+
+            if (pathOnly.rfind(kPrefix, 0) != 0 ||
+                pathOnly.size() <=
+                    std::string(kPrefix).size() +
+                        suffix.size() ||
+                pathOnly.compare(
+                    pathOnly.size() - suffix.size(),
+                    suffix.size(),
+                    suffix) != 0)
+            {
+                return std::nullopt;
+            }
+
+            const std::string text = pathOnly.substr(
+                std::string(kPrefix).size(),
+                pathOnly.size() -
+                    std::string(kPrefix).size() -
+                    suffix.size());
+
+            std::size_t parsed = 0;
+
+            try
+            {
+                const unsigned long long value =
+                    std::stoull(text, &parsed);
+
+                if (parsed != text.size() || value == 0)
+                {
+                    return std::nullopt;
+                }
+
+                return static_cast<std::uint64_t>(value);
+            }
+            catch (const std::exception &)
+            {
+                return std::nullopt;
+            }
+        }
+
+        bool TryGetRequiredUInt64(
+            const Json &body,
+            const char *key,
+            std::uint64_t *value)
+        {
+            const auto iterator = body.find(key);
+
+            if (iterator == body.end() ||
+                !iterator->is_number_unsigned())
+            {
+                return false;
+            }
+
+            *value = iterator->get<std::uint64_t>();
+            return true;
+        }
+
+        bool TryGetOptionalUInt64(
+            const Json &body,
+            const char *key,
+            std::optional<std::uint64_t> *value)
+        {
+            const auto iterator = body.find(key);
+
+            if (iterator == body.end() ||
+                iterator->is_null())
+            {
+                value->reset();
+                return true;
+            }
+
+            if (!iterator->is_number_unsigned())
+            {
+                return false;
+            }
+
+            *value = iterator->get<std::uint64_t>();
+            return true;
         }
 
         std::optional<std::pair<std::size_t, std::size_t>>
@@ -475,8 +571,10 @@ namespace jobpilot::service
     } // namespace
 
     ResumeController::ResumeController(
-        ResumeService &service)
-        : service_(service)
+        ResumeService &service,
+        ResumeArtifactService *artifactService)
+        : service_(service),
+          artifactService_(artifactService)
     {
     }
 
@@ -766,6 +864,318 @@ namespace jobpilot::service
             request.KeepAlive(),
             ErrorCode::kSuccess,
             Json{{"list", std::move(list)}});
+    }
+
+    namespace
+    {
+        // 0015 D5: every artifact response states the draft/confirmed boundary
+        // and the fact-gate verdict explicitly.
+        Json ArtifactToJson(
+            const ResumeArtifactRecord &artifact)
+        {
+            Json report = Json(nullptr);
+
+            if (artifact.factCheckReport.has_value())
+            {
+                report = Json::parse(
+                    artifact.factCheckReport.value(),
+                    nullptr,
+                    false);
+            }
+
+            return Json{
+                {"id", artifact.id},
+                {"job_id",
+                 artifact.jobId.has_value()
+                     ? Json(artifact.jobId.value())
+                     : Json(nullptr)},
+                {"application_id",
+                 artifact.applicationId.has_value()
+                     ? Json(artifact.applicationId.value())
+                     : Json(nullptr)},
+                {"base_version_id", artifact.baseVersionId},
+                {"artifact_type", artifact.artifactType},
+                {"language", artifact.language},
+                {"content",
+                 artifact.content.has_value()
+                     ? Json(artifact.content.value())
+                     : Json(nullptr)},
+                {"content_bytes",
+                 artifact.contentBytes.has_value()
+                     ? Json(artifact.contentBytes.value())
+                     : Json(nullptr)},
+                {"generator", artifact.generator},
+                {"source_version",
+                 artifact.sourceVersion.has_value()
+                     ? Json(artifact.sourceVersion.value())
+                     : Json(nullptr)},
+                {"fact_check_status", artifact.factCheckStatus},
+                {"fact_check_report", std::move(report)},
+                {"confirmed", artifact.confirmedAt.has_value()},
+                {"confirmed_at",
+                 artifact.confirmedAt.has_value()
+                     ? Json(artifact.confirmedAt.value())
+                     : Json(nullptr)},
+                {"created_at", artifact.createTime}};
+        }
+    } // namespace
+
+    void ResumeController::CreateArtifact(
+        const jobpilot::core::HttpRequest &request,
+        jobpilot::core::HttpResponse &response)
+    {
+        const std::optional<std::uint64_t> userId =
+            AuthenticateRequest(
+                request,
+                &response,
+                &service_);
+
+        if (!userId.has_value())
+        {
+            return;
+        }
+
+        if (artifactService_ == nullptr)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInternalError,
+                nullptr);
+            return;
+        }
+
+        Json body;
+
+        if (!ParseJsonBody(
+                request,
+                &response,
+                &body))
+        {
+            return;
+        }
+
+        std::uint64_t baseVersionId = 0;
+        std::optional<std::uint64_t> jobId;
+        std::optional<std::uint64_t> applicationId;
+
+        if (!TryGetRequiredUInt64(
+                body,
+                "base_version_id",
+                &baseVersionId) ||
+            !TryGetOptionalUInt64(
+                body,
+                "job_id",
+                &jobId) ||
+            !TryGetOptionalUInt64(
+                body,
+                "application_id",
+                &applicationId))
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInvalidParam,
+                nullptr);
+            return;
+        }
+
+        const ServiceResult<ResumeArtifactRecord> result =
+            artifactService_->CreateDraft(
+                userId.value(),
+                baseVersionId,
+                jobId,
+                applicationId);
+
+        if (result.code != ErrorCode::kSuccess)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                result.code,
+                nullptr);
+            return;
+        }
+
+        WriteResponse(
+            &response,
+            request.KeepAlive(),
+            ErrorCode::kSuccess,
+            ArtifactToJson(result.value));
+    }
+
+    void ResumeController::ListArtifacts(
+        const jobpilot::core::HttpRequest &request,
+        jobpilot::core::HttpResponse &response)
+    {
+        const std::optional<std::uint64_t> userId =
+            AuthenticateRequest(
+                request,
+                &response,
+                &service_);
+
+        if (!userId.has_value())
+        {
+            return;
+        }
+
+        if (artifactService_ == nullptr)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInternalError,
+                nullptr);
+            return;
+        }
+
+        const ServiceResult<
+            std::vector<ResumeArtifactRecord>> result =
+                artifactService_->List(userId.value());
+
+        if (result.code != ErrorCode::kSuccess)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                result.code,
+                nullptr);
+            return;
+        }
+
+        Json list = Json::array();
+
+        for (const ResumeArtifactRecord &artifact :
+             result.value)
+        {
+            list.push_back(ArtifactToJson(artifact));
+        }
+
+        WriteResponse(
+            &response,
+            request.KeepAlive(),
+            ErrorCode::kSuccess,
+            Json{{"list", std::move(list)}});
+    }
+
+    void ResumeController::GetArtifact(
+        const jobpilot::core::HttpRequest &request,
+        jobpilot::core::HttpResponse &response)
+    {
+        const std::optional<std::uint64_t> userId =
+            AuthenticateRequest(
+                request,
+                &response,
+                &service_);
+
+        if (!userId.has_value())
+        {
+            return;
+        }
+
+        const std::optional<std::uint64_t> artifactId =
+            ParseArtifactId(request.Path(), "");
+
+        if (artifactService_ == nullptr)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInternalError,
+                nullptr);
+            return;
+        }
+
+        if (!artifactId.has_value())
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInvalidParam,
+                nullptr);
+            return;
+        }
+
+        const ServiceResult<ResumeArtifactRecord> result =
+            artifactService_->Get(
+                userId.value(),
+                artifactId.value());
+
+        if (result.code != ErrorCode::kSuccess)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                result.code,
+                nullptr);
+            return;
+        }
+
+        WriteResponse(
+            &response,
+            request.KeepAlive(),
+            ErrorCode::kSuccess,
+            ArtifactToJson(result.value));
+    }
+
+    void ResumeController::ConfirmArtifact(
+        const jobpilot::core::HttpRequest &request,
+        jobpilot::core::HttpResponse &response)
+    {
+        const std::optional<std::uint64_t> userId =
+            AuthenticateRequest(
+                request,
+                &response,
+                &service_);
+
+        if (!userId.has_value())
+        {
+            return;
+        }
+
+        const std::optional<std::uint64_t> artifactId =
+            ParseArtifactId(request.Path(), "/confirm");
+
+        if (artifactService_ == nullptr)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInternalError,
+                nullptr);
+            return;
+        }
+
+        if (!artifactId.has_value())
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInvalidParam,
+                nullptr);
+            return;
+        }
+
+        const ServiceResult<ResumeArtifactRecord> result =
+            artifactService_->Confirm(
+                userId.value(),
+                artifactId.value());
+
+        if (result.code != ErrorCode::kSuccess)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                result.code,
+                nullptr);
+            return;
+        }
+
+        WriteResponse(
+            &response,
+            request.KeepAlive(),
+            ErrorCode::kSuccess,
+            ArtifactToJson(result.value));
     }
 
 } // namespace jobpilot::service

@@ -51,6 +51,7 @@ add_library(jobpilot_service_core STATIC
     src/resume/resume_service.cpp
     src/resume/resume_text_status.cpp
     src/resume/resume_artifact_dao.cpp
+    src/resume/resume_artifact_service.cpp
     src/resume/tailor_rule.cpp
     src/user/user_controller.cpp
     src/user/user_dao.cpp

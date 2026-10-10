@@ -1093,6 +1093,10 @@ GET /health
 | GET | /api/v1/resumes | 是 | 简历列表 |
 | POST | /api/v1/resumes/{id}/versions | 是 | 新版本 |
 | GET | /api/v1/resumes/{id}/versions | 是 | 版本列表 |
+| POST | /api/v1/resumes/artifacts | 是 | 生成定制简历草稿（D5） |
+| GET | /api/v1/resumes/artifacts | 是 | 定制产物列表（D5） |
+| GET | /api/v1/resumes/artifacts/{id} | 是 | 定制产物详情（D5） |
+| POST | /api/v1/resumes/artifacts/{id}/confirm | 是 | 人工确认（仅状态变更，不发送） |
 | GET | /api/v1/jobs | 否 | 岗位搜索 |
 | GET | /api/v1/jobs/recommended | 是 | 个性化岗位推荐 |
 | GET | /api/v1/jobs/{id} | 否 | 岗位详情 |
@@ -1291,6 +1295,36 @@ python3 tools/job_report/render_report.py \
 - 不使用表格排版、不使用制表符/竖线分隔、无图片内容；渲染版式（PDF/DOCX）属可选外部工具，
   不在核心内（Out-of-scope 9）。
 
+**路由契约（D5 已落地，四个鉴权接口）**
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | /api/v1/resumes/artifacts | 由选定简历版本生成定制草稿（不写 `resume_versions`） |
+| GET | /api/v1/resumes/artifacts | 当前用户的产物列表 |
+| GET | /api/v1/resumes/artifacts/{id} | 单个产物（含草稿正文与事实门报告） |
+| POST | /api/v1/resumes/artifacts/{id}/confirm | 人工确认（仅状态变更，不发送） |
+
+- `POST /api/v1/resumes/artifacts` 请求体：`base_version_id`（必填）、`job_id` /
+  `application_id`（可选，均须属于当前用户）。整个生成过程在一个事务内完成：版本归属校验 →
+  读取该版本正文 → 画像 + 技能 → **仅当给出 `job_id` 时**读取一次启用岗位及其要求 →
+  确定性草稿 → 机械事实门 → 落库；产物固定 `generator='rule_v1'`、
+  `source_version='tailor_rule_v1'`，`fact_check_status` 与 `fact_check_report` 原样持久化。
+  该路径只**读** `resume_versions.content`，**从不写回**简历版本内容。
+- 每个产物响应（创建 / 列表 / 单个 / 确认）恒含 `confirmed`（bool）、`confirmed_at`
+  （`null` = 草稿）、`fact_check_status`（1 通过 / 2 失败）与 `fact_check_report`。
+- 错误语义：非本人简历版本或产物 → `40002`（HTTP 404，不泄露存在性）；`job_id` 不存在或
+  未启用 → `40001`；`application_id` 不属于当前用户 → `40003`（同为 404）；对
+  `fact_check_status=2` 或已确认产物的再次确认 → `409`（`kInvalidStatusTransition`）；
+  未带 token → `401`。
+- **姓名/联系方式占位（如实记录，不是缺陷）**：`IUserProfileReader` 只暴露画像与技能，
+  不含姓名、邮箱等联系方式字段（`profile:name` / `profile:email` 两个来源标注在当前接线中
+  拿不到值）。因此草稿的姓名与联系方式一律渲染为 `【请填写：姓名】` /
+  `【请填写：联系方式】`，由人工补全；**宁可留占位符也不编造候选人信息**。
+- **确认边界**：`confirmed_at IS NULL` = 草稿，确认后仍是「已关联（岗位/投递）」，**从未被发送**；
+  不存在 `POST /api/v1/resumes/artifacts/{id}/submit`（探针返回 404），0015 不新增任何提交/
+  自动投递路径。
+
 **当前落地状态**：D2 已落地为**纯函数** `BuildTailorDraft`
 （`service/include/jobpilot/service/resume/tailor_rule.h`，测试 `test_tailor_rule`）；
-持久化（D3）、事实门（D4）、确认边界与读取接口（D5）**尚未落地**，契约如上。
+持久化（D3，`resume_artifacts`，测试 `test_resume_artifact_dao`）、机械事实门（D4）、
+确认边界与上述四个读取/确认路由（D5，测试 `test_resume_http`）均已落地。

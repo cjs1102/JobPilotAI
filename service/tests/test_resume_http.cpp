@@ -27,6 +27,9 @@
 #include "jobpilot/network/event_loop.h"
 #include "jobpilot/service/auth/session_authenticator.h"
 #include "jobpilot/service/resume/resume_controller.h"
+#include "jobpilot/service/job/job_dao.h"
+#include "jobpilot/service/resume/resume_artifact_dao.h"
+#include "jobpilot/service/resume/resume_artifact_service.h"
 #include "jobpilot/service/resume/resume_dao.h"
 #include "jobpilot/service/resume/resume_service.h"
 #include "jobpilot/service/router.h"
@@ -327,6 +330,19 @@ namespace jobpilot::service
                     *userService);
             resumeDao =
                 std::make_unique<ResumeDao>(*pool);
+            jobDao =
+                std::make_unique<JobDao>(*pool);
+            artifactDao =
+                std::make_unique<ResumeArtifactDao>(
+                    *pool,
+                    *resumeDao);
+            artifactService =
+                std::make_unique<ResumeArtifactService>(
+                    *artifactDao,
+                    *resumeDao,
+                    *userDao,
+                    *jobDao,
+                    *pool);
 
             storageRoot = MakeStorageRoot();
             storage =
@@ -342,7 +358,8 @@ namespace jobpilot::service
                     10U * 1024U * 1024U);
             resumeController =
                 std::make_unique<ResumeController>(
-                    *resumeService);
+                    *resumeService,
+                    artifactService.get());
 
             serverThread = std::thread(
                 [this]()
@@ -528,6 +545,9 @@ namespace jobpilot::service
         std::unique_ptr<UserService> userService;
         std::unique_ptr<UserController> userController;
         std::unique_ptr<ResumeDao> resumeDao;
+        std::unique_ptr<JobDao> jobDao;
+        std::unique_ptr<ResumeArtifactDao> artifactDao;
+        std::unique_ptr<ResumeArtifactService> artifactService;
         std::unique_ptr<jobpilot::core::FileStorage>
             storage;
         std::unique_ptr<ResumeService> resumeService;
@@ -832,6 +852,252 @@ namespace jobpilot::service
         ASSERT_TRUE(secondList->hasJson);
         EXPECT_TRUE(
             secondList->jsonBody["data"]["list"].empty());
+    }
+
+    TEST_F(ResumeHttpTest, ManagesTailoredArtifactsWithinTheConfirmationBoundary)
+    {
+        const auto user =
+            RegisterAndLogin("resume-artifact-http");
+        const std::string authorization =
+            "Bearer " + user.second;
+
+        std::uint64_t versionId = 0;
+
+        {
+            auto transaction = pool->BeginTransaction();
+
+            const std::uint64_t resumeId =
+                resumeDao
+                    ->CreateResume(
+                        transaction,
+                        user.first,
+                        "artifact base")
+                    .value();
+
+            ASSERT_TRUE(
+                resumeDao->LockOwnedResume(
+                    transaction,
+                    user.first,
+                    resumeId));
+
+            versionId =
+                resumeDao
+                    ->CreateVersion(
+                        transaction,
+                        resumeId,
+                        1,
+                        "1/resumes/artifact/v1.txt",
+                        std::string("原始简历正文"))
+                    .value();
+
+            transaction.Commit();
+        }
+
+        const jobpilot::core::Result versionBefore =
+            pool->Query(
+                "SELECT content FROM resume_versions WHERE id = ?",
+                {versionId});
+
+        ASSERT_EQ(versionBefore.rowCount(), 1U);
+
+        const nlohmann::json createBody{
+            {"base_version_id", versionId}};
+
+        const std::optional<HttpResponseData> created =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/artifacts",
+                createBody.dump(),
+                authorization,
+                "application/json");
+
+        ASSERT_TRUE(created.has_value());
+        ASSERT_TRUE(created->hasJson);
+        EXPECT_EQ(created->statusCode, 200);
+        EXPECT_EQ(created->jsonBody["data"]["confirmed"], false);
+        EXPECT_TRUE(
+            created->jsonBody["data"]["confirmed_at"].is_null());
+        EXPECT_EQ(
+            created->jsonBody["data"]["fact_check_status"],
+            1);
+        EXPECT_EQ(
+            created->jsonBody["data"]["generator"],
+            "rule_v1");
+        EXPECT_EQ(
+            created->jsonBody["data"]["source_version"],
+            "tailor_rule_v1");
+        EXPECT_TRUE(
+            created->jsonBody["data"]["fact_check_report"]
+                .is_object());
+        EXPECT_EQ(
+            created->jsonBody["data"]["base_version_id"],
+            versionId);
+
+        const std::string artifactContent =
+            created->jsonBody["data"]["content"]
+                .get<std::string>();
+
+        // Name/contact are not derivable from the delivered seams, so the draft
+        // states them as explicit placeholders instead of inventing them.
+        EXPECT_NE(
+            artifactContent.find("【请填写：姓名】"),
+            std::string::npos);
+        EXPECT_NE(
+            artifactContent.find("【请填写：联系方式】"),
+            std::string::npos);
+
+        const std::uint64_t artifactId =
+            created->jsonBody["data"]["id"]
+                .get<std::uint64_t>();
+        const std::string artifactPath =
+            "/api/v1/resumes/artifacts/" +
+            std::to_string(artifactId);
+
+        const std::optional<HttpResponseData> list =
+            SendRequest(
+                "GET",
+                "/api/v1/resumes/artifacts",
+                "",
+                authorization);
+
+        ASSERT_TRUE(list.has_value());
+        ASSERT_TRUE(list->hasJson);
+        EXPECT_EQ(list->statusCode, 200);
+        ASSERT_EQ(list->jsonBody["data"]["list"].size(), 1U);
+
+        const std::optional<HttpResponseData> got =
+            SendRequest("GET", artifactPath, "", authorization);
+
+        ASSERT_TRUE(got.has_value());
+        ASSERT_TRUE(got->hasJson);
+        EXPECT_EQ(got->statusCode, 200);
+        EXPECT_EQ(
+            got->jsonBody["data"]["id"],
+            artifactId);
+        EXPECT_EQ(got->jsonBody["data"]["confirmed"], false);
+
+        const std::optional<HttpResponseData> confirmed =
+            SendRequest(
+                "POST",
+                artifactPath + "/confirm",
+                "{}",
+                authorization,
+                "application/json");
+
+        ASSERT_TRUE(confirmed.has_value());
+        ASSERT_TRUE(confirmed->hasJson);
+        EXPECT_EQ(confirmed->statusCode, 200);
+        EXPECT_EQ(
+            confirmed->jsonBody["data"]["confirmed"],
+            true);
+        EXPECT_FALSE(
+            confirmed->jsonBody["data"]["confirmed_at"].is_null());
+
+        // Confirmation is a one-way state change.
+        const std::optional<HttpResponseData> again =
+            SendRequest(
+                "POST",
+                artifactPath + "/confirm",
+                "{}",
+                authorization,
+                "application/json");
+
+        ASSERT_TRUE(again.has_value());
+        EXPECT_EQ(again->statusCode, 409);
+
+        // Ownership: another user cannot base an artifact on this version nor
+        // read this artifact.
+        const auto other =
+            RegisterAndLogin("resume-artifact-other");
+
+        const std::optional<HttpResponseData> foreign =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/artifacts",
+                createBody.dump(),
+                "Bearer " + other.second,
+                "application/json");
+
+        ASSERT_TRUE(foreign.has_value());
+        EXPECT_EQ(foreign->statusCode, 404);
+
+        const std::optional<HttpResponseData> foreignRead =
+            SendRequest(
+                "GET",
+                artifactPath,
+                "",
+                "Bearer " + other.second);
+
+        ASSERT_TRUE(foreignRead.has_value());
+        EXPECT_EQ(foreignRead->statusCode, 404);
+
+        // A failed fact gate blocks confirmation at the endpoint level.
+        const jobpilot::core::ExecutionResult tampered =
+            pool->Execute(
+                "INSERT INTO resume_artifacts "
+                "(user_id, base_version_id, artifact_type, language, "
+                "content, content_bytes, generator, source_version, "
+                "fact_check_status, fact_check_report) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                {user.first,
+                 versionId,
+                 std::string("resume"),
+                 std::string("zh"),
+                 std::string("草稿"),
+                 std::uint64_t(6),
+                 std::string("rule_v1"),
+                 std::string("tailor_rule_v1"),
+                 std::int64_t(2),
+                 std::string("{\"status\": \"fail\"}")});
+
+        ASSERT_EQ(tampered.affectedRows, 1U);
+
+        const std::optional<HttpResponseData> blocked =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/artifacts/" +
+                    std::to_string(tampered.lastInsertId) +
+                    "/confirm",
+                "{}",
+                authorization,
+                "application/json");
+
+        ASSERT_TRUE(blocked.has_value());
+        EXPECT_EQ(blocked->statusCode, 409);
+
+        // 0015 boundary: nothing here sends the artifact anywhere -- the probe
+        // below asserts those verbs have no route at all.
+        for (const char *suffix : {"/submit", "/apply", "/send"})
+        {
+            const std::optional<HttpResponseData> probe =
+                SendRequest(
+                    "POST",
+                    artifactPath + suffix,
+                    "{}",
+                    authorization,
+                    "application/json");
+
+            ASSERT_TRUE(probe.has_value()) << suffix;
+            EXPECT_EQ(probe->statusCode, 404) << suffix;
+        }
+
+        // The base resume version text was never written by the artifact path.
+        const jobpilot::core::Result versionAfter =
+            pool->Query(
+                "SELECT content FROM resume_versions WHERE id = ?",
+                {versionId});
+
+        ASSERT_EQ(versionAfter.rowCount(), 1U);
+        EXPECT_EQ(
+            versionAfter.value(0, 0).value(),
+            versionBefore.value(0, 0).value());
+        EXPECT_EQ(
+            versionAfter.value(0, 0).value(),
+            "原始简历正文");
+
+        pool->Execute(
+            "DELETE FROM resume_artifacts WHERE user_id IN (?, ?)",
+            {user.first, other.first});
     }
 
 } // namespace jobpilot::service

@@ -193,6 +193,54 @@ namespace jobpilot::service
                 });
 
             router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/api/v1/resumes/artifacts",
+                [resumeController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    resumeController->CreateArtifact(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
+                "/api/v1/resumes/artifacts",
+                [resumeController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    resumeController->ListArtifacts(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
+                "/api/v1/resumes/artifacts/{id}",
+                [resumeController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    resumeController->GetArtifact(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/api/v1/resumes/artifacts/{id}/confirm",
+                [resumeController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    resumeController->ConfirmArtifact(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
                 jobpilot::core::HttpMethod::kGet,
                 "/api/v1/resumes/{id}/versions",
                 [resumeController](

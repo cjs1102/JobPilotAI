@@ -8,6 +8,7 @@
 
 #include "jobpilot/service/job/job_dao_interface.h"
 #include "jobpilot/service/job/job_search_filter.h"
+#include "jobpilot/service/job/match_explanation.h"
 #include "jobpilot/service/user/user_dao_interface.h"
 
 namespace jobpilot::service
@@ -39,6 +40,13 @@ namespace jobpilot::service
         RankingBreakdown breakdown;
         std::vector<std::string> matchedSkills;
         std::vector<std::string> missingSkills;
+
+        // 0015 B1/B3 deterministic explanation (data only; never exclusion and
+        // never part of the weighted `rule_v1` score).
+        std::vector<MatchReason> reasons;
+        std::vector<MatchDealBreaker> dealBreakers;
+        DeadlineUrgency deadlineUrgency =
+            DeadlineUrgency::kUnknown;
     };
 
     RankedJob ScoreJob(

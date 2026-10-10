@@ -730,6 +730,37 @@ namespace jobpilot::service
             response->jsonBody["data"]["list"][0]
                              ["score_version"],
             "rule_v1");
+
+        // 0015 B1: the deterministic explanation is present on every
+        // recommended item; the score itself stays rule_v1 (no re-weighting).
+        for (const auto &item :
+             response->jsonBody["data"]["list"])
+        {
+            ASSERT_TRUE(item.contains("reasons"));
+            ASSERT_TRUE(item.contains("deal_breakers"));
+            ASSERT_TRUE(item.contains("deadline_urgency"));
+            EXPECT_TRUE(item["reasons"].is_array());
+            EXPECT_TRUE(item["deal_breakers"].is_array());
+
+            const std::string urgency =
+                item["deadline_urgency"].get<std::string>();
+
+            EXPECT_TRUE(
+                urgency == "expired" ||
+                urgency == "urgent" ||
+                urgency == "soon" ||
+                urgency == "normal" ||
+                urgency == "unknown")
+                << urgency;
+
+            for (const auto &reason : item["reasons"])
+            {
+                EXPECT_TRUE(reason.contains("code"));
+                EXPECT_TRUE(reason.contains("text"));
+                EXPECT_TRUE(reason.contains("evidence"));
+            }
+        }
+
         EXPECT_TRUE(
             response->jsonBody["data"]["list"][0]
                              ["score"]

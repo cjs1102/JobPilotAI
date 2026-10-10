@@ -1,5 +1,6 @@
 #include "jobpilot/service/ai/match_rule.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -367,6 +368,257 @@ namespace jobpilot::service
         EXPECT_FALSE(ResumeMentionsSkill("rediscluster operator", "Redis"));
         EXPECT_FALSE(ResumeMentionsSkill("", "Redis"));
         EXPECT_FALSE(ResumeMentionsSkill("Redis", "  "));
+    }
+
+    // 0015 B0/B1: the deterministic explanation inputs — deadline urgency,
+    // deal-breakers as DATA, and the NULL rules. Nothing here re-weights the
+    // rule_v1 score.
+    TEST(MatchExplanationTest, ClassifiesDeadlineUrgencyWithDateOnlyHandling)
+    {
+        const auto now =
+            std::chrono::system_clock::from_time_t(1800000000);
+
+        auto format = [](std::int64_t offsetSeconds)
+        {
+            const std::time_t moment =
+                static_cast<std::time_t>(1800000000 + offsetSeconds);
+            std::tm parts{};
+            gmtime_r(&moment, &parts);
+
+            char buffer[32] = {};
+            std::strftime(
+                buffer,
+                sizeof(buffer),
+                "%Y-%m-%d %H:%M:%S",
+                &parts);
+
+            return std::string(buffer);
+        };
+
+        // A NULL deadline is unknown and is never expired.
+        EXPECT_EQ(
+            ClassifyDeadlineUrgency(std::nullopt, std::nullopt, now),
+            DeadlineUrgency::kUnknown);
+        EXPECT_EQ(
+            ToString(DeadlineUrgency::kUnknown),
+            "unknown");
+
+        // Past / <=7d / <=30d / beyond, exact-instant deadlines.
+        EXPECT_EQ(
+            ClassifyDeadlineUrgency(
+                format(-60),
+                false,
+                now),
+            DeadlineUrgency::kExpired);
+        EXPECT_EQ(
+            ClassifyDeadlineUrgency(
+                format(6 * 24 * 3600),
+                false,
+                now),
+            DeadlineUrgency::kUrgent);
+        EXPECT_EQ(
+            ClassifyDeadlineUrgency(
+                format(8 * 24 * 3600),
+                false,
+                now),
+            DeadlineUrgency::kSoon);
+        EXPECT_EQ(
+            ClassifyDeadlineUrgency(
+                format(31 * 24 * 3600),
+                false,
+                now),
+            DeadlineUrgency::kNormal);
+
+        // A date-only deadline expires at the end of its Beijing day, so a
+        // noon-of-that-day instant that is already past is still urgent, not
+        // expired.
+        EXPECT_EQ(
+            ClassifyDeadlineUrgency(
+                format(-4 * 3600),
+                true,
+                now),
+            DeadlineUrgency::kUrgent);
+
+        // Same input twice -> same verdict (determinism).
+        EXPECT_EQ(
+            ClassifyDeadlineUrgency(
+                format(6 * 24 * 3600),
+                false,
+                now),
+            ClassifyDeadlineUrgency(
+                format(6 * 24 * 3600),
+                false,
+                now));
+    }
+
+    TEST(MatchExplanationTest, DealBreakersAreDataWithNullNeverExcluded)
+    {
+        const auto now =
+            std::chrono::system_clock::from_time_t(1800000000);
+
+        JobSummary job;
+        job.educationRequired = 4;
+        job.jobNature = 2;
+
+        UserProfile profile;
+        profile.educationLevel = 3;
+        profile.campusStatus = 3;
+        profile.salaryMin = 10;
+        profile.salaryMax = 20;
+
+        job.salaryMin = 30;
+        job.salaryMax = 40;
+
+        const auto breakers =
+            EvaluateMatchDealBreakers(job, profile, now);
+
+        ASSERT_EQ(breakers.size(), 3U);
+        EXPECT_EQ(breakers[0].code, "education_unmet");
+        EXPECT_EQ(breakers[1].code, "campus_incompatible");
+        EXPECT_EQ(breakers[2].code, "salary_no_intersection");
+        for (const MatchDealBreaker &breaker : breakers)
+        {
+            EXPECT_FALSE(breaker.text.empty());
+        }
+
+        // NULL job requirement -> never excluded.
+        JobSummary noRequirement = job;
+        noRequirement.educationRequired.reset();
+        noRequirement.jobNature.reset();
+        noRequirement.salaryMin.reset();
+        noRequirement.salaryMax.reset();
+        EXPECT_TRUE(
+            EvaluateMatchDealBreakers(
+                noRequirement,
+                profile,
+                now)
+                .empty());
+
+        // NULL profile field -> no penalty, and the missing side is reported as
+        // an advisory reason instead.
+        UserProfile emptyProfile;
+        EXPECT_TRUE(
+            EvaluateMatchDealBreakers(job, emptyProfile, now)
+                .empty());
+        EXPECT_TRUE(
+            EvaluateMatchDealBreakers(job, std::nullopt, now)
+                .empty());
+
+        const auto advisories =
+            ProjectMatchReasons(
+                job,
+                emptyProfile,
+                {},
+                {},
+                now);
+
+        bool educationAdvisory = false;
+        bool campusAdvisory = false;
+        bool salaryAdvisory = false;
+
+        for (const MatchReason &reason : advisories)
+        {
+            educationAdvisory =
+                educationAdvisory ||
+                reason.code == "education_unknown";
+            campusAdvisory =
+                campusAdvisory ||
+                reason.code == "campus_unknown";
+            salaryAdvisory =
+                salaryAdvisory ||
+                reason.code == "salary_unknown";
+            EXPECT_EQ(reason.evidence, "profile");
+        }
+
+        EXPECT_TRUE(educationAdvisory);
+        EXPECT_TRUE(campusAdvisory);
+        EXPECT_TRUE(salaryAdvisory);
+
+        // An expired deadline is a deal-breaker; a NULL one never is.
+        JobSummary expired = noRequirement;
+        expired.deadline = "2000-01-01 00:00:00";
+        const auto expiredBreakers =
+            EvaluateMatchDealBreakers(expired, profile, now);
+        ASSERT_EQ(expiredBreakers.size(), 1U);
+        EXPECT_EQ(expiredBreakers[0].code, "deadline_expired");
+    }
+
+    TEST(MatchExplanationTest, ReasonsCiteDeliveredFactsOnly)
+    {
+        const auto now =
+            std::chrono::system_clock::from_time_t(1800000000);
+
+        JobSummary job;
+        job.location = "深圳";
+        // Well beyond `now` (1800000000 = 2027-01-15) so the reason is a
+        // deadline-urgency statement rather than an expired veto.
+        job.deadline = "2028-01-01 00:00:00";
+
+        UserProfile profile;
+        profile.location = "上海";
+
+        const auto reasons =
+            ProjectMatchReasons(
+                job,
+                profile,
+                {"C++"},
+                {"Redis"},
+                now);
+
+        std::vector<std::string> codes;
+
+        for (const MatchReason &reason : reasons)
+        {
+            codes.push_back(reason.code);
+            EXPECT_FALSE(reason.text.empty());
+            EXPECT_FALSE(reason.evidence.empty());
+        }
+
+        EXPECT_NE(
+            std::find(codes.begin(), codes.end(), "skills_matched"),
+            codes.end());
+        EXPECT_NE(
+            std::find(codes.begin(), codes.end(), "skills_missing"),
+            codes.end());
+        EXPECT_NE(
+            std::find(codes.begin(), codes.end(), "location_mismatch"),
+            codes.end());
+
+        bool deadlineReason = false;
+
+        for (const MatchReason &reason : reasons)
+        {
+            if (reason.evidence == "deadline")
+            {
+                deadlineReason = true;
+                EXPECT_NE(reason.code, "deadline_expired");
+            }
+        }
+
+        EXPECT_TRUE(deadlineReason);
+
+        // No facts, no invented reasons: an empty profile/job yields nothing but
+        // the deadline-unknown case (which is silent by contract).
+        JobSummary emptyJob;
+        const auto emptyReasons =
+            ProjectMatchReasons(
+                emptyJob,
+                std::nullopt,
+                {},
+                {},
+                now);
+        EXPECT_TRUE(emptyReasons.empty());
+
+        // Determinism: identical inputs -> identical projections.
+        EXPECT_EQ(
+            reasons.size(),
+            ProjectMatchReasons(
+                job,
+                profile,
+                {"C++"},
+                {"Redis"},
+                now)
+                .size());
     }
 
 } // namespace jobpilot::service

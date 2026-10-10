@@ -164,6 +164,27 @@ namespace jobpilot::service
                         skills,
                         normalized,
                         now));
+
+                // 0015 B1: deterministic explanation; the weighted score above
+                // is untouched (decision 5).
+                RankedJob &scored = ranked.back();
+                scored.reasons =
+                    ProjectMatchReasons(
+                        candidate,
+                        profile,
+                        scored.matchedSkills,
+                        scored.missingSkills,
+                        now);
+                scored.dealBreakers =
+                    EvaluateMatchDealBreakers(
+                        candidate,
+                        profile,
+                        now);
+                scored.deadlineUrgency =
+                    ClassifyDeadlineUrgency(
+                        candidate.deadline,
+                        candidate.deadlineDateOnly,
+                        now);
             }
 
             std::sort(

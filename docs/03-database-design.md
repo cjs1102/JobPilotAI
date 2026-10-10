@@ -682,3 +682,11 @@ ALTER TABLE profiles
 2. [x] A2：`profiles` 三列 + `UserProfile` DTO + DAO 读/写 + `UpdateProfile` 校验 +
    `ProfileToJson` 响应（NULL 原样透传），`test_user_*` 与 `test_schema`（fresh + migrated）。
 3. [ ] A3：PDF 文本契约（不属于本单元，等待 owner 对 §5.1 a/b 的决定）。
+
+### 10.5 阶段 B 的索引决定（B0）
+
+0015 阶段 B 的匹配解释（`reasons[]` / `deal_breakers[]` / `deadline_urgency`）**不新增索引**：
+它完全在已取回的候选行与其 requirements 上进程内计算，没有引入任何新的过滤/排序形状；
+`with_match`/`strict` 也不改变 `BuildJobFilter` 的谓词（`strict` 只在已解释的行上做排除）。
+若后续把学历/性质变成 SQL 过滤，再以 `EXPLAIN` 实测决定（`idx_job_nature_education` 仍按
+「无证据不加」处理）。

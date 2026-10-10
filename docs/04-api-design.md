@@ -389,6 +389,39 @@ GET /api/v1/jobs
 
 - `salary_min/salary_max` 表示用户可接受薪资区间，岗位薪资区间与之有交集才返回。
 - 使用薪资过滤时，未提供薪资区间的岗位不返回。
+
+**0015 阶段 B 增量契约（B0，全部可选、默认关闭）**
+
+**落地状态（避免文档与代码分歧）**：截至本单元，已落地的是**解释输入与投影**（B1）以及
+`/recommended` 响应上的 `reasons[]` / `deal_breakers[]` / `deadline_urgency`；`GET /api/v1/jobs`
+的 `with_match` / `strict` 查询参数接线属 **B4**，**尚未落地**，因此该端点当前不识别这两个参数
+（传了也按缺省处理）。B4 落地后本表即为最终契约。
+
+| 参数 | 默认 | 语义 |
+|---|---|---|
+| `with_match` | `false` | `false`：响应与今天**逐字节一致**（不出现下列任何键）。`true`：每个列表项追加 `score` / `score_version` / `matched_skills` / `missing_skills` / `reasons[]` / `deal_breakers[]` / `deadline_urgency` |
+| `strict` | `false` | `false`（默认）：`deal_breakers[]` 只是**数据**，**不排除任何行**。`true`（显式 opt-in）：仅按文档化的 deal-breaker 码排除对应行；其它行不受影响 |
+
+- **权威声明（契约）**：`rule_v1` 是唯一权威的公开排序与分数来源；LLM/增强 worker 的结果
+  **永不**出现在 `/api/v1/jobs` 或 `/recommended` 的排序、分数或理由中（ADR-0009 修正 0013）。
+  0015 阶段 B **不重新加权** `rule_v1`（决策 5）：学历/应届/薪资兼容性以**判定数据**形式
+  返回，不进入加权和，因此分数边界不变。
+- `score` / `score_version`（`"rule_v1"`）语义与 `/recommended` 完全一致；`matched_skills` /
+  `missing_skills` 是既有字段。
+- `reasons[]`：`{"code": "<稳定码>", "text": "<中文句子>", "evidence": "<tag>"}`，
+  `evidence ∈ {skills, job_requirements, profile, resume_text, deadline}`（`deadline` 为 0015 新增）。
+  稳定码集合（B1）：`skills_matched` / `skills_missing` / `education_met` / `education_unmet` /
+  `education_unknown` / `campus_unknown` / `salary_unknown` / `location_match` /
+  `location_mismatch` / `deadline_expired` / `deadline_urgent` / `deadline_soon` /
+  `deadline_normal`。只陈述已交付事实，不推测。
+- `deal_breakers[]`：`{"code", "text"}`，稳定码
+  `education_unmet` / `campus_incompatible` / `salary_no_intersection` / `deadline_expired`。
+  **NULL 规则**：岗位侧字段为 NULL（或画像侧字段未填）**永不**产生 deal-breaker，也**不惩罚**
+  候选；缺失的一侧改为 advisory reason（如 `education_unknown`）。
+- `deadline_urgency`：`expired` / `urgent`（≤7 天）/ `soon`（≤30 天）/ `normal` / `unknown`，
+  由存储的 UTC 瞬时 + `deadline_date_only` 在 API 边界推导（`date_only` 表示该北京日结束时刻）。
+  **NULL 一律 `unknown`，永不视为 `expired`**。它**只**是展示元数据：不关闭岗位、不写
+  `status`、不改 freshness、不改 `review_status`（F13 不变量）。
 - `skill` 为精确技能过滤，匹配 `job_requirements.skill`。
 - 公共搜索结果按 `create_time DESC, id DESC` 稳定排序；`sort=deadline_asc` /
   `education_asc` 覆盖该排序（见下）。

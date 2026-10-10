@@ -32,6 +32,7 @@ add_library(jobpilot_service_core STATIC
     src/job/job_extra_fields.cpp
     src/job/job_ingestion_dao.cpp
     src/job/job_ingestion_service.cpp
+    src/job/match_explanation.cpp
     src/job/job_quality.cpp
     src/job/job_ranking.cpp
     src/job/job_ranking_service.cpp

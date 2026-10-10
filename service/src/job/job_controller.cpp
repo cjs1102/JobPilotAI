@@ -973,6 +973,36 @@ namespace jobpilot::service
                 job.matchedSkills;
             item["missing_skills"] =
                 job.missingSkills;
+
+            // 0015 B1/B3: deterministic explanation keys (additive; the
+            // `rule_v1` score itself is unchanged).
+            Json reasons = Json::array();
+
+            for (const MatchReason &reason : job.reasons)
+            {
+                reasons.push_back(
+                    Json{
+                        {"code", reason.code},
+                        {"text", reason.text},
+                        {"evidence", reason.evidence}});
+            }
+
+            item["reasons"] = std::move(reasons);
+
+            Json dealBreakers = Json::array();
+
+            for (const MatchDealBreaker &breaker :
+                 job.dealBreakers)
+            {
+                dealBreakers.push_back(
+                    Json{
+                        {"code", breaker.code},
+                        {"text", breaker.text}});
+            }
+
+            item["deal_breakers"] = std::move(dealBreakers);
+            item["deadline_urgency"] =
+                ToString(job.deadlineUrgency);
             list.push_back(
                 std::move(item));
         }

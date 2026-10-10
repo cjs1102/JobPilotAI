@@ -30,6 +30,11 @@ namespace jobpilot::service
             const JobSearchFilter &filter,
             std::size_t limit) override;
 
+        // 0015 B3: the strict candidate window (list predicate + list ordering).
+        std::vector<JobSummary> SearchListWindow(
+            const JobSearchFilter &filter,
+            std::size_t limit) override;
+
         std::size_t CountRankingCandidates(
             const JobSearchFilter &filter) override;
 

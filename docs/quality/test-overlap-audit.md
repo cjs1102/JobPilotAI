@@ -1,7 +1,9 @@
 # Test Overlap Audit — 0017-B
 
 Deliverable of ExecPlan 0017 §5.2 / §7 unit B. Remote workspace
-`dev@192.168.150.129:/home/dev/projects/JobPilotAI`, release preset `build/presets/release`.
+`dev@<dev-host>:/home/dev/projects/JobPilotAI` (the private host address is redacted, as
+`tools/checks/release_preflight.py` requires of every tracked file), release preset
+`build/presets/release`.
 The audit was computed against HEAD `a4d1f5f`; the test sources are unchanged at the current HEAD
 `38f29fd` (`git log --oneline a4d1f5f..38f29fd -- service/tests backend/tests` is empty and
 `git status --porcelain -- service/tests backend/tests` is empty, so every `file:line` below still

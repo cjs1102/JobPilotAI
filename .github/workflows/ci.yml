@@ -142,9 +142,21 @@ jobs:
           mysql --host=127.0.0.1 --user=root --password=ci-root-password -e "
             GRANT ALL PRIVILEGES ON *.* TO 'jobpilot_ci'@'%';"
 
+      # Printed so a failure documents its own environment: the server version,
+      # the collation the schema asserts, how many tables the load produced, and
+      # which accounts exist.
+      - name: Record the database the tests will use
+        run: |
+          mysql --host=127.0.0.1 --user=root --password=ci-root-password -e "
+            SELECT VERSION() AS server_version, @@collation_server AS collation_server;
+            SELECT COUNT(*) AS tables_in_ci
+              FROM information_schema.tables
+              WHERE table_schema = 'jobpilot_ci' AND table_type = 'BASE TABLE';
+            SELECT CONCAT(user, '@', host) AS account FROM mysql.user
+              WHERE user IN ('root', 'jobpilot_ci');"
+
       - name: Full test suite
         run: ctest --test-dir service/build/presets/release --output-on-failure
-
       - name: Python suites
         run: |
           (cd source_adapters && python3 -m unittest discover -s jobpilot_sources/tests -t .)

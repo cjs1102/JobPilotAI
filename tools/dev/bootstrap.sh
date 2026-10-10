@@ -75,10 +75,11 @@ if [ ! -f "$CONAN_HOME_DIR/profiles/default" ]; then
 fi
 
 # A fresh Conan home has no remotes at all, so the pinned graph cannot be
-# resolved until the registry is declared. Both names are overridable for a
-# mirror, but the default is the registry this project's lock was made against.
+# resolved until the registry is declared. The default is the official
+# ConanCenter; a mirror can be substituted with these two variables (the lock
+# pins recipe revisions, which a faithful mirror serves identically).
 CONAN_REMOTE_NAME="${CONAN_REMOTE_NAME:-conancenter}"
-CONAN_REMOTE_URL="${CONAN_REMOTE_URL:-https://center2.conan.io}"
+CONAN_REMOTE_URL="${CONAN_REMOTE_URL:-https://center.conan.io}"
 if ! "$CONAN_BIN" remote list | grep -q "^${CONAN_REMOTE_NAME}:"; then
     printf 'bootstrap: adding Conan remote %s -> %s\n' "$CONAN_REMOTE_NAME" "$CONAN_REMOTE_URL"
     "$CONAN_BIN" remote add "$CONAN_REMOTE_NAME" "$CONAN_REMOTE_URL"

@@ -293,6 +293,40 @@ namespace
         EXPECT_EQ(indexes.find("idx_nature_education"), indexes.end());
     }
 
+    // 0015 A2: the three nullable candidate columns on `profiles`, with the
+    // documented types. Run against the live (migrated) database and against a
+    // fresh-DDL database; both must satisfy this assertion.
+    TEST_F(SchemaTest, Creates0015ProfileCandidateColumns)
+    {
+        const jobpilot::core::Result result =
+            pool.Query(
+                "SELECT column_name, column_type, is_nullable "
+                "FROM information_schema.columns "
+                "WHERE table_schema = ? AND table_name = 'profiles' "
+                "AND column_name IN ('education_level', "
+                "'graduation_year', 'campus_status')",
+                {database});
+
+        ASSERT_EQ(result.rowCount(), 3U);
+
+        std::map<std::string, std::string> types;
+
+        for (std::size_t row = 0;
+             row < result.rowCount();
+             ++row)
+        {
+            types[RequireValue(result.value(row, 0))] =
+                RequireValue(result.value(row, 1));
+
+            // NULL = unknown: all three are nullable.
+            EXPECT_EQ(RequireValue(result.value(row, 2)), "YES");
+        }
+
+        EXPECT_EQ(types["education_level"], "tinyint");
+        EXPECT_EQ(types["graduation_year"], "smallint");
+        EXPECT_EQ(types["campus_status"], "tinyint");
+    }
+
     TEST_F(SchemaTest, CreatesRequiredUniqueIndexes)
     {
         const jobpilot::core::Result result =

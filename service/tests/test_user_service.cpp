@@ -515,6 +515,123 @@ namespace jobpilot::service
             ErrorCode::kInvalidParam);
     }
 
+    // 0015 A2: enum/range validation for the three candidate keys, plus the
+    // NULL = unknown passthrough (never a default class).
+    TEST_F(UserServiceTest, ValidatesCandidateProfileRanges)
+    {
+        const std::string serviceEmail =
+            TrackEmail("service-candidate");
+
+        ASSERT_EQ(
+            service->Register(
+                       "candidate-user",
+                       serviceEmail,
+                       "password")
+                .code,
+            ErrorCode::kSuccess);
+
+        const ServiceResult<LoginData> login =
+            service->Login(
+                serviceEmail,
+                "password");
+
+        ASSERT_EQ(login.code, ErrorCode::kSuccess);
+        tokens.push_back(login.value.token);
+
+        UserProfile profile;
+        profile.educationLevel = 3;
+        profile.graduationYear = 2026;
+        profile.campusStatus = 2;
+
+        const ServiceResult<UserProfile> updated =
+            service->UpdateProfile(
+                login.value.userId,
+                profile);
+
+        ASSERT_EQ(updated.code, ErrorCode::kSuccess);
+        EXPECT_EQ(updated.value.educationLevel, 3U);
+        EXPECT_EQ(updated.value.graduationYear, 2026U);
+        EXPECT_EQ(updated.value.campusStatus, 2U);
+
+        const ServiceResult<UserProfile> stored =
+            service->GetProfile(login.value.userId);
+
+        ASSERT_EQ(stored.code, ErrorCode::kSuccess);
+        EXPECT_EQ(stored.value.educationLevel, 3U);
+        EXPECT_EQ(stored.value.graduationYear, 2026U);
+        EXPECT_EQ(stored.value.campusStatus, 2U);
+
+        // Out of range -> 400, both bounds.
+        UserProfile tooHighEducation = profile;
+        tooHighEducation.educationLevel = 6;
+        EXPECT_EQ(
+            service->UpdateProfile(
+                       login.value.userId,
+                       tooHighEducation)
+                .code,
+            ErrorCode::kInvalidParam);
+
+        UserProfile zeroEducation = profile;
+        zeroEducation.educationLevel = 0;
+        EXPECT_EQ(
+            service->UpdateProfile(
+                       login.value.userId,
+                       zeroEducation)
+                .code,
+            ErrorCode::kInvalidParam);
+
+        UserProfile earlyGraduation = profile;
+        earlyGraduation.graduationYear = 1989;
+        EXPECT_EQ(
+            service->UpdateProfile(
+                       login.value.userId,
+                       earlyGraduation)
+                .code,
+            ErrorCode::kInvalidParam);
+
+        UserProfile lateGraduation = profile;
+        lateGraduation.graduationYear = 2101;
+        EXPECT_EQ(
+            service->UpdateProfile(
+                       login.value.userId,
+                       lateGraduation)
+                .code,
+            ErrorCode::kInvalidParam);
+
+        UserProfile badCampus = profile;
+        badCampus.campusStatus = 4;
+        EXPECT_EQ(
+            service->UpdateProfile(
+                       login.value.userId,
+                       badCampus)
+                .code,
+            ErrorCode::kInvalidParam);
+
+        // A rejected update must not have changed the stored row.
+        const ServiceResult<UserProfile> unchanged =
+            service->GetProfile(login.value.userId);
+
+        ASSERT_EQ(unchanged.code, ErrorCode::kSuccess);
+        EXPECT_EQ(unchanged.value.educationLevel, 3U);
+        EXPECT_EQ(unchanged.value.graduationYear, 2026U);
+        EXPECT_EQ(unchanged.value.campusStatus, 2U);
+
+        // NULL passthrough: omitted keys stay unknown.
+        UserProfile cleared;
+        const ServiceResult<UserProfile> clearedResult =
+            service->UpdateProfile(
+                login.value.userId,
+                cleared);
+
+        ASSERT_EQ(clearedResult.code, ErrorCode::kSuccess);
+        EXPECT_FALSE(
+            clearedResult.value.educationLevel.has_value());
+        EXPECT_FALSE(
+            clearedResult.value.graduationYear.has_value());
+        EXPECT_FALSE(
+            clearedResult.value.campusStatus.has_value());
+    }
+
     TEST_F(UserServiceTest, ManagesSkillsWithValidationAndIsolation)
     {
         const std::string firstEmail =

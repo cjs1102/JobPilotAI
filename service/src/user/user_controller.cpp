@@ -304,7 +304,13 @@ namespace jobpilot::service
                 {"salary_max",
                  NullableUnsigned(profile.salaryMax)},
                 {"summary",
-                 NullableString(profile.summary)}};
+                 NullableString(profile.summary)},
+                {"education_level",
+                 NullableUnsigned(profile.educationLevel)},
+                {"graduation_year",
+                 NullableUnsigned(profile.graduationYear)},
+                {"campus_status",
+                 NullableUnsigned(profile.campusStatus)}};
         }
 
         Json SkillToJson(
@@ -626,7 +632,19 @@ namespace jobpilot::service
             !TryGetOptionalString(
                 body,
                 "summary",
-                &profile.summary))
+                &profile.summary) ||
+            !TryGetOptionalUInt32(
+                body,
+                "education_level",
+                &profile.educationLevel) ||
+            !TryGetOptionalUInt32(
+                body,
+                "graduation_year",
+                &profile.graduationYear) ||
+            !TryGetOptionalUInt32(
+                body,
+                "campus_status",
+                &profile.campusStatus))
         {
             WriteResponse(
                 &response,

@@ -655,6 +655,9 @@ namespace jobpilot::service
             {"salary_min", 15},
             {"salary_max", 25},
             {"summary", "熟悉 Linux"},
+            {"education_level", 3},
+            {"graduation_year", 2026},
+            {"campus_status", 2},
             {"user_id", secondUser.first}};
 
         const std::optional<HttpResponseData> updatedProfile =
@@ -670,6 +673,36 @@ namespace jobpilot::service
         EXPECT_EQ(
             updatedProfile->jsonBody["data"]["location"],
             "深圳");
+        // 0015 A2 keys round-trip through the HTTP contract.
+        EXPECT_EQ(
+            updatedProfile->jsonBody["data"]["education_level"],
+            3);
+        EXPECT_EQ(
+            updatedProfile->jsonBody["data"]["graduation_year"],
+            2026);
+        EXPECT_EQ(
+            updatedProfile->jsonBody["data"]["campus_status"],
+            2);
+
+        const std::optional<HttpResponseData> rereadProfile =
+            SendRequest(
+                "GET",
+                "/api/v1/users/profile",
+                "",
+                firstAuthorization);
+
+        ASSERT_TRUE(rereadProfile.has_value());
+        ASSERT_TRUE(rereadProfile->hasJson);
+        EXPECT_EQ(rereadProfile->statusCode, 200);
+        EXPECT_EQ(
+            rereadProfile->jsonBody["data"]["education_level"],
+            3);
+        EXPECT_EQ(
+            rereadProfile->jsonBody["data"]["graduation_year"],
+            2026);
+        EXPECT_EQ(
+            rereadProfile->jsonBody["data"]["campus_status"],
+            2);
 
         const std::optional<HttpResponseData> secondProfile =
             SendRequest(
@@ -833,6 +866,57 @@ namespace jobpilot::service
         ASSERT_TRUE(profileResult->hasJson);
         EXPECT_EQ(profileResult->statusCode, 400);
         EXPECT_EQ(profileResult->jsonBody["code"], 10001);
+
+        // 0015 A2: enum/range bounds for the candidate keys -> 400.
+        const nlohmann::json candidateCases[] = {
+            nlohmann::json{{"education_level", 6}},
+            nlohmann::json{{"education_level", 0}},
+            nlohmann::json{{"education_level", -1}},
+            nlohmann::json{{"graduation_year", 1989}},
+            nlohmann::json{{"graduation_year", 2101}},
+            nlohmann::json{{"graduation_year", -1}},
+            nlohmann::json{{"campus_status", 0}},
+            nlohmann::json{{"campus_status", 4}}};
+
+        for (const nlohmann::json &candidate : candidateCases)
+        {
+            const std::optional<HttpResponseData> rejected =
+                SendRequest(
+                    "PUT",
+                    "/api/v1/users/profile",
+                    candidate.dump(),
+                    authorization);
+
+            ASSERT_TRUE(rejected.has_value());
+            ASSERT_TRUE(rejected->hasJson);
+            EXPECT_EQ(rejected->statusCode, 400)
+                << candidate.dump();
+            EXPECT_EQ(rejected->jsonBody["code"], 10001)
+                << candidate.dump();
+        }
+
+        // NULL = unknown: explicit nulls are accepted and echoed as null.
+        const nlohmann::json nullCandidates{
+            {"education_level", nullptr},
+            {"graduation_year", nullptr},
+            {"campus_status", nullptr}};
+
+        const std::optional<HttpResponseData> nulled =
+            SendRequest(
+                "PUT",
+                "/api/v1/users/profile",
+                nullCandidates.dump(),
+                authorization);
+
+        ASSERT_TRUE(nulled.has_value());
+        ASSERT_TRUE(nulled->hasJson);
+        EXPECT_EQ(nulled->statusCode, 200);
+        EXPECT_TRUE(
+            nulled->jsonBody["data"]["education_level"].is_null());
+        EXPECT_TRUE(
+            nulled->jsonBody["data"]["graduation_year"].is_null());
+        EXPECT_TRUE(
+            nulled->jsonBody["data"]["campus_status"].is_null());
 
         const nlohmann::json invalidSkill{
             {"name", "C++"},

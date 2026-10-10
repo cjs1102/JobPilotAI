@@ -130,6 +130,9 @@ namespace jobpilot::service
         profile.salaryMin = 15;
         profile.salaryMax = 25;
         profile.summary = "熟悉 Linux 网络编程";
+        profile.educationLevel = 3;
+        profile.graduationYear = 2026;
+        profile.campusStatus = 2;
 
         ASSERT_TRUE(dao->UpsertProfile(profile));
 
@@ -140,10 +143,18 @@ namespace jobpilot::service
         EXPECT_EQ(stored->targetPosition, "C++后端开发");
         EXPECT_EQ(stored->salaryMin, 15U);
         EXPECT_EQ(stored->salaryMax, 25U);
+        // 0015 A2: the three nullable candidate columns round-trip.
+        EXPECT_EQ(stored->educationLevel, 3U);
+        EXPECT_EQ(stored->graduationYear, 2026U);
+        EXPECT_EQ(stored->campusStatus, 2U);
 
         profile.location = "上海";
         profile.salaryMin.reset();
         profile.salaryMax.reset();
+        // NULL = unknown: an omitted key must stay NULL, never a default class.
+        profile.educationLevel.reset();
+        profile.graduationYear.reset();
+        profile.campusStatus.reset();
 
         ASSERT_TRUE(dao->UpsertProfile(profile));
 
@@ -154,6 +165,9 @@ namespace jobpilot::service
         EXPECT_EQ(updated->location, "上海");
         EXPECT_FALSE(updated->salaryMin.has_value());
         EXPECT_FALSE(updated->salaryMax.has_value());
+        EXPECT_FALSE(updated->educationLevel.has_value());
+        EXPECT_FALSE(updated->graduationYear.has_value());
+        EXPECT_FALSE(updated->campusStatus.has_value());
     }
 
     TEST_F(UserDaoTest, UpsertsListsAndDeletesScopedSkills)

@@ -29,6 +29,15 @@ namespace jobpilot::service
         std::optional<std::uint32_t> salaryMin;
         std::optional<std::uint32_t> salaryMax;
         std::optional<std::string> summary;
+
+        // 0015 A2 candidate data. All three are NULL = unknown and must never
+        // be interpreted as a specific class. educationLevel reuses the
+        // jobs.education_required enum (1不限/2大专/3本科/4硕士/5博士);
+        // campusStatus is 1非应届/2应届/3在校; graduationYear is 1990..2100.
+        std::optional<std::uint32_t> educationLevel;
+        std::optional<std::uint32_t> graduationYear;
+        std::optional<std::uint32_t> campusStatus;
+
         std::string createTime;
         std::string updateTime;
     };

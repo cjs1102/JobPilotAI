@@ -671,6 +671,10 @@ Stop and report to the Lead (do not widen scope) if:
 - [x] Confirm current-tree facts (HEAD `bd7d451`)
 - [x] Design + contracts + phases (this document)
 - [ ] Phase A: contract (A1) → columns/DTO/DAO (A2) → PDF contract (A3)
+  - [x] A1 + A2 (minus PDF): `docs/03` §10 + §3 DDL + §5 note, `docs/04` §3.4 keys,
+        `database/schema/01_user.sql`, `UserProfile`/DAO/`UpdateProfile`/`ProfileToJson`,
+        `test_user_*` + `test_schema` (fresh + migrated); NULL = unknown, no backfill.
+  - [ ] A3 (PDF text contract) — separate unit, awaiting the §5.1 a/b owner decision.
 - [ ] Phase B: contract (B0) → candidate components (B1) → reasons (B2) →
       deal-breakers/urgency (B3) → writers + docs (B4)
 - [ ] Phase C: decision 2 (C1) → implement (C2) → docs (C3)

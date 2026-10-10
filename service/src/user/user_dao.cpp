@@ -195,7 +195,7 @@ namespace jobpilot::service
 
             const auto &row = result.row(0);
 
-            if (row.size() != 9)
+            if (row.size() != 12)
             {
                 throw std::runtime_error(
                     "profile query returned an unexpected column count");
@@ -241,10 +241,35 @@ namespace jobpilot::service
                 profile.summary = row[6].value();
             }
 
+            // 0015 A2 candidate data; NULL stays nullopt (unknown).
+            if (row[7].has_value())
+            {
+                profile.educationLevel =
+                    ParseUnsigned32(
+                        row[7],
+                        "profiles.education_level");
+            }
+
+            if (row[8].has_value())
+            {
+                profile.graduationYear =
+                    ParseUnsigned32(
+                        row[8],
+                        "profiles.graduation_year");
+            }
+
+            if (row[9].has_value())
+            {
+                profile.campusStatus =
+                    ParseUnsigned32(
+                        row[9],
+                        "profiles.campus_status");
+            }
+
             profile.createTime =
-                RequireValue(row[7], "profiles.create_time");
+                RequireValue(row[10], "profiles.create_time");
             profile.updateTime =
-                RequireValue(row[8], "profiles.update_time");
+                RequireValue(row[11], "profiles.update_time");
 
             return profile;
         }
@@ -372,6 +397,7 @@ namespace jobpilot::service
             pool_.Query(
                 "SELECT user_id, target_position, experience, "
                 "location, salary_min, salary_max, summary, "
+                "education_level, graduation_year, campus_status, "
                 "create_time, update_time "
                 "FROM profiles WHERE user_id = ? LIMIT 1",
                 {userId});
@@ -390,22 +416,29 @@ namespace jobpilot::service
         pool_.Execute(
             "INSERT INTO profiles "
             "(user_id, target_position, experience, location, "
-            "salary_min, salary_max, summary) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "salary_min, salary_max, summary, education_level, "
+            "graduation_year, campus_status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON DUPLICATE KEY UPDATE "
             "target_position = VALUES(target_position), "
             "experience = VALUES(experience), "
             "location = VALUES(location), "
             "salary_min = VALUES(salary_min), "
             "salary_max = VALUES(salary_max), "
-            "summary = VALUES(summary)",
+            "summary = VALUES(summary), "
+            "education_level = VALUES(education_level), "
+            "graduation_year = VALUES(graduation_year), "
+            "campus_status = VALUES(campus_status)",
             {profile.userId,
              OptionalStringParam(profile.targetPosition),
              OptionalStringParam(profile.experience),
              OptionalStringParam(profile.location),
              OptionalUnsignedParam(profile.salaryMin),
              OptionalUnsignedParam(profile.salaryMax),
-             OptionalStringParam(profile.summary)});
+             OptionalStringParam(profile.summary),
+             OptionalUnsignedParam(profile.educationLevel),
+             OptionalUnsignedParam(profile.graduationYear),
+             OptionalUnsignedParam(profile.campusStatus)});
 
         return true;
     }

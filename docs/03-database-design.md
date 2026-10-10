@@ -62,6 +62,9 @@ CREATE TABLE profiles (
     salary_min      INT UNSIGNED DEFAULT NULL COMMENT '期望月薪下限(千元)',
     salary_max      INT UNSIGNED DEFAULT NULL COMMENT '期望月薪上限(千元)',
     summary         TEXT         DEFAULT NULL COMMENT '自我评价',
+    education_level TINYINT      DEFAULT NULL COMMENT '最高学历 1不限/2大专/3本科/4硕士/5博士(与 jobs.education_required 同枚举，0015)',
+    graduation_year SMALLINT     DEFAULT NULL COMMENT '毕业年份 1990..2100，NULL=未知(0015)',
+    campus_status   TINYINT      DEFAULT NULL COMMENT '1非应届/2应届/3在校，NULL=未知(0015)',
     create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_id (user_id),
@@ -248,6 +251,11 @@ CREATE TABLE notifications (
 > 类型标志（见 §9.1/§9.6）。
 
 > 岗位搜索初期用 `LIKE '%kw%'`，数据量大后引入全文索引或 ES（见架构文档 §12 演进路径）。
+
+> 0015 A2 的三个 `profiles` 新列（`education_level` / `graduation_year` /
+> `campus_status`）**不新增索引**：`profiles` 只按 `user_id` 读取，`uk_user_id`
+> 已覆盖，本阶段没有任何按这三列过滤的查询（候选匹配组件属阶段 B，届时如需
+> 过滤再以 `EXPLAIN` 证据决定）。详见 §10。
 
 ## 6. 数据初始化
 
@@ -622,3 +630,55 @@ F13 确认的第 3/4 条要求：(a) date-only 值按北京正午的 UTC 瞬时�
 避免输出一个看似到期时刻的 12:00。因此 `deadline_date_only` 是 (b)/(c) 在
 存储+响应链路上的**逻辑必需**，作为派生决定记录于此。若产品否决该派生，
 可退回「只存瞬时」，但必须同时放弃 (b) 的区分能力。
+
+## 10. 0015 Additive Candidate Data Migration Contract（增量契约）
+
+0015 阶段 A（候选人数据完整性）只新增 `profiles` 的三个**可空**列。不改任何既有列、
+不改 `rule_v1` 权重、不触碰 0015A 质量门与 48 KiB 上限、不回填历史行。
+
+### 10.1 `profiles` 新增列（已落地）
+
+```sql
+education_level TINYINT  DEFAULT NULL  -- 1不限/2大专/3本科/4硕士/5博士（与 jobs.education_required 同枚举）
+graduation_year SMALLINT DEFAULT NULL  -- 毕业年份 1990..2100
+campus_status   TINYINT  DEFAULT NULL  -- 1非应届/2应届/3在校
+```
+
+三列均可空且 `DEFAULT NULL`；非空时的取值范围由应用层（`UserService::IsValidProfile`）
+与 `docs/04` §3.4 的键契约共同约束。
+
+### 10.2 不变量
+
+- **NULL = 未知**：三列为 `NULL` 表示「用户没有提供」，**绝不能被解释为某个具体档位**
+  （不是「不限」、不是「非应届」、不是任何默认年份）。读路径必须把 `NULL` 原样映射为
+  `null`/`std::nullopt`，不得用 0 或默认值代替；阶段 B 的匹配 NULL 规则以本契约为前提。
+- **枚举唯一复用**：`education_level` 与 `jobs.education_required` 使用**同一套** 1..5 语义，
+  两端不得各自扩展或重新解释；本阶段不新增枚举值。
+- **NULL ≠ 负值、≠ 0**：`graduation_year` 不用 0 表示未知；越界值属于参数错误（`400`），
+  不是「未知」。
+- **additive only**：既有 profile 键含义不变；`uk_user_id`、`idx_location` 不变。
+- **无新索引**（A0 决定）：`profiles` 只按 `user_id` 读取（`uk_user_id` 已覆盖）；本阶段没有
+  任何按新列过滤的查询，按「无证据不加索引」处理，见 §5 注记。若阶段 B 需要过滤，再以
+  `EXPLAIN` 实测决定。
+- **不是时间语义**：`graduation_year` 是日历年，不参与 `deadline`/F13 生命周期，也不影响
+  freshness。
+
+### 10.3 既有库升级
+
+```sql
+ALTER TABLE profiles
+    ADD COLUMN education_level TINYINT  DEFAULT NULL COMMENT '最高学历 1不限/2大专/3本科/4硕士/5博士(与 jobs.education_required 同枚举，0015)',
+    ADD COLUMN graduation_year SMALLINT DEFAULT NULL COMMENT '毕业年份 1990..2100，NULL=未知(0015)',
+    ADD COLUMN campus_status   TINYINT  DEFAULT NULL COMMENT '1非应届/2应届/3在校，NULL=未知(0015)';
+```
+
+既有行三列一律为 `NULL`（**未知**）——这是列默认值，不代表历史用户已被分类；
+**不做任何回填/批量推断**。ALTER 幂等：仅在列不存在时执行一次。与 0014 §9.4 同一条纪律：
+迁移先行、代码随后、fresh DDL 库与迁移库都以 `backend/tests/test_schema.cpp` 断言。
+
+### 10.4 实施顺序
+
+1. [x] A1：本契约（§10）+ §3 锁定 DDL + §5 索引注记 + `docs/04` §3.4 键契约。
+2. [x] A2：`profiles` 三列 + `UserProfile` DTO + DAO 读/写 + `UpdateProfile` 校验 +
+   `ProfileToJson` 响应（NULL 原样透传），`test_user_*` 与 `test_schema`（fresh + migrated）。
+3. [ ] A3：PDF 文本契约（不属于本单元，等待 owner 对 §5.1 a/b 的决定）。

@@ -180,9 +180,24 @@ PUT /api/v1/users/profile
   "location": "深圳",
   "salary_min": 15,
   "salary_max": 25,
-  "summary": "熟悉C++、Linux、网络编程"
+  "summary": "熟悉C++、Linux、网络编程",
+  "education_level": 3,
+  "graduation_year": 2026,
+  "campus_status": 2
 }
 ```
+
+0015 A2 增量键（全部**可选**；省略或显式 `null` = 未知）：
+
+- `education_level`：整数 `1..5`（`1不限/2大专/3本科/4硕士/5博士`），与岗位侧
+  `education_required` **同一枚举**；越界（含 0、6、负数、非整数）→ `400`（`code=10001`）。
+- `graduation_year`：整数 `1990..2100`（毕业**日历年**，不是时间戳，不参与 deadline 语义）；
+  越界（含 1989、2101、负数、非整数）→ `400`。
+- `campus_status`：整数 `1非应届/2应届/3在校`；越界（含 0、4、负数、非整数）→ `400`。
+- **NULL 语义**：三键省略或为 `null` 表示「未知」，服务端存 `NULL` 并**原样返回 `null`**；
+  不得用 0、空串或任何默认档位代替（`docs/03` §10.2）。响应中三键始终出现，无值即 `null`。
+- `GET /api/v1/users/profile` 与 `PUT /api/v1/users/profile` 使用同一组键；更新为整组语义
+  （未提供的键写 `NULL`，与既有 6 个键一致）。
 
 ### 3.5 技能管理
 

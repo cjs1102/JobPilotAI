@@ -102,6 +102,27 @@ namespace jobpilot::service
             return false;
         }
 
+        if (profile.educationLevel.has_value() &&
+            (profile.educationLevel.value() < 1 ||
+             profile.educationLevel.value() > 5))
+        {
+            return false;
+        }
+
+        if (profile.graduationYear.has_value() &&
+            (profile.graduationYear.value() < 1990 ||
+             profile.graduationYear.value() > 2100))
+        {
+            return false;
+        }
+
+        if (profile.campusStatus.has_value() &&
+            (profile.campusStatus.value() < 1 ||
+             profile.campusStatus.value() > 3))
+        {
+            return false;
+        }
+
         return !profile.salaryMin.has_value() ||
                !profile.salaryMax.has_value() ||
                profile.salaryMin.value() <=

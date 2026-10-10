@@ -17,8 +17,10 @@
 > raw lines in `## Verified Snapshot`). **No plan is active.** Carried forward:
 > 0014's Step 5 is environment-limited (see the Completed Plan section and
 > `## Next Entry` items 6/7), the bookmarklet's publish/read-back acceptance is
-> still open, 0015's D6 stays deferred by owner decision, and 0016's CI `image`
-> job awaits the owner's first GitHub run.
+> still open, 0015's D6 stays deferred by owner decision, and 0016's CI has now
+> run: `clean build` and `container image and the end-to-end gate` are green on a
+> GitHub runner and the suite job ran the whole 309-test suite there (run
+> `38057642118` at `9238b97`, all three jobs green), which closes CE-4 and CE-5.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -165,8 +167,14 @@ Delivered:
   control; it found and fixed the `main.cpp` artifact wiring (plan §17).
 - P4 CI: `.github/workflows/ci.yml` with `build`, `integration` (MySQL 8.0 +
   Redis 7, schema from the committed files, the whole CTest suite, both Python
-  suites) and `image` jobs; the `image` job is not replayable on this host and
-  awaits the owner's first GitHub run.
+  suites) and `image` jobs. The first real runs then did their job: they exposed
+  the compose environment the image job needed, and — the reason the suite job had
+  never executed a single test — a ctest path pointing at the service entry's
+  build directory while the job had configured the root entry. `clean build` and
+  `container image and the end-to-end gate` are confirmed green on a runner
+  (closing CE-5: the committed image builds there and the gate passes against
+  it), and run `38057642118` at `9238b97` is green on all three jobs, the suite
+  job included - its first genuine execution of the 309 tests on a runner.
 - P5 open-source hygiene: English Quick Start in `README.md`,
   `THIRD_PARTY_NOTICES.md`, dated corrections in `docs/07`/`docs/08`, the
   `docs/README.md` reading order, and a secret/private-detail scan (two private
@@ -484,14 +492,15 @@ Performance baseline:
    `0a6e59e`, raw lines in `## Verified Snapshot`), so the recorded MVP roadmap is
    complete through packaging and **no plan is active**. Genuinely open:
    0014's Step 5 (item 6), the bookmarklet's `publish-capture`/read-back
-   acceptance (item 7), 0015's D6 deferral (0015 plan §17), and 0016's CI `image`
-   job — unconfirmed until the owner sees the first GitHub run. That workflow
-   itself is verified as far as it can be from here: `actionlint` 1.7.7 reports
-   **0 issues** (schema, expressions and shell rules), while no Actions run can be
-   observed because this repository is **private** and the credential available on
-   the development host has no Actions scope. The repository being private is also
-   the one thing that keeps the packaging work from being "open source" in
-   practice: making it public (and confirming the first CI run) is the owner's
+   acceptance (item 7), 0015's D6 deferral (0015 plan §17), and 0016's CI: the
+   workflow runs: run `38057642118` at `9238b97` is **green on all three jobs** —
+   `clean build`, `container image and the end-to-end gate` (the committed
+   `ubuntu:24.04` image builds on a runner and the demo gate passes against it:
+   CE-5 closed) and `full test suite (MySQL + Redis)`, whose first genuine
+   execution ran the whole 309-test suite green. That workflow itself is
+   verified as far as it can be locally (actionlint 1.7.7: **0 issues**). The
+   repository being **private** is also the one thing that keeps the packaging
+   work from being "open source" in practice: making it public is the owner's
    call. The Lead commits and pushes this archival change.
 9. **Resolved — both plans are archived under `completed/`.** 0015A's §13 step
    boxes remain unticked on purpose (never maintained during the stage); its

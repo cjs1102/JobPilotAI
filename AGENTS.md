@@ -22,8 +22,16 @@ not done:
   not executed (§19.5).
 - 0015's D6 (`ai_worker` `resume_optimize` wording pass) remains **deferred by
   owner decision** (0015 plan §17).
-- 0016's CI **`image` job is unconfirmed until the owner sees the first GitHub
-  run** (0016 §14 P4 / §17; Docker Hub is unreachable on this host).
+- 0016's CI **`image` job is confirmed green**, and the first real CI run exposed
+  and fixed four things it was meant to expose: the workflow ran for the first
+  time on 2026-10-10 (`clean build` ✓ and `container image and the end-to-end
+  gate` ✓ — the committed `ubuntu:24.04` image builds on a runner and the demo
+  gate passes against it, which closes CE-5), while the `integration` job needed
+  an `.env` for compose, the ctest path corrected to the root entry's build
+  directory, and the registry default moved to the official ConanCenter. Run
+  `38057642118` (`9238b97`) is then green on all three jobs, including the suite
+  job's first genuine execution. The repository being **private** is still the one
+  thing that keeps the packaging work from being open source in practice.
 
 Product direction is China-first per
 `docs/adr/0011-china-first-sourcing-and-compliance.md` (public sources plus

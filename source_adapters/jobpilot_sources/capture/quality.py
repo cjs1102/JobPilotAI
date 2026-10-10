@@ -25,8 +25,11 @@ Mirrored rules, in the C++ order:
    query-only URL -> needs_review.
 6. ``source_url_shape_unrecognised`` - no detail marker and no >= 4 digit run ->
    advisory.
-7. ``employer_is_platform`` - registry match -> needs_review (fail-open when the
-   name is unknown).
+7. ``employer_is_platform`` - registry match **and** the source host confirms the
+   same platform (exact or subdomain, 0015A option B) -> needs_review; a registry
+   match whose host does not confirm it becomes the advisory
+   ``platform_host_unverified`` and the row stays visible (fail-open). A name
+   absent from the registry never produces either finding.
 8. ``employer_implausible`` - normalised employer empty/1 ASCII byte long, or
    all ASCII digits -> advisory.
 9. ``title_equals_company`` -> needs_review.
@@ -48,6 +51,7 @@ from ..registry import (
     PlatformNameRegistry,
     ascii_trim,
     normalize_platform_name,
+    source_url_host,
 )
 from .artifact import CaptureError
 
@@ -69,6 +73,7 @@ CODE_SOURCE_URL_UNUSABLE = "source_url_unusable"
 CODE_SOURCE_URL_NOT_DETAIL = "source_url_not_detail"
 CODE_SOURCE_URL_UNRECOGNISED = "source_url_shape_unrecognised"
 CODE_EMPLOYER_IS_PLATFORM = "employer_is_platform"
+CODE_PLATFORM_HOST_UNVERIFIED = "platform_host_unverified"
 CODE_EMPLOYER_IMPLAUSIBLE = "employer_implausible"
 CODE_TITLE_EQUALS_COMPANY = "title_equals_company"
 CODE_DUPLICATE_CONTENT_IN_BATCH = "duplicate_content_in_batch"
@@ -453,17 +458,37 @@ def evaluate_findings(
             )
 
     if company:
-        if active.size > 0 and active.contains(company):
-            _add(
-                findings,
-                CODE_EMPLOYER_IS_PLATFORM,
-                'employer equals a registered platform name ("'
-                f'{company}"); the platform is not the employer',
-                OUTCOME_NEEDS_REVIEW,
-                field="company",
-            )
-
         normalized = normalize_platform_name(company)
+
+        if active.size > 0 and active.contains(company):
+            # 0015A option B (plan section 6.1 codes 2/3): the verdict is
+            # asserted only when the deterministic hostname mapping confirms the
+            # same platform. Company, host and registry are exact-matched; the
+            # real employer is never inferred from free text. Anything else -
+            # an unknown host or a different platform's host - degrades to an
+            # advisory and the row stays visible (fail-open).
+            host = source_url_host(url)
+
+            if active.host_confirms_platform(host, normalized):
+                _add(
+                    findings,
+                    CODE_EMPLOYER_IS_PLATFORM,
+                    'employer equals a registered platform name ("'
+                    f'{company}") and the source host ("{host}") is that '
+                    "platform's own domain; the platform is not the employer",
+                    OUTCOME_NEEDS_REVIEW,
+                    field="company",
+                )
+            else:
+                _add(
+                    findings,
+                    CODE_PLATFORM_HOST_UNVERIFIED,
+                    'employer equals a registered platform name ("'
+                    f'{company}") but the source host ("{host}") does not '
+                    "confirm it; no verdict asserted, kept advisory",
+                    OUTCOME_ADVISORY,
+                    field="company",
+                )
 
         # C++ compares `normalized.size() < 2` in BYTES, so a one-character CJK
         # name (3 bytes) is plausible while a single ASCII character is not.
@@ -639,6 +664,7 @@ __all__ = [
     "CODE_DUPLICATE_CONTENT_IN_BATCH",
     "CODE_EMPLOYER_IMPLAUSIBLE",
     "CODE_EMPLOYER_IS_PLATFORM",
+    "CODE_PLATFORM_HOST_UNVERIFIED",
     "CODE_SOURCE_URL_NOT_DETAIL",
     "CODE_SOURCE_URL_UNRECOGNISED",
     "CODE_SOURCE_URL_UNUSABLE",

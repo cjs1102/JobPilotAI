@@ -34,8 +34,10 @@ from jobpilot_sources.registry import (
     PLATFORM_NAMES_FILE_ENV,
     SUFFIXES,
     PlatformNameRegistry,
+    normalize_host,
     normalize_platform_name,
     resolve_platform_names_path,
+    source_url_host,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -110,6 +112,82 @@ NORMALIZATION_TABLE = (
     ("前程无忧网", "前程无忧"),
 )
 
+#: The canonical host-suffix mapping of the shared registry file, keyed by the
+#: NORMALISED platform name (`智联招聘` -> `智联`). The C++ registry reports
+#: HostMappingCount() == 18 and HostConfirmsPlatform() == 1 for every pair here.
+CANONICAL_HOST_SUFFIXES = {
+    "牛客": ("nowcoder.com", "niuke.com"),
+    "实习僧": ("shixiseng.com",),
+    "国聘": ("iguopin.com",),
+    "智联": ("zhaopin.com",),
+    "前程无忧": ("51job.com",),
+    "中华英才": ("chinahr.com",),
+    "应届生求职": ("yingjiesheng.com",),
+    "大街": ("dajie.com",),
+    "猎聘": ("liepin.com",),
+    "拉勾": ("lagou.com",),
+    "看准": ("kanzhun.com",),
+    "职友集": ("jobui.com",),
+    "nowcoder": ("nowcoder.com",),
+    "boss直聘": ("zhipin.com",),
+    "51job": ("51job.com",),
+    "lagou": ("lagou.com",),
+    "liepin": ("liepin.com",),
+    "zhaopin": ("zhaopin.com",),
+}
+
+#: (host, platform, confirmed) captured from the compiled C++ registry through
+#: `HostConfirmsPlatform(host, Normalize(platform))` - the `HC|` rows of
+#: tools/verify_platform_name_parity.cpp.
+HOST_CONFIRMATION_TABLE = (
+    ("nowcoder.com", "牛客", True),
+    ("nowcoder.com", "nowcoder", True),
+    ("niuke.com", "牛客", True),
+    ("niuke.com", "nowcoder", False),
+    ("www.nowcoder.com", "牛客", True),
+    ("WWW.NowCoder.com", "牛客", True),
+    ("nowcoder.com.", "牛客", True),
+    ("nowcoder.com..", "牛客", True),
+    ("jobs.nowcoder.com", "牛客", True),
+    ("evilnowcoder.com", "牛客", False),
+    ("nowcoder.com.cn", "牛客", False),
+    ("nowcoder.com:8080", "牛客", False),
+    ("user@nowcoder.com", "牛客", False),
+    ("zhaopin.com", "牛客", False),
+    ("nowcoder.com", "智联招聘", False),
+    ("zhaopin.com", "智联招聘", True),
+    ("shixiseng.com", "实习僧", True),
+    ("unknown.example.com", "牛客", False),
+    ("nowcoder.com", "未知平台", False),
+    ("", "牛客", False),
+    ("nowcoder.com", "", False),
+)
+
+#: (input, normalized) for `NormalizeHost` (ASCII trim/fold, trailing dots,
+#: one leading `www.`). The port stays: `HostOf` removes it before this.
+HOST_NORMALIZATION_TABLE = (
+    ("  NowCoder.com  ", "nowcoder.com"),
+    ("WWW.NowCoder.com", "nowcoder.com"),
+    ("nowcoder.com.", "nowcoder.com"),
+    ("nowcoder.com...", "nowcoder.com"),
+    ("www.www.x.com", "www.x.com"),
+    ("nowcoder.com:8080", "nowcoder.com:8080"),
+    ("　nowcoder.com　", "　nowcoder.com　"),
+    ("", ""),
+)
+
+#: (url, host) for `HostOf`: authority only, userinfo and port removed; a value
+#: without `://` has no host.
+SOURCE_URL_HOST_TABLE = (
+    ("https://nowcoder.com/campus/1001", "nowcoder.com"),
+    ("http://www.nowcoder.com./a?b=1", "nowcoder.com"),
+    ("https://user:pw@NowCoder.com:8443/jobs/1#frag", "nowcoder.com"),
+    ("https://nowcoder.com?x=1", "nowcoder.com"),
+    ("https://nowcoder.com#frag", "nowcoder.com"),
+    ("nowcoder.com/campus/1001", ""),
+    ("", ""),
+)
+
 
 class NormalizationParityTest(unittest.TestCase):
     def test_normalization_table_matches_the_cpp_registry(self) -> None:
@@ -168,6 +246,177 @@ class NormalizationParityTest(unittest.TestCase):
         registry = PlatformNameRegistry.from_names([" 牛客网 ", "", "   ", "ACME"])
 
         self.assertEqual(registry.names, frozenset({"牛客", "acme"}))
+
+
+class HostMappingParityTest(unittest.TestCase):
+    """0015A option B: the hostname -> platform mapping, pinned to C++.
+
+    Expectations come from the compiled C++ registry (`tools/
+    verify_platform_name_parity.cpp`, `HCOUNT|`/`HC|` rows); every value below
+    was produced by the real `PlatformNameRegistry`, not by reading the YAML.
+    """
+
+    def registry(self) -> PlatformNameRegistry:
+        return PlatformNameRegistry.load(PACKAGE_DATA_FILE)
+
+    def test_host_mapping_count(self) -> None:
+        self.assertEqual(self.registry().host_mapping_count, 18)
+
+    def test_canonical_host_suffixes(self) -> None:
+        self.assertEqual(dict(self.registry().hosts), CANONICAL_HOST_SUFFIXES)
+
+    def test_host_confirmation_table_matches_the_cpp_registry(self) -> None:
+        registry = self.registry()
+
+        for host, platform, expected in HOST_CONFIRMATION_TABLE:
+            with self.subTest(host=host, platform=platform):
+                self.assertIs(
+                    registry.host_confirms_platform(
+                        host, normalize_platform_name(platform)
+                    ),
+                    expected,
+                )
+
+    def test_host_normalization_table(self) -> None:
+        for value, expected in HOST_NORMALIZATION_TABLE:
+            with self.subTest(value=value):
+                self.assertEqual(normalize_host(value), expected)
+
+    def test_source_url_host_table(self) -> None:
+        for url, expected in SOURCE_URL_HOST_TABLE:
+            with self.subTest(url=url):
+                self.assertEqual(source_url_host(url), expected)
+
+    def test_alias_pair_shares_a_host_and_each_confirms_it(self) -> None:
+        registry = self.registry()
+
+        self.assertTrue(
+            registry.host_confirms_platform("nowcoder.com", "牛客")
+        )
+        self.assertTrue(
+            registry.host_confirms_platform("nowcoder.com", "nowcoder")
+        )
+        self.assertEqual(
+            registry.host_suffixes("牛客"), ("nowcoder.com", "niuke.com")
+        )
+        self.assertEqual(
+            registry.host_suffixes("nowcoder"), ("nowcoder.com",)
+        )
+
+    def test_an_alias_does_not_inherit_the_other_aliases_host(self) -> None:
+        registry = self.registry()
+
+        self.assertTrue(registry.host_confirms_platform("niuke.com", "牛客"))
+        self.assertFalse(
+            registry.host_confirms_platform("niuke.com", "nowcoder")
+        )
+
+    def test_alias_safety_is_structural_not_map_ordered(self) -> None:
+        # Regression guard for the C++ host-keyed lookup bug: here the mapping
+        # is a per-platform tuple sequence and the only lookup key is the
+        # normalised platform name, so a host shared by two aliases confirms
+        # both and can never resolve through order to just one of them.
+        registry = self.registry()
+
+        self.assertEqual(len(dict(registry.hosts)), registry.host_mapping_count)
+
+        for platform in ("牛客", "nowcoder"):
+            self.assertIn("nowcoder.com", registry.host_suffixes(platform))
+
+    def test_unknown_host_and_unknown_platform_never_confirm(self) -> None:
+        registry = self.registry()
+
+        self.assertFalse(
+            registry.host_confirms_platform("unknown.example.com", "牛客")
+        )
+        self.assertFalse(
+            registry.host_confirms_platform("nowcoder.com", "未知")
+        )
+        self.assertFalse(registry.host_confirms_platform("", "牛客"))
+        self.assertFalse(registry.host_confirms_platform("nowcoder.com", ""))
+
+    def test_without_the_file_there_is_no_host_mapping(self) -> None:
+        # Mirrors C++ FromNames(): names alone carry no host suffixes, so host
+        # confirmation can only come from the single-source data file.
+        bare = PlatformNameRegistry.from_names(["牛客", "nowcoder"])
+
+        self.assertEqual(bare.host_mapping_count, 0)
+        self.assertFalse(
+            bare.host_confirms_platform("nowcoder.com", "牛客")
+        )
+
+        with_hosts = PlatformNameRegistry.from_names(
+            ["牛客", "nowcoder"],
+            hosts={
+                "牛客": ("nowcoder.com", "niuke.com"),
+                "nowcoder": "nowcoder.com",
+            },
+        )
+
+        self.assertEqual(with_hosts.host_mapping_count, 2)
+        self.assertTrue(
+            with_hosts.host_confirms_platform("www.nowcoder.com", "牛客")
+        )
+        self.assertTrue(
+            with_hosts.host_confirms_platform("nowcoder.com", "nowcoder")
+        )
+
+    def test_a_missing_file_leaves_the_host_mapping_empty(self) -> None:
+        registry = PlatformNameRegistry.load(
+            "/nonexistent/platform_names.yaml"
+        )
+
+        self.assertEqual(registry.host_mapping_count, 0)
+        self.assertFalse(
+            registry.host_confirms_platform("nowcoder.com", "牛客")
+        )
+
+    def test_the_shipped_hosts_section_uses_the_cpp_supported_grammar(self) -> None:
+        """The C++ reader is line based, not a YAML parser.
+
+        A quoted value or an inline ``# comment`` is read differently there
+        (the quote/comment characters become part of the host entry and never
+        match), while PyYAML strips them - i.e. the two languages would read a
+        different mapping. A YAML list is ignored by both and stays allowed.
+        This test fails loudly on a divergent edit instead of diverging
+        silently.
+        """
+
+        lines = PACKAGE_DATA_FILE.read_text(encoding="utf-8").splitlines()
+        inside = False
+        checked = 0
+
+        for line in lines:
+            stripped = line.strip()
+
+            if stripped == "platform_hosts:":
+                inside = True
+                continue
+
+            if not inside:
+                continue
+
+            if not stripped or stripped.startswith("#"):
+                continue
+
+            indented = line.startswith((" ", "\t"))
+
+            if not indented and not stripped.startswith("-"):
+                break  # a new top-level key ends the section
+
+            if stripped.startswith("-") or ":" not in stripped:
+                continue
+
+            key, _, value = stripped.partition(":")
+
+            for part in (key, value):
+                self.assertNotIn('"', part)
+                self.assertNotIn("'", part)
+                self.assertNotIn("#", part)
+
+            checked += 1
+
+        self.assertGreater(checked, 0, "platform_hosts section was not found")
 
 
 class RegistryPathTest(unittest.TestCase):
@@ -311,6 +560,14 @@ class FailOpenTest(unittest.TestCase):
 class SingleSourceGuardTest(unittest.TestCase):
     """No second hard-coded platform list in either language."""
 
+    @staticmethod
+    def canonical_host_suffixes() -> frozenset[str]:
+        return frozenset(
+            suffix
+            for entries in CANONICAL_HOST_SUFFIXES.values()
+            for suffix in entries
+        )
+
     def test_no_platform_name_is_hard_coded_in_python(self) -> None:
         offenders: list[str] = []
 
@@ -331,11 +588,32 @@ class SingleSourceGuardTest(unittest.TestCase):
             "jobpilot_sources/data/platform_names.yaml",
         )
 
+    def test_no_host_suffix_is_hard_coded_in_python(self) -> None:
+        offenders: list[str] = []
+
+        for path in sorted(PACKAGE_ROOT.rglob("*.py")):
+            if "tests" in path.relative_to(PACKAGE_ROOT).parts:
+                continue
+
+            text = path.read_text(encoding="utf-8")
+
+            for suffix in self.canonical_host_suffixes():
+                if suffix in text:
+                    offenders.append(f"{path.name}: {suffix}")
+
+        self.assertEqual(
+            offenders,
+            [],
+            "host suffixes must live only in "
+            "jobpilot_sources/data/platform_names.yaml",
+        )
+
     def test_no_platform_name_is_hard_coded_in_cpp(self) -> None:
         if not any(directory.is_dir() for directory in CPP_JOB_DIRS):
             self.skipTest("C++ job sources are not present")
 
         offenders: list[str] = []
+        tokens = CANONICAL_NORMALIZED | self.canonical_host_suffixes()
 
         for directory in CPP_JOB_DIRS:
             if not directory.is_dir():
@@ -347,7 +625,7 @@ class SingleSourceGuardTest(unittest.TestCase):
 
                 text = path.read_text(encoding="utf-8")
 
-                for name in CANONICAL_NORMALIZED:
+                for name in tokens:
                     if name in text:
                         offenders.append(f"{path.name}: {name}")
 
@@ -369,6 +647,11 @@ class SingleSourceGuardTest(unittest.TestCase):
 
         self.assertIn("PlatformNameRegistry::Normalize", text)
         self.assertIn("platform_names.yaml", text)
+        # The host layer is demonstrated through the real registry too.
+        self.assertIn("HostConfirmsPlatform", text)
+        self.assertIn("HostMappingCount", text)
+        self.assertIn("platform_hosts", text)
+        self.assertIn("EvaluateJobQuality", text)
 
 
 if __name__ == "__main__":

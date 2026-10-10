@@ -257,7 +257,8 @@ receives) and reports, per item, the same vocabulary as the engine:
 | `company_missing` | reject | employer empty after trim |
 | `description_too_large` | reject | description > 49,152 UTF-8 **bytes** |
 | `source_url_unusable` | reject | not an absolute `http(s)` URL |
-| `employer_is_platform` | needs_review | normalized employer is in the registry |
+| `employer_is_platform` | needs_review | normalized employer is in the registry **and** the source host confirms that same platform (exact or subdomain) |
+| `platform_host_unverified` | advisory (stays visible) | registered platform employer whose source host does **not** confirm it (unknown host, or another platform's host) |
 | `source_url_not_detail` | needs_review | site root / `/jobs` `/job` `/search` `/list` / `/positions` / query-only |
 | `title_equals_company` | needs_review | normalized title equals normalized employer |
 | `duplicate_content_in_batch` | needs_review | equal employer+title+location under a different URL (all items) |
@@ -266,7 +267,10 @@ receives) and reports, per item, the same vocabulary as the engine:
 | `description_marker_minor` | advisory (stays visible) | 1–2 markers, or share < 20 % |
 | `source_url_shape_unrecognised` | advisory (stays visible) | no detail marker and no ≥ 4-digit segment |
 
-An unknown platform name or URL shape is **clean** (fail-open). A `reject` stops
+An unknown platform name or URL shape is **clean** (fail-open); a *registered*
+platform name whose source host does not confirm it stays **visible** with the
+advisory `platform_host_unverified`, so a weak signal never hides a job. A
+`reject` stops
 the whole batch before any request (exit `2`); `needs_review` items are still
 published — the server stores them hidden and queues them, which is the designed
 behaviour. Parsing failures (missing `title`/`company`, an over-long
@@ -303,6 +307,46 @@ string). Membership normalizes its argument, so `牛客网` matches the register
 `tools/verify_platform_name_parity.cpp` (opt-in; see Tests) and pinned by
 `tests/test_registry.py::NormalizationParityTest`, which asserts the canonical
 normalized set and the exact normalisation table.
+
+### Platform host mapping (`platform_hosts`, 0015A option B)
+
+The same file carries one curated host-suffix list per platform:
+
+```yaml
+platform_hosts:
+  牛客: nowcoder.com, niuke.com
+  nowcoder: nowcoder.com
+```
+
+- Keys are matched after the **name** normalization above (`智联招聘` → `智联`),
+  values are comma-separated host suffixes normalized by `NormalizeHost`:
+  ASCII trim + fold, trailing dots removed, one leading `www.` removed. A YAML
+  list value is ignored exactly as the C++ reader ignores it, so neither
+  language can invent a mapping the other does not have.
+- **Maintainer note:** the C++ reader is line based, not a YAML parser. Keep
+  values as plain `key: a.com, b.com` scalars. A quoted value or an inline
+  `# comment` is read *differently* there (the quote/comment characters become
+  part of the entry and never match a host) while PyYAML strips them —
+  `tests/test_registry.py::test_the_shipped_hosts_section_uses_the_cpp_supported_grammar`
+  fails on that edit rather than letting the two languages diverge; supporting
+  those forms requires moving the C++ reader to yaml-cpp.
+- `employer_is_platform` is asserted only when the company matches a registered
+  name **and** `HostConfirmsPlatform` confirms that same platform from the
+  `source_url` host — exact match or a real subdomain boundary (`jobs.nowcoder.com`
+  yes, `evilnowcoder.com` no). The engine extracts the host with `HostOf`
+  (userinfo and port stripped, `://` required) before normalizing.
+- Otherwise the finding degrades to the advisory `platform_host_unverified` and
+  the row stays visible (fail-open). An unknown platform name produces neither.
+- The mapping is keyed by **normalized platform name**, never by host, so two
+  aliases sharing a host (e.g. `牛客`/`nowcoder`) each confirm it independently.
+  There is deliberately no host→platform lookup, so no map-order ambiguity can
+  exist — the Python loader is alias-safe by construction, matching the C++
+  `map<platform, vector<host>>`.
+
+Parity for both layers is demonstrated against the real C++ registry (94
+byte-identical rows: `N|`/`SIZE|`/`C|`/`F|`/`SET|`/`HCOUNT|`/`HC|`/`Q|`) and
+pinned by `tests/test_registry.py::HostMappingParityTest` plus the engine mirror
+in `tests/test_capture_quality.py::ENGINE_HOST_DECISION_TABLE`.
 
 ### Description cap: 48 KiB of UTF-8 bytes
 
@@ -572,7 +616,9 @@ cd <repository root> && /tmp/verify_platform_name_parity   # N|SIZE|C|F|SET rows
 ```
 
 Its `N|…` rows are byte-identical to `tests/test_registry.py`'s normalisation
-table; `tests/test_registry.py` also compares the env-var name and the default
+table, and its `HCOUNT|`/`HC|`/`Q|` rows are byte-identical to the pinned host
+mapping and the engine-host decision table (94 rows in total across both layers).
+`tests/test_registry.py` also compares the env-var name and the default
 path against `job_quality.h` when the C++ tree is present (and skips otherwise).
 The default Python suite never compiles or runs C++.
 

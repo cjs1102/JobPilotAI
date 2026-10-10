@@ -27,6 +27,7 @@ from jobpilot_sources.capture.quality import (
     CODE_DUPLICATE_CONTENT_IN_BATCH,
     CODE_EMPLOYER_IMPLAUSIBLE,
     CODE_EMPLOYER_IS_PLATFORM,
+    CODE_PLATFORM_HOST_UNVERIFIED,
     CODE_SOURCE_URL_NOT_DETAIL,
     CODE_SOURCE_URL_UNRECOGNISED,
     CODE_SOURCE_URL_UNUSABLE,
@@ -60,7 +61,52 @@ PAYLOAD = {
     "description": "负责后端服务开发，参与需求评审。",
 }
 
-REGISTRY = PlatformNameRegistry.from_names(["牛客"])
+REGISTRY = PlatformNameRegistry.from_names(
+    ["牛客", "nowcoder", "实习僧"],
+    hosts={
+        "牛客": ("nowcoder.com", "niuke.com"),
+        "nowcoder": ("nowcoder.com",),
+        "实习僧": ("shixiseng.com",),
+    },
+)
+
+#: The `Q|` rows of tools/verify_platform_name_parity.cpp, produced by the real
+#: C++ engine (`EvaluateJobQuality` -> HostOf -> NormalizeHost -> the mapping).
+#: `(url, company, "code:outcome,...")` - host-confirmed vs advisory fallback.
+ENGINE_HOST_DECISION_TABLE = (
+    ("https://nowcoder.com/campus/1001", "牛客",
+     "employer_is_platform:needs_review"),
+    ("http://nowcoder.com/campus/1001", "牛客",
+     "employer_is_platform:needs_review"),
+    ("https://www.nowcoder.com/campus/1001", "牛客",
+     "employer_is_platform:needs_review"),
+    ("https://WWW.NOWCODER.COM/campus/1001", "牛客",
+     "employer_is_platform:needs_review"),
+    ("https://jobs.nowcoder.com/campus/1001", "牛客",
+     "employer_is_platform:needs_review"),
+    ("https://nowcoder.com./campus/1001", "牛客",
+     "employer_is_platform:needs_review"),
+    ("https://nowcoder.com:8443/campus/1001", "牛客",
+     "employer_is_platform:needs_review"),
+    ("https://user:pw@nowcoder.com/campus/1001", "牛客",
+     "employer_is_platform:needs_review"),
+    ("https://niuke.com/campus/1001", "牛客",
+     "employer_is_platform:needs_review"),
+    ("https://nowcoder.com/campus/1001", "nowcoder",
+     "employer_is_platform:needs_review"),
+    ("https://nowcoder.com/campus/1001", "实习僧",
+     "platform_host_unverified:accepted_advisory"),
+    ("https://zhaopin.com/campus/1001", "牛客",
+     "platform_host_unverified:accepted_advisory"),
+    ("https://unknown.example/campus/1001", "牛客",
+     "platform_host_unverified:accepted_advisory"),
+    ("https://jobs.example-cn.invalid/campus/1001", "牛客",
+     "platform_host_unverified:accepted_advisory"),
+    ("https://nowcoder.com/campus/1001", "某公司", ""),
+    ("not-a-url", "牛客",
+     "source_url_unusable:rejected,"
+     "platform_host_unverified:accepted_advisory"),
+)
 
 
 def payload(**overrides) -> dict:
@@ -159,14 +205,77 @@ class EmployerTest(unittest.TestCase):
                 self.assertEqual(item.diagnostic_code, CODE_COMPANY_MISSING)
                 self.assertEqual(item.diagnostic_field, "company")
 
-    def test_registered_platform_name_needs_review(self) -> None:
+    def test_registered_platform_name_with_a_confirming_host_needs_review(self) -> None:
         item = evaluate_item_quality(
-            payload(company=" 牛客网 "), registry=REGISTRY
+            payload(
+                company=" 牛客网 ",
+                source_url="https://www.nowcoder.com/campus/1001",
+            ),
+            registry=REGISTRY,
         )
 
         self.assertEqual(item.outcome, OUTCOME_NEEDS_REVIEW)
         self.assertEqual(item.review_status, 1)
         self.assertIn(CODE_EMPLOYER_IS_PLATFORM, codes(item))
+        self.assertIn("nowcoder.com", item.findings[0].reason)
+
+    def test_registered_platform_without_a_confirming_host_is_advisory(self) -> None:
+        for url in (
+            "https://jobs.example-cn.invalid/campus/1001",
+            "https://unknown.example/campus/1001",
+            # Another platform's host must not confirm this one.
+            "https://www.shixiseng.com/campus/1001",
+        ):
+            with self.subTest(url=url):
+                item = evaluate_item_quality(
+                    payload(company=" 牛客网 ", source_url=url),
+                    registry=REGISTRY,
+                )
+
+                self.assertEqual(item.outcome, "clean")
+                self.assertEqual(item.review_status, 0)
+                self.assertEqual(codes(item), [CODE_PLATFORM_HOST_UNVERIFIED])
+                self.assertEqual(item.findings[0].outcome, OUTCOME_ADVISORY)
+
+    def test_the_host_decision_table_matches_the_cpp_engine(self) -> None:
+        for url, company, expected in ENGINE_HOST_DECISION_TABLE:
+            with self.subTest(url=url, company=company):
+                item = evaluate_item_quality(
+                    payload(company=company, source_url=url),
+                    registry=REGISTRY,
+                )
+                rendered = ",".join(
+                    f"{finding.code}:{finding.outcome}"
+                    for finding in item.findings
+                )
+
+                self.assertEqual(rendered, expected)
+
+    def test_the_alias_pair_confirms_a_shared_host_independently(self) -> None:
+        for company in ("牛客", "nowcoder"):
+            with self.subTest(company=company):
+                item = evaluate_item_quality(
+                    payload(
+                        company=company,
+                        source_url="https://nowcoder.com/campus/1001",
+                    ),
+                    registry=REGISTRY,
+                )
+
+                self.assertEqual(item.outcome, OUTCOME_NEEDS_REVIEW)
+                self.assertIn(CODE_EMPLOYER_IS_PLATFORM, codes(item))
+
+    def test_an_alias_does_not_inherit_the_other_aliases_host(self) -> None:
+        item = evaluate_item_quality(
+            payload(
+                company="nowcoder",
+                source_url="https://niuke.com/campus/1001",
+            ),
+            registry=REGISTRY,
+        )
+
+        self.assertEqual(item.outcome, "clean")
+        self.assertEqual(codes(item), [CODE_PLATFORM_HOST_UNVERIFIED])
 
     def test_unknown_platform_name_fails_open(self) -> None:
         for company in ("某公司", "示例科技有限公司", "牛客科技"):
@@ -363,7 +472,7 @@ class BatchTest(unittest.TestCase):
                 payload(),
                 payload(
                     company="牛客网",
-                    source_url="https://x.invalid/campus/2002",
+                    source_url="https://jobs.nowcoder.com/campus/2002",
                 ),
                 payload(company="", source_url="https://x.invalid/campus/3003"),
             ],
@@ -464,7 +573,7 @@ class IntegrationWithTheCapturePipelineTest(unittest.TestCase):
             {
                 "title": "运维工程师",
                 "company": "牛客",
-                "source_url": "https://x.invalid/campus/2002",
+                "source_url": "https://www.nowcoder.com/campus/2002",
             }
         )
 
@@ -472,6 +581,20 @@ class IntegrationWithTheCapturePipelineTest(unittest.TestCase):
 
         self.assertEqual(item.outcome, OUTCOME_NEEDS_REVIEW)
         self.assertIn(CODE_EMPLOYER_IS_PLATFORM, codes(item))
+
+    def test_a_capture_object_with_an_unrelated_host_is_advisory(self) -> None:
+        capture = parse_artifact(
+            {
+                "title": "运维工程师",
+                "company": "牛客",
+                "source_url": "https://x.invalid/campus/2002",
+            }
+        )
+
+        item = evaluate_item_quality(capture, registry=REGISTRY)
+
+        self.assertEqual(item.outcome, "clean")
+        self.assertEqual(codes(item), [CODE_PLATFORM_HOST_UNVERIFIED])
 
 
 class BookmarkletDefaultTest(unittest.TestCase):

@@ -240,7 +240,13 @@ class QualityFindingsTest(unittest.TestCase):
             registry=(
                 registry
                 if registry is not None
-                else PlatformNameRegistry.from_names(["牛客"])
+                else PlatformNameRegistry.from_names(
+                    ["牛客", "nowcoder"],
+                    hosts={
+                        "牛客": ("nowcoder.com", "niuke.com"),
+                        "nowcoder": ("nowcoder.com",),
+                    },
+                )
             ),
         )
 
@@ -261,14 +267,14 @@ class QualityFindingsTest(unittest.TestCase):
         self.assertEqual(item["outcome"], "clean")
         self.assertEqual(item["review_status"], 0)
         self.assertEqual(item["findings"], [])
-        self.assertEqual(result["registry"]["size"], 1)
+        self.assertEqual(result["registry"]["size"], 2)
         self.assertNotIn(TOKEN, output)
 
     def test_dry_run_surfaces_a_needs_review_platform_match(self) -> None:
         document = {
             "title": "T",
             "company": "牛客网",
-            "source_url": "https://x.invalid/campus/1001",
+            "source_url": "https://www.nowcoder.com/campus/1001",
         }
 
         with tempfile_json(json.dumps(document)) as path:
@@ -285,11 +291,34 @@ class QualityFindingsTest(unittest.TestCase):
         self.assertEqual(finding["outcome"], "needs_review")
         self.assertEqual(finding["review_status"], 1)
 
+    def test_dry_run_keeps_an_unconfirmed_platform_employer_visible(self) -> None:
+        document = {
+            "title": "T",
+            "company": "牛客网",
+            "source_url": "https://jobs.example-cn.invalid/campus/1001",
+        }
+
+        with tempfile_json(json.dumps(document)) as path:
+            code, output = self.run_publish(path=path, dry_run=True)
+
+        result = json.loads(output)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(result["counters"]["clean"], 1)
+        self.assertEqual(result["counters"]["needs_review"], 0)
+        self.assertEqual(result["counters"]["advisory"], 1)
+
+        finding = result["items"][0]["findings"][0]
+
+        self.assertEqual(finding["code"], "platform_host_unverified")
+        self.assertEqual(finding["outcome"], "accepted_advisory")
+        self.assertEqual(finding["review_status"], 0)
+
     def test_human_readable_dry_run_explains_the_flag(self) -> None:
         document = {
             "title": "T",
             "company": "牛客网",
-            "source_url": "https://x.invalid/campus/1001",
+            "source_url": "https://www.nowcoder.com/campus/1001",
         }
 
         with tempfile_json(json.dumps(document)) as path:

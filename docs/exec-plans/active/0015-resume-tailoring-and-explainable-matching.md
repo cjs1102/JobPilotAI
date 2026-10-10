@@ -743,8 +743,11 @@ Stop and report to the Lead (do not widen scope) if:
         (the persisted gate verdict blocks `Confirm`).
   - [ ] D5: human-confirmation boundary + artifact read endpoints (draft vs confirmed; **no
         submission endpoint exists**).
-  - [ ] D6 (conditional, only if the worker path is chosen): ai_worker `resume_optimize`
-        wording-only pass.
+  - [x] D6 — **DEFERRED by owner decision (recorded in §17)**, not skipped silently: the worker
+        path is optional, the deterministic `tailor_rule_v1` draft is the deliverable, and no LLM
+        surface / AI key / worker handler is wired in this stage. `generator='rule_v1'` +
+        `source_version='tailor_rule_v1'` remain the ONLY generator; any future wording pass is
+        already bounded by the D4 fact gate (wording may only be ADDED, never invented).
   - [ ] D7: docs sync (README/AGENTS/project-state) + the stage's single L4.
 
 ## 15. Smallest First Implementable Unit
@@ -784,6 +787,17 @@ separate artifact.
 
 ## 17. Known Issues and Follow-ups
 
+- **D6 (ai_worker `resume_optimize` wording pass) is DEFERRED — decision recorded
+  2026-10-10, not silently dropped.** Owner decision 3 makes the worker path
+  optional, and the deterministic path is the stage deliverable, so 0015 ships with
+  `generator='rule_v1'` / `source_version='tailor_rule_v1'` as the **only**
+  generator: no LLM surface is wired, no AI key is required, no worker handler is
+  added. If it is ever revisited, the boundary is already fixed and enforced:
+  a wording pass may only **add** wording, and `FactCheck` (D4) mechanically rejects
+  any appended claim that does not map to a source fact — including text appended
+  after the verbatim quote terminator `【原始简历文本结束】`. Reopening this needs a
+  new decision entry here and in §11 (Open Decision 3), plus the wording-only merge
+  test named in §8 D(worker).
 - `resume_optimize` / `interview_gen` are reserved contract-only endpoints
   (`docs/04:904-911`); 0015 may make `resume_optimize` real (§11 Open Decision 3)
   and still leaves `interview_gen` and `interview_records` untouched.

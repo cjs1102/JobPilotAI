@@ -8,6 +8,7 @@ namespace jobpilot::service
     class AiInternalController;
     class ApplicationController;
     class InternalJobImportController;
+    class InternalJobReviewController;
     class InternalSourceSyncController;
     class JobController;
     class ResumeController;
@@ -22,6 +23,7 @@ namespace jobpilot::service
         InternalJobImportController *internalJobImportController = nullptr,
         InternalSourceSyncController *internalSourceSyncController = nullptr,
         AiController *aiController = nullptr,
-        AiInternalController *aiInternalController = nullptr);
+        AiInternalController *aiInternalController = nullptr,
+        InternalJobReviewController *internalJobReviewController = nullptr);
 
 } // namespace jobpilot::service

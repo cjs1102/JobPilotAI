@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "jobpilot/database/mysql_pool.h"
+#include "jobpilot/service/job/job_quality_types.h"
 
 namespace jobpilot::service
 {
@@ -67,6 +68,21 @@ namespace jobpilot::service
             jobpilot::core::ConnectionPool::Transaction &transaction,
             std::uint64_t jobId,
             const std::vector<JobRequirementImportData> &requirements) = 0;
+
+        // 0015A: persist the pre-ingest verdict on the row it belongs to,
+        // inside the caller's upsert transaction (never a second one).
+        virtual void SetReviewStatus(
+            jobpilot::core::ConnectionPool::Transaction &transaction,
+            std::uint64_t jobId,
+            std::int32_t status) = 0;
+
+        // Replaces the still-open findings of this job with the current
+        // findings; resolved rows stay for the audit trail. Rejected items are
+        // never passed here (they write nothing).
+        virtual void InsertReviewItems(
+            jobpilot::core::ConnectionPool::Transaction &transaction,
+            std::uint64_t jobId,
+            const std::vector<JobQualityFinding> &findings) = 0;
     };
 
 } // namespace jobpilot::service

@@ -34,3 +34,17 @@ ai:
   enhancement_enabled: false
   lease_seconds: 120
   max_attempts: 3
+
+# 0015A pre-ingest quality. The platform-name registry
+# source_adapters/jobpilot_sources/data/platform_names.yaml is the SINGLE
+# source of truth shared by the Python capture package and the C++ service.
+# The service resolves its path at startup from JOB_QUALITY_PLATFORM_NAMES_FILE
+# and falls back to that repo-relative default, so the service must be started
+# from the repository root (as the documented run command does). A missing or
+# unreadable file yields an empty registry plus a warning on stderr: unknown
+# employer names never trigger a review (fail-open).
+#
+# Public visibility: only review_status = 0 (clean) jobs are returned by the
+# public list/recommended endpoints. Setting
+# JOB_PUBLIC_INCLUDE_NEEDS_REVIEW=true disables that predicate (compatibility
+# rollback; no stored data is changed).

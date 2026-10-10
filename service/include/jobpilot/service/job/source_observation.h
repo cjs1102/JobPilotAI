@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "jobpilot/service/job/job_ingestion_dao_interface.h"
+#include "jobpilot/service/job/job_quality_types.h"
 
 namespace jobpilot::service
 {
@@ -62,6 +63,12 @@ namespace jobpilot::service
         std::optional<std::string> externalId;
         std::optional<std::string> publishedAt;
         std::vector<JobRequirementImportData> requirements;
+
+        // 0015A derived pre-ingest verdict, stamped by SourceSyncService right
+        // before the transactional apply. Not part of the wire payload and not
+        // used for rejected items (they never reach the DAO).
+        std::int32_t reviewStatus = 0;
+        std::vector<JobQualityFinding> findings;
     };
 
     // One adapter run against a single (source, source_scope) board.

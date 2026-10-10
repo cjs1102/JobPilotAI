@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "jobpilot/service/job/job_ingestion_dao_interface.h"
+#include "jobpilot/service/job/job_quality.h"
 #include "jobpilot/service/result.h"
 
 namespace jobpilot::core
@@ -24,6 +25,9 @@ namespace jobpilot::service
         std::size_t created = 0;
         std::size_t updated = 0;
         std::size_t total = 0;
+
+        // 0015A: per-item findings + needs_review/rejected/clean counters.
+        JobQualitySummary quality;
     };
 
     class JobIngestionService
@@ -31,7 +35,12 @@ namespace jobpilot::service
     public:
         JobIngestionService(
             IJobIngestionDao &jobIngestionDao,
-            jobpilot::core::ConnectionPool &pool);
+            jobpilot::core::ConnectionPool &pool,
+            // 0015A item 2: the composition boundary resolves the single
+            // platform-name registry (env override + repo-relative default)
+            // unless a caller injects one.
+            PlatformNameRegistry platforms =
+                PlatformNameRegistry::LoadFromEnvironment(nullptr));
 
         ServiceResult<JobIngestionResult> Import(
             const std::vector<JobIngestionItem> &jobs);
@@ -42,6 +51,7 @@ namespace jobpilot::service
 
         IJobIngestionDao &jobIngestionDao_;
         jobpilot::core::ConnectionPool &pool_;
+        PlatformNameRegistry platforms_;
     };
 
 } // namespace jobpilot::service

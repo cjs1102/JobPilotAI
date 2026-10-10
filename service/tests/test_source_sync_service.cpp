@@ -89,7 +89,7 @@ namespace jobpilot::service
             std::size_t closeCalls = 0;
             bool throwOnApply = false;
             bool throwOnClose = false;
-            SourceObservationApplyResult applyResult{3, 2, 5};
+            SourceObservationApplyResult applyResult{3, 2, 5, 0, {}};
             SourceObservationCloseResult closeResult{4, 1};
 
         private:
@@ -128,6 +128,11 @@ namespace jobpilot::service
                         static_cast<std::uint64_t>(
                             std::stoull(value.value())));
                 }
+            }
+
+            for (std::uint64_t jobId : extraJobIds)
+            {
+                jobpilot::test::CleanupJob(pool.get(), jobId);
             }
         }
 
@@ -170,6 +175,7 @@ namespace jobpilot::service
 
         std::unique_ptr<jobpilot::core::ConnectionPool> pool;
         std::string scope;
+        std::vector<std::uint64_t> extraJobIds;
     };
 
     TEST_F(SourceSyncServiceTest, RejectsInvalidObservationsWithoutCallingDao)
@@ -226,7 +232,7 @@ namespace jobpilot::service
     TEST_F(SourceSyncServiceTest, PropagatesCountersAndCompleteness)
     {
         RecordingSourceSyncDao dao;
-        dao.applyResult = {3, 2, 5};
+        dao.applyResult = {3, 2, 5, 0, {}};
         dao.closeResult = {7, 4};
         SourceSyncService service(dao, *pool);
 
@@ -256,7 +262,7 @@ namespace jobpilot::service
     TEST_F(SourceSyncServiceTest, IncompleteObservationNeverCloses)
     {
         RecordingSourceSyncDao dao;
-        dao.applyResult = {0, 1, 1};
+        dao.applyResult = {0, 1, 1, 0, {}};
         dao.closeResult = {9, 9};
         SourceSyncService service(dao, *pool);
 
@@ -280,7 +286,7 @@ namespace jobpilot::service
     TEST_F(SourceSyncServiceTest, EmptyCompleteBoardStillRunsClosePass)
     {
         RecordingSourceSyncDao dao;
-        dao.applyResult = {0, 0, 0};
+        dao.applyResult = {0, 0, 0, 0, {}};
         dao.closeResult = {2, 0};
         SourceSyncService service(dao, *pool);
 
@@ -375,6 +381,123 @@ namespace jobpilot::service
         ASSERT_EQ(count.rowCount(), 1U);
         ASSERT_TRUE(count.value(0, 0).has_value());
         EXPECT_EQ(count.value(0, 0).value(), "0");
+    }
+
+    // 0015A constraint: a single rejected item writes NOTHING (no transaction
+    // is opened) and the batch still honours F14 manual-record priority, both
+    // when the rejected item sits next to a valid one.
+    TEST_F(SourceSyncServiceTest, RejectsWriteNothingAndPreserveManualPriority)
+    {
+        SourceSyncDao delegate;
+        RecordingSourceSyncDao dao(&delegate);
+        SourceSyncService service(dao, *pool);
+
+        const std::string manualUrl = Url("manual-priority");
+        const std::uint64_t manualId =
+            jobpilot::test::InsertJob(
+                pool.get(),
+                "Manual Co",
+                "Manual Job",
+                "Remote",
+                "Manual description",
+                manualUrl,
+                1,
+                "2026-10-01 10:00:00");
+        extraJobIds.push_back(manualId);
+
+        // One rejected item (company_missing) + one valid item that collides
+        // with the manual row.
+        SourceObservation observation = MakeObservation();
+        observation.jobs.clear();
+
+        SourceObservationJob invalid = MakeObservedJob("invalid");
+        invalid.job.company = "   ";
+        observation.jobs.push_back(invalid);
+
+        SourceObservationJob colliding = MakeObservedJob("collide");
+        colliding.job.sourceUrl = manualUrl;
+        observation.jobs.push_back(colliding);
+
+        const ServiceResult<SourceSyncResult> rejected =
+            service.Sync(observation);
+
+        EXPECT_EQ(rejected.code, ErrorCode::kInvalidParam);
+        EXPECT_EQ(rejected.value.quality.rejected, 1U);
+        EXPECT_EQ(
+            rejected.value.quality.diagnosticCode,
+            "company_missing");
+        EXPECT_EQ(
+            rejected.value.quality.diagnosticField,
+            "company");
+
+        // No transaction was opened and nothing was written.
+        EXPECT_EQ(dao.applyCalls, 0U);
+        EXPECT_EQ(dao.closeCalls, 0U);
+
+        const jobpilot::core::Result manual = pool->Query(
+            "SELECT company, title, source, status, last_seen_at, "
+            "source_scope FROM jobs WHERE id = ?",
+            {manualId});
+
+        ASSERT_EQ(manual.rowCount(), 1U);
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(manual.value(0, 0)),
+            "Manual Co");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(manual.value(0, 1)),
+            "Manual Job");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(manual.value(0, 2)),
+            "manual");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(manual.value(0, 3)),
+            "1");
+        EXPECT_FALSE(manual.value(0, 4).has_value());
+        EXPECT_FALSE(manual.value(0, 5).has_value());
+
+        const jobpilot::core::Result invalidRow = pool->Query(
+            "SELECT COUNT(*) FROM jobs WHERE source_url = ?",
+            {Url("invalid")});
+
+        ASSERT_EQ(invalidRow.rowCount(), 1U);
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(invalidRow.value(0, 0)),
+            "0");
+
+        // Without the rejected item the observation still skips the manual
+        // collision (F14) and leaves the manual row untouched, including its
+        // lifecycle fields.
+        SourceObservation clean = MakeObservation();
+        clean.jobs.clear();
+        clean.jobs.push_back(colliding);
+
+        const ServiceResult<SourceSyncResult> applied =
+            service.Sync(clean);
+
+        ASSERT_EQ(applied.code, ErrorCode::kSuccess);
+        EXPECT_EQ(applied.value.seen, 1U);
+        EXPECT_EQ(applied.value.skippedManual, 1U);
+        EXPECT_EQ(applied.value.created, 0U);
+        EXPECT_EQ(applied.value.updated, 0U);
+        EXPECT_EQ(dao.applyCalls, 1U);
+
+        const jobpilot::core::Result after = pool->Query(
+            "SELECT company, title, source, status, last_seen_at, "
+            "source_scope FROM jobs WHERE id = ?",
+            {manualId});
+
+        ASSERT_EQ(after.rowCount(), 1U);
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(after.value(0, 0)),
+            "Manual Co");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(after.value(0, 1)),
+            "Manual Job");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(after.value(0, 2)),
+            "manual");
+        EXPECT_FALSE(after.value(0, 4).has_value());
+        EXPECT_FALSE(after.value(0, 5).has_value());
     }
 
 } // namespace jobpilot::service

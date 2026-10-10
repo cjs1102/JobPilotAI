@@ -72,6 +72,47 @@ namespace jobpilot::service
 
             return OptionalBoolParam(job.deadlineDateOnly);
         }
+
+        // VARCHAR(255)/VARCHAR(64) count characters under utf8mb4, so cut on a
+        // UTF-8 code-point boundary instead of mid-sequence.
+        std::string TruncateUtf8(
+            const std::string &value,
+            std::size_t maxChars)
+        {
+            std::size_t chars = 0;
+            std::size_t index = 0;
+
+            while (index < value.size() && chars < maxChars)
+            {
+                const unsigned char lead =
+                    static_cast<unsigned char>(value[index]);
+
+                std::size_t width = 1;
+
+                if ((lead & 0xE0U) == 0xC0U)
+                {
+                    width = 2;
+                }
+                else if ((lead & 0xF0U) == 0xE0U)
+                {
+                    width = 3;
+                }
+                else if ((lead & 0xF8U) == 0xF0U)
+                {
+                    width = 4;
+                }
+
+                if (index + width > value.size())
+                {
+                    break;
+                }
+
+                index += width;
+                ++chars;
+            }
+
+            return value.substr(0, index);
+        }
     } // namespace
 
     JobUpsertResult JobIngestionDao::UpsertJob(
@@ -178,6 +219,70 @@ namespace jobpilot::service
             {
                 throw std::runtime_error(
                     "job requirement insert did not create a row");
+            }
+        }
+    }
+
+    void JobIngestionDao::SetReviewStatus(
+        jobpilot::core::ConnectionPool::Transaction &transaction,
+        std::uint64_t jobId,
+        std::int32_t status)
+    {
+        if (jobId == 0)
+        {
+            throw std::invalid_argument(
+                "job id must not be zero");
+        }
+
+        // 0 clean / 1 needs_review / 2 quarantined.
+        if (status < 0 || status > 2)
+        {
+            throw std::invalid_argument(
+                "review status must be 0, 1 or 2");
+        }
+
+        // MySQL reports 0 affected rows when the value is unchanged (the
+        // default is already 0), so the result is intentionally not asserted.
+        transaction.Execute(
+            "UPDATE jobs SET review_status = ? WHERE id = ?",
+            {static_cast<std::int64_t>(status),
+             jobId});
+    }
+
+    void JobIngestionDao::InsertReviewItems(
+        jobpilot::core::ConnectionPool::Transaction &transaction,
+        std::uint64_t jobId,
+        const std::vector<JobQualityFinding> &findings)
+    {
+        if (jobId == 0)
+        {
+            throw std::invalid_argument(
+                "job id must not be zero");
+        }
+
+        // Re-observing a job refreshes its still-open findings; rows a reviewer
+        // already resolved stay as the audit trail.
+        transaction.Execute(
+            "DELETE FROM job_review_items "
+            "WHERE job_id = ? AND resolution = 'open'",
+            {jobId});
+
+        for (const JobQualityFinding &finding : findings)
+        {
+            const jobpilot::core::ExecutionResult inserted =
+                transaction.Execute(
+                    "INSERT INTO job_review_items "
+                    "(job_id, reason_code, reason_text, outcome, resolution) "
+                    "VALUES (?, ?, ?, ?, 'open')",
+                    {jobId,
+                     TruncateUtf8(finding.code, 64),
+                     TruncateUtf8(finding.reason, 255),
+                     std::string(ToString(finding.outcome))});
+
+            if (inserted.affectedRows != 1)
+            {
+                throw std::runtime_error(
+                    "job review item insert did not create a row");
             }
         }
     }

@@ -490,12 +490,21 @@ namespace jobpilot::service
         std::uint64_t userId = 0;
         std::uint64_t resumeVersionId = 0;
         std::vector<std::string> sourceUrls;
+
+        // 0015A: source_url must be an absolute http(s) job-detail URL
+        // (ExecPlan 0015A section 5.5.1); the fixtures below use this shape.
+        std::string UniqueUrl(
+            const std::string &prefix)
+        {
+            return "https://example.invalid/job/" +
+                   jobpilot::test::UniqueJobToken(prefix);
+        }
     };
 
     TEST_F(JobIngestionHttpTest, RejectsAuthenticationAndInvalidRequests)
     {
         const std::string sourceUrl =
-            jobpilot::test::UniqueJobToken(
+            UniqueUrl(
                 "http-auth");
         sourceUrls.push_back(sourceUrl);
         const std::string body =
@@ -560,7 +569,7 @@ namespace jobpilot::service
         {
             tooMany.push_back(
                 MakeJobJson(
-                    jobpilot::test::UniqueJobToken(
+                    UniqueUrl(
                         "http-too-many"),
                     "Too Many " +
                         std::to_string(index)));
@@ -582,7 +591,7 @@ namespace jobpilot::service
 
         nlohmann::json negativeSalary =
             MakeJobJson(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "http-negative-salary"),
                 "Negative Salary");
         negativeSalary["salary_min"] = -1;
@@ -607,7 +616,7 @@ namespace jobpilot::service
     TEST_F(JobIngestionHttpTest, ImportsIdempotentlyAndCompletesClosure)
     {
         const std::string sourceUrl =
-            jobpilot::test::UniqueJobToken(
+            UniqueUrl(
                 "http-idempotent");
         sourceUrls.push_back(sourceUrl);
 
@@ -724,10 +733,10 @@ namespace jobpilot::service
     TEST_F(JobIngestionHttpTest, RollsBackWholeBatch)
     {
         const std::string validUrl =
-            jobpilot::test::UniqueJobToken(
+            UniqueUrl(
                 "http-rollback-valid");
         const std::string invalidUrl =
-            jobpilot::test::UniqueJobToken(
+            UniqueUrl(
                 "http-rollback-invalid");
         sourceUrls.push_back(validUrl);
         sourceUrls.push_back(invalidUrl);
@@ -798,81 +807,81 @@ namespace jobpilot::service
         };
 
         nlohmann::json base = MakeJobJson(
-            jobpilot::test::UniqueJobToken("extra-base"),
+            UniqueUrl("extra-base"),
             "Extra Base");
 
         nlohmann::json educationTooHigh = base;
         educationTooHigh["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-education-high");
+            UniqueUrl("extra-education-high");
         educationTooHigh["education_required"] = 6;
         EXPECT_EQ(statusFor(educationTooHigh), 400);
 
         nlohmann::json educationTooLow = base;
         educationTooLow["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-education-low");
+            UniqueUrl("extra-education-low");
         educationTooLow["education_required"] = 0;
         EXPECT_EQ(statusFor(educationTooLow), 400);
 
         nlohmann::json educationNegative = base;
         educationNegative["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-education-negative");
+            UniqueUrl("extra-education-negative");
         educationNegative["education_required"] = -1;
         EXPECT_EQ(statusFor(educationNegative), 400);
 
         nlohmann::json natureTooHigh = base;
         natureTooHigh["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-nature-high");
+            UniqueUrl("extra-nature-high");
         natureTooHigh["job_nature"] = 4;
         EXPECT_EQ(statusFor(natureTooHigh), 400);
 
         nlohmann::json invertedYears = base;
         invertedYears["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-years-inverted");
+            UniqueUrl("extra-years-inverted");
         invertedYears["experience_years_min"] = 5;
         invertedYears["experience_years_max"] = 3;
         EXPECT_EQ(statusFor(invertedYears), 400);
 
         nlohmann::json yearsOverflow = base;
         yearsOverflow["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-years-overflow");
+            UniqueUrl("extra-years-overflow");
         yearsOverflow["experience_years_max"] = 32768;
         EXPECT_EQ(statusFor(yearsOverflow), 400);
 
         nlohmann::json malformedDeadline = base;
         malformedDeadline["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-deadline-malformed");
+            UniqueUrl("extra-deadline-malformed");
         malformedDeadline["deadline"] = "2026-10-31T10:30:00";
         EXPECT_EQ(statusFor(malformedDeadline), 400);
 
         nlohmann::json impossibleDeadline = base;
         impossibleDeadline["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-deadline-impossible");
+            UniqueUrl("extra-deadline-impossible");
         impossibleDeadline["deadline"] = "2026-02-29 10:30:00";
         EXPECT_EQ(statusFor(impossibleDeadline), 400);
 
         nlohmann::json dateOnlyWithInstant = base;
         dateOnlyWithInstant["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-date-only-instant");
+            UniqueUrl("extra-date-only-instant");
         dateOnlyWithInstant["deadline"] = "2026-10-31 10:30:00";
         dateOnlyWithInstant["deadline_date_only"] = true;
         EXPECT_EQ(statusFor(dateOnlyWithInstant), 400);
 
         nlohmann::json flagWithoutDeadline = base;
         flagWithoutDeadline["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-flag-only");
+            UniqueUrl("extra-flag-only");
         flagWithoutDeadline["deadline_date_only"] = true;
         EXPECT_EQ(statusFor(flagWithoutDeadline), 400);
 
         nlohmann::json nonBooleanFlag = base;
         nonBooleanFlag["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-flag-type");
+            UniqueUrl("extra-flag-type");
         nonBooleanFlag["deadline"] = "2026-10-31 04:00:00";
         nonBooleanFlag["deadline_date_only"] = "yes";
         EXPECT_EQ(statusFor(nonBooleanFlag), 400);
 
         nlohmann::json dateOnlyValid = base;
         dateOnlyValid["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-date-only-valid");
+            UniqueUrl("extra-date-only-valid");
         dateOnlyValid["education_required"] = 3;
         dateOnlyValid["experience_years_min"] = 0;
         dateOnlyValid["experience_years_max"] = 3;
@@ -883,7 +892,7 @@ namespace jobpilot::service
 
         nlohmann::json explicitValid = base;
         explicitValid["source_url"] =
-            jobpilot::test::UniqueJobToken("extra-explicit-valid");
+            UniqueUrl("extra-explicit-valid");
         explicitValid["deadline"] = "2026-10-31 10:30:00";
         explicitValid["deadline_date_only"] = false;
         EXPECT_EQ(statusFor(explicitValid), 200);
@@ -892,7 +901,7 @@ namespace jobpilot::service
     TEST_F(JobIngestionHttpTest, RoundTripsBothDeadlineKindsThroughApi)
     {
         const std::string dateOnlyUrl =
-            jobpilot::test::UniqueJobToken("extra-roundtrip-date");
+            UniqueUrl("extra-roundtrip-date");
         sourceUrls.push_back(dateOnlyUrl);
 
         nlohmann::json dateOnly =
@@ -1029,7 +1038,7 @@ namespace jobpilot::service
 
         // Explicit time is preserved and rendered as Beijing local time.
         const std::string explicitUrl =
-            jobpilot::test::UniqueJobToken("extra-roundtrip-explicit");
+            UniqueUrl("extra-roundtrip-explicit");
         sourceUrls.push_back(explicitUrl);
 
         nlohmann::json explicitJob =

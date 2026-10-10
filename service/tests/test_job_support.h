@@ -109,6 +109,12 @@ namespace jobpilot::test
             return;
         }
 
+        // 0015A: job_review_items has no FK, so the audit rows are removed with
+        // the job row they belong to.
+        pool->Execute(
+            "DELETE FROM job_review_items WHERE job_id = ?",
+            {jobId});
+
         pool->Execute(
             "DELETE FROM job_requirements WHERE job_id = ?",
             {jobId});

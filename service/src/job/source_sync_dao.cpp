@@ -255,6 +255,19 @@ namespace jobpilot::service
                 transaction,
                 upserted.jobId,
                 item.requirements);
+
+            // 0015A: the pre-ingest verdict is written in the same transaction
+            // as the row it belongs to. Items are never rejected here (a
+            // rejected observation fails validation and writes nothing).
+            requirementsWriter_.SetReviewStatus(
+                transaction,
+                upserted.jobId,
+                item.reviewStatus);
+
+            requirementsWriter_.InsertReviewItems(
+                transaction,
+                upserted.jobId,
+                item.findings);
         }
 
         return result;

@@ -9,6 +9,7 @@
 #include "jobpilot/service/application/application_controller.h"
 #include "jobpilot/service/job/job_controller.h"
 #include "jobpilot/service/job/internal_job_import_controller.h"
+#include "jobpilot/service/job/internal_job_review_controller.h"
 #include "jobpilot/service/job/internal_source_sync_controller.h"
 #include "jobpilot/service/resume/resume_controller.h"
 #include "jobpilot/service/user/user_controller.h"
@@ -25,7 +26,8 @@ namespace jobpilot::service
         InternalJobImportController *internalJobImportController,
         InternalSourceSyncController *internalSourceSyncController,
         AiController *aiController,
-        AiInternalController *aiInternalController)
+        AiInternalController *aiInternalController,
+        InternalJobReviewController *internalJobReviewController)
     {
         if (server == nullptr ||
             userController == nullptr)
@@ -396,6 +398,46 @@ namespace jobpilot::service
                     jobpilot::core::HttpResponse &response)
                 {
                     aiInternalController->Input(
+                        request,
+                        response);
+                });
+        }
+
+        if (internalJobReviewController != nullptr)
+        {
+            // Static route first so /review/backfill never reaches {id}.
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kGet,
+                "/internal/jobs/review-queue",
+                [internalJobReviewController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    internalJobReviewController->Queue(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/internal/jobs/review/backfill",
+                [internalJobReviewController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    internalJobReviewController->Backfill(
+                        request,
+                        response);
+                });
+
+            router.RegisterRoute(
+                jobpilot::core::HttpMethod::kPost,
+                "/internal/jobs/review/{id}",
+                [internalJobReviewController](
+                    const jobpilot::core::HttpRequest &request,
+                    jobpilot::core::HttpResponse &response)
+                {
+                    internalJobReviewController->Review(
                         request,
                         response);
                 });

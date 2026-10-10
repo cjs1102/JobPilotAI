@@ -57,7 +57,8 @@ namespace jobpilot::service
         void WriteError(
             const jobpilot::core::HttpRequest &request,
             jobpilot::core::HttpResponse *response,
-            ErrorCode code)
+            ErrorCode code,
+            const Json &data = Json(nullptr))
         {
             const int statusCode =
                 HttpStatusFor(code);
@@ -74,10 +75,79 @@ namespace jobpilot::service
                      static_cast<int>(code)},
                     {"message",
                      ErrorMessage(code)},
-                    {"data", nullptr}}
+                    {"data", data}}
                     .dump());
             response->SetKeepAlive(
                 request.KeepAlive());
+        }
+
+        // 0015A ingest-response projection (ExecPlan 0015A section 5.2).
+        Json QualityToJson(
+            const JobQualitySummary &summary)
+        {
+            Json items = Json::array();
+
+            for (const JobQualityItemResult &item : summary.items)
+            {
+                Json findings = Json::array();
+
+                for (const JobQualityFinding &finding : item.findings)
+                {
+                    findings.push_back(
+                        Json{
+                            {"code", finding.code},
+                            {"reason", finding.reason},
+                            {"outcome",
+                             ToString(finding.outcome)},
+                            {"review_status",
+                             item.reviewStatus}});
+                }
+
+                Json entry{
+                    {"index", item.index},
+                    {"source_url", item.sourceUrl},
+                    {"review_status", item.reviewStatus},
+                    {"rejected", item.rejected},
+                    {"findings", std::move(findings)}};
+
+                if (item.rejected)
+                {
+                    entry["diagnostic"] = Json{
+                        {"code", item.diagnosticCode},
+                        {"field", item.diagnosticField},
+                        {"reason", item.diagnosticReason}};
+                }
+
+                items.push_back(std::move(entry));
+            }
+
+            Json data{
+                {"items", std::move(items)},
+                {"needs_review", summary.needsReview},
+                {"rejected", summary.rejected},
+                {"clean", summary.clean}};
+
+            if (!summary.diagnosticCode.empty())
+            {
+                data["diagnostic"] = Json{
+                    {"code", summary.diagnosticCode},
+                    {"field", summary.diagnosticField},
+                    {"reason", summary.diagnosticReason}};
+            }
+
+            return data;
+        }
+
+        Json QualityDataOrNull(
+            const JobQualitySummary &summary)
+        {
+            if (summary.items.empty() &&
+                summary.diagnosticCode.empty())
+            {
+                return Json(nullptr);
+            }
+
+            return QualityToJson(summary);
         }
 
         bool ConstantTimeEquals(
@@ -530,26 +600,29 @@ namespace jobpilot::service
             WriteError(
                 request,
                 &response,
-                result.code);
+                result.code,
+                QualityDataOrNull(result.value.quality));
             return;
         }
+
+        Json responseBody =
+            QualityToJson(result.value.quality);
+        responseBody["created"] = result.value.created;
+        responseBody["updated"] = result.value.updated;
+        responseBody["seen"] = result.value.seen;
+        responseBody["closed"] = result.value.closed;
+        responseBody["complete"] = result.value.complete;
+        responseBody["skipped_manual"] =
+            result.value.skippedManual;
+        responseBody["skipped_manual_urls"] =
+            result.value.skippedManualUrls;
 
         response.SetStatusCode(200);
         response.SetStatusMessage("OK");
         response.SetHeader(
             "Content-Type",
             "application/json");
-        response.SetBody(
-            Json{
-                {"created", result.value.created},
-                {"updated", result.value.updated},
-                {"seen", result.value.seen},
-                {"closed", result.value.closed},
-                {"complete", result.value.complete},
-                {"skipped_manual", result.value.skippedManual},
-                {"skipped_manual_urls",
-                 result.value.skippedManualUrls}}
-                .dump());
+        response.SetBody(responseBody.dump());
         response.SetKeepAlive(
             request.KeepAlive());
     }

@@ -74,11 +74,53 @@ namespace jobpilot::service
                 }
             }
 
+            void SetReviewStatus(
+                jobpilot::core::ConnectionPool::Transaction &transaction,
+                std::uint64_t jobId,
+                std::int32_t status) override
+            {
+                transactions.push_back(&transaction);
+                ++reviewStatusCalls;
+                capturedJobIds.push_back(jobId);
+                capturedReviewStatus = status;
+
+                if (delegate_ != nullptr)
+                {
+                    delegate_->SetReviewStatus(
+                        transaction,
+                        jobId,
+                        status);
+                }
+            }
+
+            void InsertReviewItems(
+                jobpilot::core::ConnectionPool::Transaction &transaction,
+                std::uint64_t jobId,
+                const std::vector<JobQualityFinding> &findings) override
+            {
+                transactions.push_back(&transaction);
+                ++reviewItemCalls;
+                capturedFindings = findings;
+
+                if (delegate_ != nullptr)
+                {
+                    delegate_->InsertReviewItems(
+                        transaction,
+                        jobId,
+                        findings);
+                }
+            }
+
             std::vector<
                 jobpilot::core::ConnectionPool::Transaction *>
                 transactions;
             std::size_t upsertCalls = 0;
             std::size_t replaceCalls = 0;
+            std::size_t reviewStatusCalls = 0;
+            std::size_t reviewItemCalls = 0;
+            std::vector<std::uint64_t> capturedJobIds;
+            std::int32_t capturedReviewStatus = -1;
+            std::vector<JobQualityFinding> capturedFindings;
             bool throwOnSecondUpsert = false;
 
         private:
@@ -151,6 +193,15 @@ namespace jobpilot::service
                 requirements};
         }
 
+        // 0015A: source_url must be an absolute http(s) job-detail URL
+        // (ExecPlan 0015A section 5.5.1); the fixtures below use this shape.
+        std::string UniqueUrl(
+            const std::string &prefix)
+        {
+            return "https://example.invalid/job/" +
+                   jobpilot::test::UniqueJobToken(prefix);
+        }
+
         std::unique_ptr<
             jobpilot::core::ConnectionPool>
             pool;
@@ -172,7 +223,7 @@ namespace jobpilot::service
         {
             tooMany.push_back(
                 MakeItem(
-                    jobpilot::test::UniqueJobToken(
+                    UniqueUrl(
                         "too-many")));
         }
 
@@ -181,7 +232,7 @@ namespace jobpilot::service
             ErrorCode::kInvalidParam);
 
         const std::string duplicateUrl =
-            jobpilot::test::UniqueJobToken(
+            UniqueUrl(
                 "duplicate-source");
         std::vector<JobIngestionItem> duplicateBatch = {
             MakeItem(duplicateUrl),
@@ -199,7 +250,7 @@ namespace jobpilot::service
 
         JobIngestionItem invalidSalary =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "invalid-salary"));
         invalidSalary.job.salaryMin = 40;
         invalidSalary.job.salaryMax = 20;
@@ -209,7 +260,7 @@ namespace jobpilot::service
 
         JobIngestionItem invalidLevel =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "invalid-level"),
                 {{"C++", 4}});
         EXPECT_EQ(
@@ -227,7 +278,7 @@ namespace jobpilot::service
         JobIngestionService service(dao, *pool);
 
         const std::string sourceUrl =
-            jobpilot::test::UniqueJobToken(
+            UniqueUrl(
                 "service-idempotent");
         sourceUrls.push_back(sourceUrl);
 
@@ -286,10 +337,10 @@ namespace jobpilot::service
         JobIngestionService service(dao, *pool);
 
         const std::string firstUrl =
-            jobpilot::test::UniqueJobToken(
+            UniqueUrl(
                 "rollback-first");
         const std::string secondUrl =
-            jobpilot::test::UniqueJobToken(
+            UniqueUrl(
                 "rollback-second");
         sourceUrls.push_back(firstUrl);
         sourceUrls.push_back(secondUrl);
@@ -338,7 +389,7 @@ namespace jobpilot::service
 
         JobIngestionItem valid =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "extra-valid"));
         valid.job.educationRequired = 3;
         valid.job.experienceYearsMin = 0;
@@ -352,7 +403,7 @@ namespace jobpilot::service
 
         JobIngestionItem explicitTime =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "extra-explicit"));
         explicitTime.job.deadline = "2026-10-31 10:30:00";
         explicitTime.job.deadlineDateOnly = false;
@@ -369,28 +420,28 @@ namespace jobpilot::service
 
         JobIngestionItem educationTooHigh =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "extra-education"));
         educationTooHigh.job.educationRequired = 6;
         rejects(educationTooHigh);
 
         JobIngestionItem natureTooHigh =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "extra-nature"));
         natureTooHigh.job.jobNature = 4;
         rejects(natureTooHigh);
 
         JobIngestionItem yearsOverflow =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "extra-years"));
         yearsOverflow.job.experienceYearsMax = 32768;
         rejects(yearsOverflow);
 
         JobIngestionItem invertedYears =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "extra-years-inverted"));
         invertedYears.job.experienceYearsMin = 5;
         invertedYears.job.experienceYearsMax = 3;
@@ -398,14 +449,14 @@ namespace jobpilot::service
 
         JobIngestionItem malformedDeadline =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "extra-deadline"));
         malformedDeadline.job.deadline = "2026-10-31T10:30:00";
         rejects(malformedDeadline);
 
         JobIngestionItem dateOnlyWithInstant =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "extra-kind"));
         dateOnlyWithInstant.job.deadline = "2026-10-31 10:30:00";
         dateOnlyWithInstant.job.deadlineDateOnly = true;
@@ -413,13 +464,277 @@ namespace jobpilot::service
 
         JobIngestionItem flagWithoutDeadline =
             MakeItem(
-                jobpilot::test::UniqueJobToken(
+                UniqueUrl(
                     "extra-flag"));
         flagWithoutDeadline.job.deadlineDateOnly = true;
         rejects(flagWithoutDeadline);
 
         // Only the two valid batches reached the DAO.
         EXPECT_EQ(dao.upsertCalls, 2U);
+    }
+
+    TEST_F(JobIngestionServiceTest, RecordsFindingsAndReviewStatus)
+    {
+        JobIngestionDao ingestionDao;
+        RecordingJobIngestionDao dao(&ingestionDao);
+        JobIngestionService service(
+            dao,
+            *pool,
+            PlatformNameRegistry::FromNames({"牛客"}));
+
+        const std::string cleanUrl = UniqueUrl("quality-clean");
+        const std::string platformUrl = UniqueUrl("quality-platform");
+
+        JobIngestionItem clean = MakeItem(cleanUrl);
+        JobIngestionItem platform = MakeItem(platformUrl);
+        platform.job.company = "牛客";
+        JobIngestionItem homepage;
+        homepage.job = MakeJob("https://example.invalid/");
+        homepage.job.company = "Homepage Co";
+        homepage.job.title = "Homepage Job";
+        sourceUrls.push_back(homepage.job.sourceUrl);
+
+        const ServiceResult<JobIngestionResult> result =
+            service.Import({clean, platform, homepage});
+
+        ASSERT_EQ(result.code, ErrorCode::kSuccess);
+        EXPECT_EQ(result.value.created, 3U);
+        EXPECT_EQ(result.value.quality.rejected, 0U);
+        EXPECT_EQ(result.value.quality.needsReview, 2U);
+        EXPECT_EQ(result.value.quality.clean, 1U);
+        ASSERT_EQ(result.value.quality.items.size(), 3U);
+
+        EXPECT_EQ(
+            result.value.quality.items[0].reviewStatus,
+            0);
+        EXPECT_TRUE(
+            result.value.quality.items[0].findings.empty());
+        EXPECT_FALSE(
+            result.value.quality.items[0].rejected);
+
+        EXPECT_EQ(
+            result.value.quality.items[1].reviewStatus,
+            1);
+        ASSERT_FALSE(
+            result.value.quality.items[1].findings.empty());
+        EXPECT_EQ(
+            result.value.quality.items[1].findings[0].code,
+            "employer_is_platform");
+        EXPECT_EQ(
+            result.value.quality.items[1].findings[0].outcome,
+            JobQualityOutcome::kNeedsReview);
+
+        EXPECT_EQ(
+            result.value.quality.items[2].reviewStatus,
+            1);
+        ASSERT_FALSE(
+            result.value.quality.items[2].findings.empty());
+        EXPECT_EQ(
+            result.value.quality.items[2].findings[0].code,
+            "source_url_not_detail");
+        EXPECT_EQ(
+            result.value.quality.items[2].sourceUrl,
+            "https://example.invalid/");
+
+        // Persisted in the same transaction: the verdict on the row and the
+        // open findings in job_review_items.
+        const jobpilot::core::Result platformRow =
+            pool->Query(
+                "SELECT review_status FROM jobs WHERE source_url = ?",
+                {platformUrl});
+
+        ASSERT_EQ(platformRow.rowCount(), 1U);
+        EXPECT_EQ(platformRow.value(0, 0).value(), "1");
+
+        const jobpilot::core::Result platformItems =
+            pool->Query(
+                "SELECT reason_code, outcome, resolution "
+                "FROM job_review_items "
+                "WHERE job_id = (SELECT id FROM jobs "
+                "WHERE source_url = ?)",
+                {platformUrl});
+
+        ASSERT_EQ(platformItems.rowCount(), 1U);
+        EXPECT_EQ(
+            platformItems.value(0, 0).value(),
+            "employer_is_platform");
+        EXPECT_EQ(
+            platformItems.value(0, 1).value(),
+            "needs_review");
+        EXPECT_EQ(platformItems.value(0, 2).value(), "open");
+
+        const jobpilot::core::Result cleanRow =
+            pool->Query(
+                "SELECT review_status FROM jobs WHERE source_url = ?",
+                {cleanUrl});
+
+        ASSERT_EQ(cleanRow.rowCount(), 1U);
+        EXPECT_EQ(cleanRow.value(0, 0).value(), "0");
+
+        EXPECT_EQ(dao.reviewStatusCalls, 3U);
+        EXPECT_EQ(dao.reviewItemCalls, 3U);
+    }
+
+    TEST_F(JobIngestionServiceTest, RejectsUnusableInputWithADiagnostic)
+    {
+        RecordingJobIngestionDao dao;
+        JobIngestionService service(dao, *pool);
+
+        JobIngestionItem missingCompany =
+            MakeItem(UniqueUrl("reject-company"));
+        missingCompany.job.company = "   ";
+
+        const ServiceResult<JobIngestionResult> companyRejected =
+            service.Import({missingCompany});
+
+        ASSERT_EQ(companyRejected.code, ErrorCode::kInvalidParam);
+        EXPECT_EQ(
+            companyRejected.value.quality.rejected,
+            1U);
+        EXPECT_EQ(
+            companyRejected.value.quality.diagnosticCode,
+            "company_missing");
+        EXPECT_EQ(
+            companyRejected.value.quality.diagnosticField,
+            "company");
+        EXPECT_FALSE(
+            companyRejected.value.quality.diagnosticReason.empty());
+        ASSERT_EQ(
+            companyRejected.value.quality.items.size(),
+            1U);
+        EXPECT_TRUE(
+            companyRejected.value.quality.items[0].rejected);
+
+        JobIngestionItem unusableUrl =
+            MakeItem("not-a-url");
+        const ServiceResult<JobIngestionResult> urlRejected =
+            service.Import({unusableUrl});
+
+        ASSERT_EQ(urlRejected.code, ErrorCode::kInvalidParam);
+        EXPECT_EQ(
+            urlRejected.value.quality.diagnosticCode,
+            "source_url_unusable");
+        EXPECT_EQ(
+            urlRejected.value.quality.diagnosticField,
+            "source_url");
+
+        JobIngestionItem hugeDescription =
+            MakeItem(UniqueUrl("reject-description"));
+        hugeDescription.job.description =
+            std::string(kMaxDescriptionBytes + 1, 'a');
+
+        const ServiceResult<JobIngestionResult> descriptionRejected =
+            service.Import({hugeDescription});
+
+        ASSERT_EQ(
+            descriptionRejected.code,
+            ErrorCode::kInvalidParam);
+        EXPECT_EQ(
+            descriptionRejected.value.quality.diagnosticCode,
+            "description_too_large");
+        EXPECT_EQ(
+            descriptionRejected.value.quality.diagnosticField,
+            "description");
+
+        JobIngestionItem hugeCompany =
+            MakeItem(UniqueUrl("reject-company-large"));
+        hugeCompany.job.company = std::string(129, 'a');
+
+        const ServiceResult<JobIngestionResult> companyCapRejected =
+            service.Import({hugeCompany});
+
+        ASSERT_EQ(companyCapRejected.code, ErrorCode::kInvalidParam);
+        EXPECT_EQ(
+            companyCapRejected.value.quality.diagnosticCode,
+            "company_too_large");
+        EXPECT_EQ(
+            companyCapRejected.value.quality.diagnosticField,
+            "company");
+
+        EXPECT_EQ(dao.upsertCalls, 0U);
+        EXPECT_EQ(dao.replaceCalls, 0U);
+
+        const jobpilot::core::Result written =
+            pool->Query(
+                "SELECT COUNT(*) FROM jobs "
+                "WHERE source_url LIKE "
+                "'https://example.invalid/job/reject-%'",
+                {});
+
+        ASSERT_EQ(written.rowCount(), 1U);
+        EXPECT_EQ(written.value(0, 0).value(), "0");
+    }
+
+    TEST_F(JobIngestionServiceTest, RegistryIsFailOpenAndAdvisoryStaysVisible)
+    {
+        JobIngestionDao ingestionDao;
+        RecordingJobIngestionDao dao(&ingestionDao);
+        JobIngestionService service(
+            dao,
+            *pool,
+            PlatformNameRegistry::FromNames({"牛客"}));
+
+        JobIngestionItem unknown =
+            MakeItem(UniqueUrl("registry-unknown"));
+        unknown.job.company = "Acme Corp";
+
+        const ServiceResult<JobIngestionResult> unknownResult =
+            service.Import({unknown});
+
+        ASSERT_EQ(unknownResult.code, ErrorCode::kSuccess);
+        EXPECT_EQ(
+            unknownResult.value.quality.needsReview,
+            0U);
+        EXPECT_EQ(unknownResult.value.quality.rejected, 0U);
+        EXPECT_TRUE(
+            unknownResult.value.quality.items[0].findings.empty());
+
+        // An unrecognised-but-http(s) shape is advisory: the row stays visible
+        // with review_status = 0 (ExecPlan 0015A section 6.1 codes 9-11).
+        JobIngestionItem advisory;
+        advisory.job = MakeJob(
+            "https://example.invalid/board/alpha");
+        sourceUrls.push_back(advisory.job.sourceUrl);
+
+        const ServiceResult<JobIngestionResult> advisoryResult =
+            service.Import({advisory});
+
+        ASSERT_EQ(advisoryResult.code, ErrorCode::kSuccess);
+        EXPECT_EQ(advisoryResult.value.quality.clean, 1U);
+        EXPECT_EQ(advisoryResult.value.quality.needsReview, 0U);
+        ASSERT_EQ(
+            advisoryResult.value.quality.items.size(),
+            1U);
+        ASSERT_FALSE(
+            advisoryResult.value.quality.items[0].findings.empty());
+        EXPECT_EQ(
+            advisoryResult.value.quality.items[0].findings[0].code,
+            "source_url_shape_unrecognised");
+        EXPECT_EQ(
+            advisoryResult.value.quality.items[0].findings[0].outcome,
+            JobQualityOutcome::kAdvisory);
+
+        const jobpilot::core::Result status =
+            pool->Query(
+                "SELECT review_status FROM jobs WHERE source_url = ?",
+                {"https://example.invalid/board/alpha"});
+
+        ASSERT_EQ(status.rowCount(), 1U);
+        EXPECT_EQ(status.value(0, 0).value(), "0");
+
+        // The DB stores the documented vocabulary verbatim: the widened
+        // VARCHAR(24) column holds accepted_advisory (17 bytes).
+        const jobpilot::core::Result outcome =
+            pool->Query(
+                "SELECT outcome FROM job_review_items "
+                "WHERE job_id = (SELECT id FROM jobs "
+                "WHERE source_url = ?)",
+                {"https://example.invalid/board/alpha"});
+
+        ASSERT_EQ(outcome.rowCount(), 1U);
+        EXPECT_EQ(
+            outcome.value(0, 0).value(),
+            "accepted_advisory");
     }
 
 } // namespace jobpilot::service

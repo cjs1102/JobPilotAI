@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "jobpilot/service/job/job_quality.h"
 #include "jobpilot/service/job/source_sync_dao_interface.h"
 #include "jobpilot/service/result.h"
 
@@ -20,6 +21,9 @@ namespace jobpilot::service
         bool complete = false;
         std::size_t skippedManual = 0;
         std::vector<std::string> skippedManualUrls;
+
+        // 0015A: per-item findings + needs_review/rejected/clean counters.
+        JobQualitySummary quality;
     };
 
     class SourceSyncService
@@ -27,7 +31,11 @@ namespace jobpilot::service
     public:
         SourceSyncService(
             ISourceSyncDao &sourceSyncDao,
-            jobpilot::core::ConnectionPool &pool);
+            jobpilot::core::ConnectionPool &pool,
+            // 0015A item 2: composition boundary for the single platform-name
+            // registry (env override + repo-relative default).
+            PlatformNameRegistry platforms =
+                PlatformNameRegistry::LoadFromEnvironment(nullptr));
 
         // One transaction per observation: validate, upsert every observed
         // job plus its requirements, and close missing jobs only for a
@@ -38,6 +46,7 @@ namespace jobpilot::service
     private:
         ISourceSyncDao &sourceSyncDao_;
         jobpilot::core::ConnectionPool &pool_;
+        PlatformNameRegistry platforms_;
     };
 
 } // namespace jobpilot::service

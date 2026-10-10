@@ -17,6 +17,16 @@ namespace jobpilot::service
             jobpilot::core::ConnectionPool::Transaction &transaction,
             std::uint64_t jobId,
             const std::vector<JobRequirementImportData> &requirements) override;
+
+        void SetReviewStatus(
+            jobpilot::core::ConnectionPool::Transaction &transaction,
+            std::uint64_t jobId,
+            std::int32_t status) override;
+
+        void InsertReviewItems(
+            jobpilot::core::ConnectionPool::Transaction &transaction,
+            std::uint64_t jobId,
+            const std::vector<JobQualityFinding> &findings) override;
     };
 
 } // namespace jobpilot::service

@@ -178,6 +178,17 @@ jobs:
 
       - name: Full test suite
         run: ctest --test-dir build/presets/release --output-on-failure
+
+      # 0017-B. The test-overlap audit concluded that no case is removable, but
+      # its mapping is only a guard if something checks it: this fails the job
+      # when a removed name is still live, a survivor is gone, the counts drift
+      # from the live ctest list, or the report's marker disagrees with the map.
+      - name: Coverage map guard
+        run: |
+          python3 tools/checks/test_coverage_map.py \
+            --test-dir build/presets/release \
+            --map docs/quality/test-merge-map.json
+
       - name: Python suites
         run: |
           (cd source_adapters && python3 -m unittest discover -s jobpilot_sources/tests -t .)

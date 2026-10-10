@@ -1,0 +1,1022 @@
+{
+  "schema_version": 1,
+  "audit": "0017-B: test overlap audit (docs/exec-plans/active/0017-ops-hardening-and-acceptance-closure.md section 5.2)",
+  "report": "docs/quality/test-overlap-audit.md",
+  "checker": "tools/checks/test_coverage_map.py",
+  "method": "Static intra-file analysis of service/tests/*.cpp and backend/tests/*.cpp; see the audit report section 2 for the exact commands, the four detector filters and the coverage statistics (1533 within-binary pairs, 0 verbatim containments).",
+  "merge_rule": "Remove a case only when it and the survivor are in the SAME test binary, drive the SAME input/fixture, and the survivor's assertion set STRICTLY CONTAINS the removed case's assertions on the same target. Cap: 20 removals. Any uncertainty keeps the case.",
+  "removed": [],
+  "survivors": [],
+  "counts": {
+    "before": 309,
+    "after": 309,
+    "removed": 0,
+    "survivors": 0,
+    "candidates_evaluated": 66,
+    "candidate_pairs_unordered": 50,
+    "record_only": 47,
+    "cap": 20
+  },
+  "evaluated": [
+    {
+      "removed": "HttpCorrectnessTest.RejectsDuplicateContentLength",
+      "survivor": "HttpCorrectnessTest.RejectsMixedCaseDuplicateContentLength",
+      "binary": "test_http_correctness",
+      "file": "backend/tests/test_http_correctness.cpp",
+      "removed_line": 42,
+      "survivor_line": 59,
+      "decision": "KEEP",
+      "detector": [
+        "shape_containment"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_EQ( parser.Parse(&buffer), ParseResult::kError)"
+    },
+    {
+      "removed": "HttpCorrectnessTest.RejectsMixedCaseDuplicateContentLength",
+      "survivor": "HttpCorrectnessTest.RejectsDuplicateContentLength",
+      "binary": "test_http_correctness",
+      "file": "backend/tests/test_http_correctness.cpp",
+      "removed_line": 59,
+      "survivor_line": 42,
+      "decision": "KEEP",
+      "detector": [
+        "shape_containment"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_EQ( parser.Parse(&buffer), ParseResult::kError)"
+    },
+    {
+      "removed": "SourceObservationValidation.AcceptsCompleteEmptyBoard",
+      "survivor": "SourceObservationValidation.AcceptsIncompletePartialBatch",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 82,
+      "survivor_line": 99,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_TRUE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.AcceptsIncompletePartialBatch",
+      "survivor": "SourceObservationValidation.AcceptsCompleteEmptyBoard",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 99,
+      "survivor_line": 82,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_TRUE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsEmptyObservedAt",
+      "survivor": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 240,
+      "survivor_line": 90,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsEmptyObservedAt",
+      "survivor": "SourceObservationValidation.RejectsSourceTooLong",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 240,
+      "survivor_line": 187,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsEmptyObservedAt",
+      "survivor": "SourceObservationValidation.RejectsMalformedObservedAt",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 240,
+      "survivor_line": 232,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsEmptyObservedAt",
+      "survivor": "SourceObservationValidation.RejectsJobSourceMismatch",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 240,
+      "survivor_line": 269,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "survivor": "SourceObservationValidation.RejectsSourceTooLong",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 90,
+      "survivor_line": 187,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "survivor": "SourceObservationValidation.RejectsMalformedObservedAt",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 90,
+      "survivor_line": 232,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "survivor": "SourceObservationValidation.RejectsEmptyObservedAt",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 90,
+      "survivor_line": 240,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "survivor": "SourceObservationValidation.RejectsJobSourceMismatch",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 90,
+      "survivor_line": 269,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsJobSourceMismatch",
+      "survivor": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 269,
+      "survivor_line": 90,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsJobSourceMismatch",
+      "survivor": "SourceObservationValidation.RejectsSourceTooLong",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 269,
+      "survivor_line": 187,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsJobSourceMismatch",
+      "survivor": "SourceObservationValidation.RejectsMalformedObservedAt",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 269,
+      "survivor_line": 232,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsJobSourceMismatch",
+      "survivor": "SourceObservationValidation.RejectsEmptyObservedAt",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 269,
+      "survivor_line": 240,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsMalformedObservedAt",
+      "survivor": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 232,
+      "survivor_line": 90,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsMalformedObservedAt",
+      "survivor": "SourceObservationValidation.RejectsSourceTooLong",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 232,
+      "survivor_line": 187,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsMalformedObservedAt",
+      "survivor": "SourceObservationValidation.RejectsEmptyObservedAt",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 232,
+      "survivor_line": 240,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsMalformedObservedAt",
+      "survivor": "SourceObservationValidation.RejectsJobSourceMismatch",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 232,
+      "survivor_line": 269,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsSourceTooLong",
+      "survivor": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 187,
+      "survivor_line": 90,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsSourceTooLong",
+      "survivor": "SourceObservationValidation.RejectsMalformedObservedAt",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 187,
+      "survivor_line": 232,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsSourceTooLong",
+      "survivor": "SourceObservationValidation.RejectsEmptyObservedAt",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 187,
+      "survivor_line": 240,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.RejectsSourceTooLong",
+      "survivor": "SourceObservationValidation.RejectsJobSourceMismatch",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 187,
+      "survivor_line": 269,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "assertion_sets_equal_not_strict",
+      "reason": "the two cases assert the identical target set, so neither strictly contains the other",
+      "evidence": "assertion sets identical: EXPECT_FALSE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "ConfigTest.LoadsAiDefaults",
+      "survivor": "ConfigTest.LoadsDefaults",
+      "binary": "test_config",
+      "file": "backend/tests/test_config.cpp",
+      "removed_line": 246,
+      "survivor_line": 21,
+      "decision": "KEEP",
+      "detector": [
+        "identical_inputs",
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ(config.ai.leaseSeconds, 120)"
+    },
+    {
+      "removed": "ConfigTest.LoadsDefaults",
+      "survivor": "ConfigTest.LoadsAiDefaults",
+      "binary": "test_config",
+      "file": "backend/tests/test_config.cpp",
+      "removed_line": 21,
+      "survivor_line": 246,
+      "decision": "KEEP",
+      "detector": [
+        "identical_inputs",
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( config.storage.maxFileBytes, 10U * 1024U * 1024U)"
+    },
+    {
+      "removed": "LoggerTest.RejectsUnknownLevel",
+      "survivor": "LoggerTest.InitializesAndWrites",
+      "binary": "test_logger",
+      "file": "backend/tests/test_logger.cpp",
+      "removed_line": 30,
+      "survivor_line": 12,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_THROW( Logger::Initialize( \"verbose\", std::make_shared<spdlog::sinks::ostream_sink_mt>( output)), std::invalid_argument)"
+    },
+    {
+      "removed": "SqlResultTest.ThrowsOnInvalidColumnIndex",
+      "survivor": "SqlResultTest.ThrowsOnInvalidRowIndex",
+      "binary": "test_sql_result",
+      "file": "backend/tests/test_sql_result.cpp",
+      "removed_line": 67,
+      "survivor_line": 56,
+      "decision": "KEEP",
+      "detector": [
+        "identical_inputs",
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_THROW(result.value(0, 1), std::out_of_range)"
+    },
+    {
+      "removed": "SqlResultTest.ThrowsOnInvalidRowIndex",
+      "survivor": "SqlResultTest.ThrowsOnInvalidColumnIndex",
+      "binary": "test_sql_result",
+      "file": "backend/tests/test_sql_result.cpp",
+      "removed_line": 56,
+      "survivor_line": 67,
+      "decision": "KEEP",
+      "detector": [
+        "identical_inputs",
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_THROW(result.row(1), std::out_of_range)"
+    },
+    {
+      "removed": "AiTaskServiceTest.RefusesInputWithoutALiveLease",
+      "survivor": "AiTaskServiceTest.BuildsTheWorkerInputBundle",
+      "binary": "test_ai_task_service",
+      "file": "service/tests/test_ai_task_service.cpp",
+      "removed_line": 1394,
+      "survivor_line": 1286,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"worker-a\", 1024).code, ErrorCode::kSuccess)"
+    },
+    {
+      "removed": "AiTaskServiceTest.RejectsInvalidIdentifiersWithoutDaoCalls",
+      "survivor": "AiTaskServiceTest.RefusesInputWithoutALiveLease",
+      "binary": "test_ai_task_service",
+      "file": "service/tests/test_ai_task_service.cpp",
+      "removed_line": 634,
+      "survivor_line": 1394,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"\", 1).code, ErrorCode::kInvalidParam)"
+    },
+    {
+      "removed": "AiTaskServiceTest.RejectsInvalidIdentifiersWithoutDaoCalls",
+      "survivor": "AiTaskServiceTest.RejectsMissingJobResumeAndResumeText",
+      "binary": "test_ai_task_service",
+      "file": "service/tests/test_ai_task_service.cpp",
+      "removed_line": 634,
+      "survivor_line": 696,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"\", 1).code, ErrorCode::kInvalidParam)"
+    },
+    {
+      "removed": "AiTaskServiceTest.RejectsInvalidIdentifiersWithoutDaoCalls",
+      "survivor": "AiTaskServiceTest.MapsDaoFailuresToDatabaseError",
+      "binary": "test_ai_task_service",
+      "file": "service/tests/test_ai_task_service.cpp",
+      "removed_line": 634,
+      "survivor_line": 773,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"\", 1).code, ErrorCode::kInvalidParam)"
+    },
+    {
+      "removed": "AiTaskServiceTest.RejectsInvalidIdentifiersWithoutDaoCalls",
+      "survivor": "AiTaskServiceTest.DisabledEnhancementResolvesAtCreation",
+      "binary": "test_ai_task_service",
+      "file": "service/tests/test_ai_task_service.cpp",
+      "removed_line": 634,
+      "survivor_line": 846,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"\", 1).code, ErrorCode::kInvalidParam)"
+    },
+    {
+      "removed": "AiTaskServiceTest.RejectsInvalidIdentifiersWithoutDaoCalls",
+      "survivor": "AiTaskServiceTest.OwnershipRefusalUsesOneNotFoundCode",
+      "binary": "test_ai_task_service",
+      "file": "service/tests/test_ai_task_service.cpp",
+      "removed_line": 634,
+      "survivor_line": 1000,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"\", 1).code, ErrorCode::kInvalidParam)"
+    },
+    {
+      "removed": "AiTaskServiceTest.RejectsInvalidIdentifiersWithoutDaoCalls",
+      "survivor": "AiTaskServiceTest.FailedAndDegradedTasksStillExposeTheRuleResult",
+      "binary": "test_ai_task_service",
+      "file": "service/tests/test_ai_task_service.cpp",
+      "removed_line": 634,
+      "survivor_line": 1041,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"\", 1).code, ErrorCode::kInvalidParam)"
+    },
+    {
+      "removed": "AiTaskServiceTest.RejectsInvalidIdentifiersWithoutDaoCalls",
+      "survivor": "AiTaskServiceTest.BuildsTheWorkerInputBundle",
+      "binary": "test_ai_task_service",
+      "file": "service/tests/test_ai_task_service.cpp",
+      "removed_line": 634,
+      "survivor_line": 1286,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"\", 1).code, ErrorCode::kInvalidParam)"
+    },
+    {
+      "removed": "AiTaskServiceTest.RejectsInvalidIdentifiersWithoutDaoCalls",
+      "survivor": "AiTaskServiceTest.ReportsBrokenBundleAsInternalError",
+      "binary": "test_ai_task_service",
+      "file": "service/tests/test_ai_task_service.cpp",
+      "removed_line": 634,
+      "survivor_line": 1433,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"\", 1).code, ErrorCode::kInvalidParam)"
+    },
+    {
+      "removed": "JobRankingServiceTest.RequiresUsableProfileOrSkills",
+      "survivor": "JobRankingServiceTest.SortsPaginatesAndReportsTruncation",
+      "binary": "test_job_ranking_service",
+      "file": "service/tests/test_job_ranking_service.cpp",
+      "removed_line": 237,
+      "survivor_line": 189,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.RankJobs(1, {}, 1, 20).code, ErrorCode::kInvalidParam)"
+    },
+    {
+      "removed": "MatchResultJsonTest.IsDeterministicForTheSameInput",
+      "survivor": "MatchResultJsonTest.RoundTripsEveryField",
+      "binary": "test_match_result_json",
+      "file": "service/tests/test_match_result_json.cpp",
+      "removed_line": 68,
+      "survivor_line": 124,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_EQ( SerializeMatchResult(result), SerializeMatchResult(result))"
+    },
+    {
+      "removed": "SourceObservationValidation.AcceptsCompleteEmptyBoard",
+      "survivor": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 82,
+      "survivor_line": 90,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_TRUE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "SourceObservationValidation.AcceptsIncompletePartialBatch",
+      "survivor": "SourceObservationValidation.RejectsIncompleteEmptyBoard",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 99,
+      "survivor_line": 90,
+      "decision": "KEEP",
+      "detector": [
+        "inputs_verbatim_subset"
+      ],
+      "rule_failure": "assertions_not_contained",
+      "reason": "the removed case asserts at least one target the survivor never asserts",
+      "evidence": "A-only assertion not present in B: EXPECT_TRUE(ValidateSourceObservation(observation))"
+    },
+    {
+      "removed": "ConfigTest.RejectsInvalidPort",
+      "survivor": "ConfigTest.RejectsInvalidStorageConfiguration",
+      "binary": "test_config",
+      "file": "backend/tests/test_config.cpp",
+      "removed_line": 157,
+      "survivor_line": 229,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_THROW( Config::LoadFromString( \"server:\\n\" \" port: 70000\\n\", BaseEnvironment()), ConfigError) ; B-only assertion EXPECT_THROW( Config::LoadFromString( \"storage:\\n\" \" max_file_bytes: 0\\n\", BaseEnvironment()), ConfigError)"
+    },
+    {
+      "removed": "ConfigTest.RejectsInvalidPort",
+      "survivor": "ConfigTest.RejectsInvalidAiConfiguration",
+      "binary": "test_config",
+      "file": "backend/tests/test_config.cpp",
+      "removed_line": 157,
+      "survivor_line": 293,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_THROW( Config::LoadFromString( \"server:\\n\" \" port: 70000\\n\", BaseEnvironment()), ConfigError) ; B-only assertion EXPECT_THROW( Config::LoadFromString( \"ai: []\\n\", BaseEnvironment()), ConfigError)"
+    },
+    {
+      "removed": "ConfigTest.RejectsMalformedYaml",
+      "survivor": "ConfigTest.RejectsInvalidAiConfiguration",
+      "binary": "test_config",
+      "file": "backend/tests/test_config.cpp",
+      "removed_line": 220,
+      "survivor_line": 293,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_THROW( Config::LoadFromString( \"server: [\\n\", BaseEnvironment()), ConfigError) ; B-only assertion EXPECT_THROW( Config::LoadFromString( \"ai: []\\n\", BaseEnvironment()), ConfigError)"
+    },
+    {
+      "removed": "ConfigTest.RejectsPasswordInYaml",
+      "survivor": "ConfigTest.RejectsInvalidStorageConfiguration",
+      "binary": "test_config",
+      "file": "backend/tests/test_config.cpp",
+      "removed_line": 177,
+      "survivor_line": 229,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_THROW( Config::LoadFromString( \"mysql:\\n\" \" password: not-allowed\\n\", BaseEnvironment()), ConfigError) ; B-only assertion EXPECT_THROW( Config::LoadFromString( \"storage:\\n\" \" max_file_bytes: 0\\n\", BaseEnvironment()), ConfigError)"
+    },
+    {
+      "removed": "ConfigTest.RejectsPasswordInYaml",
+      "survivor": "ConfigTest.RejectsInvalidAiConfiguration",
+      "binary": "test_config",
+      "file": "backend/tests/test_config.cpp",
+      "removed_line": 177,
+      "survivor_line": 293,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_THROW( Config::LoadFromString( \"mysql:\\n\" \" password: not-allowed\\n\", BaseEnvironment()), ConfigError) ; B-only assertion EXPECT_THROW( Config::LoadFromString( \"ai: []\\n\", BaseEnvironment()), ConfigError)"
+    },
+    {
+      "removed": "ConfigTest.RejectsTypeErrors",
+      "survivor": "ConfigTest.RejectsInvalidStorageConfiguration",
+      "binary": "test_config",
+      "file": "backend/tests/test_config.cpp",
+      "removed_line": 167,
+      "survivor_line": 229,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_THROW( Config::LoadFromString( \"server:\\n\" \" port: invalid\\n\", BaseEnvironment()), ConfigError) ; B-only assertion EXPECT_THROW( Config::LoadFromString( \"storage:\\n\" \" max_file_bytes: 0\\n\", BaseEnvironment()), ConfigError)"
+    },
+    {
+      "removed": "ConfigTest.RejectsTypeErrors",
+      "survivor": "ConfigTest.RejectsInvalidAiConfiguration",
+      "binary": "test_config",
+      "file": "backend/tests/test_config.cpp",
+      "removed_line": 167,
+      "survivor_line": 293,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_THROW( Config::LoadFromString( \"server:\\n\" \" port: invalid\\n\", BaseEnvironment()), ConfigError) ; B-only assertion EXPECT_THROW( Config::LoadFromString( \"ai: []\\n\", BaseEnvironment()), ConfigError)"
+    },
+    {
+      "removed": "SchemaTest.SourceUrlUniquenessIsUnchanged",
+      "survivor": "SchemaTest.StoresTheFullReviewOutcomeVocabulary",
+      "binary": "test_schema",
+      "file": "backend/tests/test_schema.cpp",
+      "removed_line": 506,
+      "survivor_line": 256,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts ASSERT_EQ(result.rowCount(), 1U) ; B-only assertion EXPECT_EQ(RequireValue(result.value(0, 0)), \"varchar(24)\")"
+    },
+    {
+      "removed": "SchemaTest.SourceUrlUniquenessIsUnchanged",
+      "survivor": "SchemaTest.LegacyJobRowReadsWithFreshnessDefaults",
+      "binary": "test_schema",
+      "file": "backend/tests/test_schema.cpp",
+      "removed_line": 506,
+      "survivor_line": 522,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts ASSERT_EQ(result.rowCount(), 1U) ; B-only assertion EXPECT_EQ(RequireValue(result.value(0, 0)), \"1\")"
+    },
+    {
+      "removed": "SchemaTest.StoresTheFullReviewOutcomeVocabulary",
+      "survivor": "SchemaTest.SourceUrlUniquenessIsUnchanged",
+      "binary": "test_schema",
+      "file": "backend/tests/test_schema.cpp",
+      "removed_line": 256,
+      "survivor_line": 506,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts ASSERT_EQ(result.rowCount(), 1U) ; B-only assertion EXPECT_EQ(RequireValue(result.value(0, 0)), \"0\")"
+    },
+    {
+      "removed": "SchemaTest.StoresTheFullReviewOutcomeVocabulary",
+      "survivor": "SchemaTest.LegacyJobRowReadsWithFreshnessDefaults",
+      "binary": "test_schema",
+      "file": "backend/tests/test_schema.cpp",
+      "removed_line": 256,
+      "survivor_line": 522,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts ASSERT_EQ(result.rowCount(), 1U) ; B-only assertion EXPECT_EQ(RequireValue(result.value(0, 0)), \"1\")"
+    },
+    {
+      "removed": "JobIngestionDaoTest.CreatesJob",
+      "survivor": "JobIngestionDaoTest.UpdatesExistingJobByIdempotentSourceUrl",
+      "binary": "test_job_ingestion_dao",
+      "file": "service/tests/test_job_ingestion_dao.cpp",
+      "removed_line": 86,
+      "survivor_line": 114,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts ASSERT_TRUE(job.has_value()) ; B-only assertion ASSERT_EQ(count.rowCount(), 1U)"
+    },
+    {
+      "removed": "JobQualityTest.MissingCompanyGoesToReviewNotReject",
+      "survivor": "JobQualityTest.RootOrListUrlGoesToReviewButStaysStored",
+      "binary": "test_job_quality",
+      "file": "service/tests/test_job_quality.cpp",
+      "removed_line": 91,
+      "survivor_line": 135,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_EQ(report.reviewStatus, 1) ; B-only assertion EXPECT_FALSE(report.rejected)"
+    },
+    {
+      "removed": "JobQualityTest.MissingCompanyGoesToReviewNotReject",
+      "survivor": "JobQualityTest.TitleEqualsCompanyGoesToReview",
+      "binary": "test_job_quality",
+      "file": "service/tests/test_job_quality.cpp",
+      "removed_line": 91,
+      "survivor_line": 217,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_EQ(report.reviewStatus, 1) ; B-only assertion EXPECT_TRUE(HasCode(report, \"title_equals_company\"))"
+    },
+    {
+      "removed": "JobQualityTest.MissingCompanyGoesToReviewNotReject",
+      "survivor": "JobQualityTest.DateOnlyDeadlineWithWrongInstantNeedsReview",
+      "binary": "test_job_quality",
+      "file": "service/tests/test_job_quality.cpp",
+      "removed_line": 91,
+      "survivor_line": 250,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_EQ(report.reviewStatus, 1) ; B-only assertion EXPECT_EQ( EvaluateJobQuality(correct, PlatformNameRegistry{}).reviewStatus, 0)"
+    },
+    {
+      "removed": "JobQualityTest.TitleEqualsCompanyGoesToReview",
+      "survivor": "JobQualityTest.MissingCompanyGoesToReviewNotReject",
+      "binary": "test_job_quality",
+      "file": "service/tests/test_job_quality.cpp",
+      "removed_line": 217,
+      "survivor_line": 91,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_EQ(report.reviewStatus, 1) ; B-only assertion EXPECT_TRUE(HasCode(report, \"company_missing\"))"
+    },
+    {
+      "removed": "JobQualityTest.TitleEqualsCompanyGoesToReview",
+      "survivor": "JobQualityTest.RootOrListUrlGoesToReviewButStaysStored",
+      "binary": "test_job_quality",
+      "file": "service/tests/test_job_quality.cpp",
+      "removed_line": 217,
+      "survivor_line": 135,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_EQ(report.reviewStatus, 1) ; B-only assertion EXPECT_FALSE(report.rejected)"
+    },
+    {
+      "removed": "JobQualityTest.TitleEqualsCompanyGoesToReview",
+      "survivor": "JobQualityTest.DateOnlyDeadlineWithWrongInstantNeedsReview",
+      "binary": "test_job_quality",
+      "file": "service/tests/test_job_quality.cpp",
+      "removed_line": 217,
+      "survivor_line": 250,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_EQ(report.reviewStatus, 1) ; B-only assertion EXPECT_EQ( EvaluateJobQuality(correct, PlatformNameRegistry{}).reviewStatus, 0)"
+    },
+    {
+      "removed": "TailorRuleTest.RequirementsBecomeMatchedAndMissingStatements",
+      "survivor": "TailorRuleTest.NothingDerivableBecomesAPlaceholderNotAClaim",
+      "binary": "test_tailor_rule",
+      "file": "service/tests/test_tailor_rule.cpp",
+      "removed_line": 203,
+      "survivor_line": 160,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_NE( draft.content.find(\"\\nKafka\\n\"), std::string::npos) ; B-only assertion EXPECT_FALSE(draft.placeholders.empty())"
+    },
+    {
+      "removed": "TailorRuleTest.RequirementsBecomeMatchedAndMissingStatements",
+      "survivor": "TailorRuleTest.RendersTheAtsPlainTextContract",
+      "binary": "test_tailor_rule",
+      "file": "service/tests/test_tailor_rule.cpp",
+      "removed_line": 203,
+      "survivor_line": 239,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "different_input_literal_inside_assertion",
+      "reason": "the discriminating input literal lives inside the assertion, so the two cases drive different inputs",
+      "evidence": "A asserts EXPECT_NE( draft.content.find(\"\\nKafka\\n\"), std::string::npos) ; B-only assertion EXPECT_EQ(draft.content.find(\"<table\"), std::string::npos)"
+    },
+    {
+      "removed": "SchemaTest.LegacyJobRowReadsWithNull0014Fields",
+      "survivor": "SchemaTest.LegacyJobRowReadsWithFreshnessDefaults",
+      "binary": "test_schema",
+      "file": "backend/tests/test_schema.cpp",
+      "removed_line": 612,
+      "survivor_line": 522,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "inputs_not_contained",
+      "reason": "the removed case drives setup/input statements the survivor does not",
+      "evidence": "A-only input statement not present in B: const jobpilot::core::Result result = pool.Query( \"SELECT education_required, experience_years_min, \" \"experience_years_max, job_nature, deadline, \" \"deadline_date_only \" \"FROM jobs WHERE source_url = ?\", {url})"
+    },
+    {
+      "removed": "ResumeServiceTest.WriteFailureDoesNotCreateMetadata",
+      "survivor": "ResumeServiceTest.CompensatesPromoteFailure",
+      "binary": "test_resume_service",
+      "file": "service/tests/test_resume_service.cpp",
+      "removed_line": 445,
+      "survivor_line": 415,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "inputs_not_contained",
+      "reason": "the removed case drives setup/input statements the survivor does not",
+      "evidence": "A-only input statement not present in B: failingStorage.failWrite = true"
+    },
+    {
+      "removed": "SourceSyncDaoTest.GraceBoundaryAtFortyEightHoursDoesNotClose",
+      "survivor": "SourceSyncDaoTest.CompleteAbsenceMarksMissingWithoutClosing",
+      "binary": "test_source_sync_dao",
+      "file": "service/tests/test_source_sync_dao.cpp",
+      "removed_line": 324,
+      "survivor_line": 245,
+      "decision": "KEEP",
+      "detector": [
+        "asserts_norm_subset"
+      ],
+      "rule_failure": "inputs_not_contained",
+      "reason": "the removed case drives setup/input statements the survivor does not",
+      "evidence": "A-only input statement not present in B: const SourceObservationCloseResult result = CloseUnseen( MakeObservation(scopeA, \"2026-10-03 00:00:00\"))"
+    },
+    {
+      "removed": "SourceObservationValidation.AcceptsCompleteObservationWithJobs",
+      "survivor": "SourceObservationValidation.AcceptsAllSupportedSources",
+      "binary": "test_source_observation",
+      "file": "service/tests/test_source_observation.cpp",
+      "removed_line": 77,
+      "survivor_line": 119,
+      "decision": "KEEP",
+      "detector": [
+        "manual_review_loop_equivalent"
+      ],
+      "rule_failure": "assertion_sets_not_identical_loop_iteration_unproven",
+      "reason": "The survivor's first loop iteration builds MakeObservation() with source=greenhouse and job.source=greenhouse - byte-identical to the removed case's input - and asserts the same predicate. But the assertion statements are not identical text and the survivor's assertion set is not strictly larger, so containment is a human judgement, not a mechanical proof; deleting the case would make the default-fixture assertion depend on the loop's source list. Kept per the hard rule and reported as NOT PROVEN.",
+      "evidence": "A: EXPECT_TRUE(ValidateSourceObservation(MakeObservation())); B iteration 1: SourceObservation observation = MakeObservation(); observation.source = source; observation.jobs[0].job.source = source; EXPECT_TRUE(ValidateSourceObservation(observation)) << source; loop over {\"greenhouse\", \"lever\", \"ashby\"}"
+    }
+  ],
+  "notes": [
+    "k = 0: no candidate satisfied all three clauses of the merge rule, so no test source was edited.",
+    "Each evaluated entry records the clause that failed; 'decision' is the audit verdict for the pair.",
+    "RECORD-ONLY cases are documented in the report; they are kept and are not counted as removals.",
+    "external/integration labelled cases: 4 candidate directions touched external-labelled SchemaTest cases and all were rejected, so no failure-mode case was merged away."
+  ]
+}

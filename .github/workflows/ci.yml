@@ -156,7 +156,7 @@ jobs:
               WHERE user IN ('root', 'jobpilot_ci');"
 
       - name: Full test suite
-        run: ctest --test-dir service/build/presets/release --output-on-failure
+        run: ctest --test-dir build/presets/release --output-on-failure
       - name: Python suites
         run: |
           (cd source_adapters && python3 -m unittest discover -s jobpilot_sources/tests -t .)

@@ -505,7 +505,28 @@ Stop and report to the owner (do not widen scope) if:
 
 - [x] P0 Owner review of this plan — **approved 2026-10-10, all eight §11
       decisions ruled**
-- [ ] P1 Build and run contract (CE-1, CE-2, CE-5, TSan configure, storage volume)
+- [x] P1 Build and run contract — **done 2026-10-10** (commits `2b94ee2` for the
+      lock, `tools/dev/bootstrap.sh` and the TSan fix; `838beef` for the
+      Dockerfile, the compose `app` profile and the `resume_storage` mount).
+      Evidence: **CE-2** from a fresh `CONAN_HOME` and a scratch output folder —
+      `Downloading 5 packages`, `gtest/1.14.0: Building from source`,
+      `Install finished successfully`, `conan_toolchain.cmake` 8240 B, 21 MB
+      cache; `cmake --preset tsan` configures rc=0, with a three-line negative
+      control showing the old ordering is a configure error; **CE-1** — a fresh
+      clone of `838beef` (clean tree), no generated toolchain in the clone,
+      `cmake --preset release` failing before bootstrap and succeeding after it,
+      both the root entry and the `service/` entry producing a 2960344-byte
+      `jobpilot_service`, `ce1_rc=0`; **run story** — isolated compose stack,
+      `/health` 200, upload `resume_id 1` with `text_extracted=true` /
+      `text_status=ok`, the stored bytes matching the upload both through the
+      container path and through the named volume, the row and the bytes both
+      surviving a container recreation, clean teardown; the developer's
+      containers, volumes and database untouched before and after (`jobs` 4 rows,
+      all `review_status=0`, `job_review_items` 0, `resume_artifacts` 0). The
+      MySQL healthcheck defect this found is recorded in §17. **CE-5 stays open
+      for the committed `ubuntu:24.04` base** (Docker Hub unreachable here, §8.1)
+      and is the P4 CI job's to close; the scratch-base run is recorded as
+      exactly that.
 - [ ] P2 Database bootstrap + upgrade documentation + demo isolation
 - [ ] P3 Demo gate script + extended sample dataset (CE-3, negative control)
 - [ ] P4 CI workflow (CE-4; first GitHub run confirmed by the owner)

@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <memory>
 #include <mutex>
@@ -463,6 +464,22 @@ namespace jobpilot::service
                 .get<std::size_t>();
         }
 
+        // Connected schema name: identity evidence for the scratch-database
+        // guard on the apply/revert path.
+        std::string ConnectedDatabase() const
+        {
+            const jobpilot::core::Result result =
+                pool->Query("SELECT DATABASE()", {});
+
+            if (result.rowCount() == 0 ||
+                !result.value(0, 0).has_value())
+            {
+                return std::string();
+            }
+
+            return result.value(0, 0).value();
+        }
+
         ServerState state;
         std::thread serverThread;
         std::unique_ptr<jobpilot::core::ConnectionPool> pool;
@@ -837,6 +854,59 @@ namespace jobpilot::service
 
     TEST_F(JobReviewHttpTest, BackfillDryRunWritesNothingApplyAndRevertRestore)
     {
+        // ITEM 4 (0015A): apply/revert may only ever run against an explicitly
+        // named scratch database. This is the ONLY test in this binary that
+        // flips existing rows, so it must never fall back to the shared dev
+        // database (or any database implicitly chosen by ctest).
+        //
+        // Run it with:
+        //   MYSQL_DATABASE=jobpilot_review_scratch \
+        //   JOBPILOT_TEST_REVIEW_DB=jobpilot_review_scratch \
+        //   MYSQL_PASSWORD=root ./build/presets/release/test_job_review_http
+        // Without the variable the case skips explicitly; if it points at the
+        // dev database the case fails loudly.
+        const char *scratchEnv =
+            std::getenv("JOBPILOT_TEST_REVIEW_DB");
+        const std::string connected = ConnectedDatabase();
+
+        std::cout << "REVIEW_DB_ISOLATION connected=" << connected
+                  << " scratch_env="
+                  << (scratchEnv == nullptr ? "<unset>" : scratchEnv)
+                  << "\n";
+
+        if (scratchEnv == nullptr || *scratchEnv == '\0')
+        {
+            GTEST_SKIP()
+                << "JOBPILOT_TEST_REVIEW_DB is not set: refusing to run "
+                   "backfill apply/revert against '"
+                << connected
+                << "' implicitly. Set JOBPILOT_TEST_REVIEW_DB and "
+                   "MYSQL_DATABASE to a scratch database "
+                   "(e.g. jobpilot_review_scratch, loaded from "
+                   "database/schema/*.sql).";
+        }
+
+        const std::string scratch = scratchEnv;
+
+        if (scratch == "jobpilot" || connected == "jobpilot")
+        {
+            GTEST_FAIL()
+                << "refusing to run backfill apply/revert against the dev "
+                   "database 'jobpilot' (connected='" << connected
+                << "', requested='" << scratch << "')";
+            return;
+        }
+
+        if (connected != scratch)
+        {
+            GTEST_FAIL()
+                << "connected database '" << connected
+                << "' is not the requested scratch database '" << scratch
+                << "'; set MYSQL_DATABASE and JOBPILOT_TEST_REVIEW_DB to the "
+                   "same scratch database";
+            return;
+        }
+
         const std::string token =
             jobpilot::test::UniqueJobToken("backfill-job");
         const std::uint64_t jobId = AddJob(
@@ -907,6 +977,13 @@ namespace jobpilot::service
         EXPECT_GE(applied->jsonBody["applied"].get<std::size_t>(), 1U);
         EXPECT_EQ(ReviewStatus(jobId), 1);
 
+        // Auditable before/after counts: after == before + applied.
+        EXPECT_EQ(
+            applied->jsonBody["after_needs_review"].get<std::size_t>(),
+            applied->jsonBody["before_needs_review"]
+                    .get<std::size_t>() +
+                applied->jsonBody["applied"].get<std::size_t>());
+
         // The classified row is queued with the engine's reason.
         const jobpilot::core::Result queued = pool->Query(
             "SELECT reason_code, resolution, resolved_by "
@@ -933,6 +1010,12 @@ namespace jobpilot::service
         EXPECT_EQ(reverted->statusCode, 200);
         EXPECT_GE(reverted->jsonBody["reverted"].get<std::size_t>(), 1U);
         EXPECT_EQ(ReviewStatus(jobId), 0);
+
+        // Rollback basis: the needs_review distribution is restored to the
+        // pre-apply count.
+        EXPECT_EQ(
+            reverted->jsonBody["after_needs_review"].get<std::size_t>(),
+            dryRun->jsonBody["before_needs_review"].get<std::size_t>());
 
         const jobpilot::core::Result leftover = pool->Query(
             "SELECT COUNT(*) FROM job_review_items "

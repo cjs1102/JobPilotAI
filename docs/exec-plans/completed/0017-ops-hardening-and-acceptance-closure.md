@@ -1,12 +1,14 @@
 # ExecPlan 0017: 运维硬化 + 验收闭环（OPS HARDENING AND ACCEPTANCE CLOSURE）
 
 > Status: **Completed and archived**（2026-10-10）。四个单元全部落地，各自定点验证后提交
-> （`e6cae75` A、`4a7995e` B、`38f29fd` C+D、`b2a55be` D 的修红），计划本身见 `a4d1f5f`。
-> 阶段收口的单次 L4 **环境受限（environment-limited）**：宿主机当时比 0016 那次 L4 慢约
-> 3.7 倍（纯 CPU 的 `test_bcrypt` 7.13 s → 26.58 s），debug 阶段有 9 个 2 秒 socket 超时的
-> HTTP 用例因此失败；builds 与两个 Python 套件全绿，根因、原始行与健康基线探针见 §10.2。
-> **未取得绿色矩阵，也不得这样描述。** 本阶段未改生产代码与测试代码，故 0016 在同一代码上
-> 的绿色 L4 仍按 §2.1 规则 1 复用。
+> （`e6cae75` A、`4a7995e` B、`38f29fd` C+D、`b2a55be` D 的修红、`b1d1b89` 收口文档），
+> 计划本身见 `a4d1f5f`，只读 CI 工具见 `tools/dev/ci-status.sh`。
+> 阶段收口的单次 L4 **第二次尝试全绿**：debug / asan / ubsan 各
+> `100% tests passed, 0 tests failed out of 309`、sanitizer 诊断 0、Python `Ran 446` +
+> `Ran 190` 均 `OK`、回填隔离 dev `[ SKIPPED ]` + scratch `[ PASSED ] 7 tests`（§10.2）。
+> 第一次尝试因宿主比 0016 慢 3.7 倍而记为 environment-limited，harness 因此加了前置探针
+> 闸门，该次记录完整保留为历史。四次推送的 CI 全部 `success`，integration job 从 5m21s
+> 降到 1m16s–1m49s（§10.3）。
 >
 > 基线 HEAD：`a8dd333`（开工时 = `origin/main`，工作区干净，无进行中计划）。
 >
@@ -275,8 +277,9 @@ sanitizer 诊断 0）、`service/` 与 root Release 构建、两个 Python 套�
 - [x] P3 = 0017-C：`capture-acceptance.sh` + 合成 JSON 端到端证据（`38f29fd`）
 - [x] P4 = 0017-D：`RELEASE_CHECKLIST.md` + `release_preflight.py` 原始输出（`38f29fd`，
       并按 §11 的记录修掉它在已推送树上抓到的私网地址，`b2a55be`）
-- [x] P5 = L4（一次，**environment-limited**：宿主比 0016 慢 3.7x，见 §10.2）+ 状态文档同步
-      + 计划归档
+- [x] P5 = L4（第二次尝试全绿：debug / asan / ubsan 各 309/309、Python 446 + 190、回填隔离
+      dev `SKIPPED` + scratch 7/7；第一次尝试 environment-limited 保留为历史，见 §10.2）
+      + 状态文档同步 + 计划归档 + CI 结果入档（§10.3）
 
 ### 10.1 单元证据
 
@@ -318,7 +321,33 @@ clone 上 `7 pass, 0 fail, 0 skip, 5 manual`（`ACTIONLINT=…` 指向 actionlin
 私网地址（0016 P5 曾手工 redact 同类地址），已 redact 并推送；手动项（Actions 分钟数、
 About/描述、仓库可见性、PAT 轮换）由脚本打印 `MANUAL:` 行并在清单 §5/§6 展开。
 
-### 10.2 L4（阶段收口，一次）——**环境受限，未取得绿色矩阵**
+### 10.2 L4（阶段收口，一次）——**第二次尝试全绿**
+
+宿主恢复后重跑（日志 `build/l4-0017/run2.log`；harness 现带前置闸门：纯 CPU 的
+`test_bcrypt` 超过 14 s 直接 exit 3，不再产出误导性失败）：
+
+```text
+probe: test_bcrypt 9050ms                                  （0016 基线 7130ms）
+builds: debug / asan / ubsan  configure rc=0 + build rc=0；service release rc=0；
+        root-release configure rc=0 + rc=0
+debug: 100% tests passed, 0 tests failed out of 309        Total Test time = 114.83 sec
+asan : 100% tests passed, 0 tests failed out of 309        Total Test time = 130.21 sec
+ubsan: 100% tests passed, 0 tests failed out of 309        Total Test time =  74.41 sec
+sanitizer diagnostics: debug 0 / asan 0 / ubsan 0
+python: source_adapters `Ran 446 tests` + `OK`；ai_worker `Ran 190 tests` + `OK`
+review dev    : REVIEW_DB_ISOLATION connected=jobpilot scratch_env=<unset>
+                → [ SKIPPED ] 1 test（apply/revert 用例），其余 6 个通过
+review scratch: REVIEW_DB_ISOLATION connected=jobpilot_l4_scratch
+                scratch_env=jobpilot_l4_scratch → [ PASSED ] 7 tests
+teardown: containers outside the project after = jobpilot-mysql jobpilot-redis（隔离成立）
+```
+
+隔离：全过程只用阶段自有的 compose 项目 `jobpilot-l4-0017`（MySQL `:13399` /
+Redis `:16399` / 独立卷），开发库 `jobpilot`（跑前跑后 4 行 jobs）、
+`jobpilot_review_scratch` 与开发容器均未被触碰；回填 scratch leg 用的是该容器内新建、
+同样装载了 `database/schema` 的 `jobpilot_l4_scratch` 库。
+
+#### 第一次尝试：environment-limited（保留为历史）
 
 harness：`build/l4-0017/run.sh`（gitignored）。隔离：阶段自有的 compose 项目
 `jobpilot-l4-0017`（MySQL `:13399` / Redis `:16399` / 独立卷，schema 由 `database/schema`
@@ -355,8 +384,9 @@ ctest(debug): 97% tests passed, 9 tests failed out of 309
 
 探针命令：`/usr/bin/time ./build/presets/debug/backend/test_bcrypt`；**健康基线 = 7.1 s**
 （`build/l4-0017/probe-bcrypt.log`）。约 25 分钟后（其他一切结束、系统空闲）复测仍是
-`elapsed=28.96 user=28.13`（`probe-bcrypt2.log`），即该环境状况在本次会话内没有恢复，
-重跑只会重复同样的 9 个环境性失败。
+`elapsed=28.96 user=28.13`（`probe-bcrypt2.log`），即该环境状况当时没有恢复，重跑只会重复
+同样的 9 个环境性失败。**该状况随后自行恢复**：第三次探针 `elapsed=9.05`（`probe-bcrypt3.log`），
+同一天的第二次重跑因此全绿（见本节开头）。
 
 回填隔离的两条 leg 本次**未取得**：停止 harness 时它的 EXIT trap 已经 `down -v` 拆掉了隔离
 栈，随后手工重跑两条 leg 时 MySQL 不可达（`mysql_real_connect failed: Can't connect to
@@ -369,13 +399,32 @@ MySQL server on '127.0.0.1:13399' (111)`），属于拆栈后的操作顺序错�
 并把本次能做的部分全部做实（上面的 builds、两个 Python 套件、debug 结果与根因证据）。
 宿主健康后重跑一次即可补齐：`bash build/l4-0017/run.sh`（约 10 分钟；**先跑探针**，
 `test_bcrypt` 明显慢于 7.1 s 时不要跑，那只会产出环境噪声）。
-**本阶段的 L4 记为 environment-limited，不得描述为绿色。**
+**该次尝试按 environment-limited 记录；重跑已在同一天完成并全绿（见本节开头），
+最终结论以绿色为准。**
 
-### 10.3 推送与 CI
+### 10.3 推送与 CI（owner 提供只读 token 后，用 `tools/dev/ci-status.sh` 取回）
 
-三次推送：`38f29fd`（P0+A+C+D）、`4a7995e`（B）、`b2a55be`（D 修红）。每次推送都会触发 CI
-（`ci.yml` 的 build + integration，以及 main 上的 `image.yml`）；run id、三个 job 的耗时与
-结论由 owner 在 Actions 页确认，`docs/RELEASE_CHECKLIST.md` §5/§7 给出了要抄录的字段。
+四次推送的 run 全部 `completed/success`。Actions 分钟 = 各 job 耗时之和：
+
+```text
+基线 a8dd333  run 38058123275  ci    clean build 3m17s + full test suite 5m21s + image 2m48s = 11m26s
+38f29fd  run 38059689900  ci    clean build 2m44s + full test suite 1m16s                    = 4m00s
+         run 38059689891  image  container image and the end-to-end gate 3m00s
+4a7995e  run 38059807734  ci    clean build 4m18s + full test suite 1m22s                    = 5m40s
+         run 38059807647  image  container image and the end-to-end gate 2m29s
+b2a55be  run 38060121842  ci    clean build 3m13s + full test suite 1m25s                    = 4m38s
+         run 38060121858  image  container image and the end-to-end gate 2m51s
+b1d1b89  run 38061519836  ci    clean build 3m56s + full test suite 1m49s                    = 5m45s
+         run 38061519743  image  container image and the end-to-end gate 2m49s
+```
+
+结论：**integration job 从基线的 5m21s 降到 1m16s–1m49s**——不再装 Conan、不再 configure
+和编译，只下载产物、装 schema、跑 309 个 CTest 用例和两个 Python 套件，每次推送省下约
+3.5–4 分钟 Actions 分钟；`clean build` 仍是真正的干净编译（2m44s–4m18s，波动来自 runner 与
+Conan 缓存冷热），`image` job 已移入自己的 workflow 并按路径/分支过滤。四次运行的
+`ci` + `image` 合计 7m00s–8m34s，基线同类推送是 11m26s（三者并行，run 墙钟 5m24s）。
+**新增的 `Coverage map guard` 步骤在四次运行中全部通过**，即 0017-B 的映射在 runner 上也被
+强制执行。
 
 ## 11. 已知问题与后续
 
@@ -383,8 +432,11 @@ MySQL server on '127.0.0.1:13399' (111)`），属于拆栈后的操作顺序错�
   `jobpilot-mysql` 容器内新建了一个独立库 `jobpilot_ci`（13 张表、0 行业务数据，创建于
   2026-10-10 14:24:50）来跑 integration job 的步骤；开发库 `jobpilot` 与
   `jobpilot_review_scratch` 未被触碰（跑前跑后 `jobpilot.jobs` 都是 4 行）。这比 §4.1 的
-  "独立 compose 项目/端口/卷" 宽松一档，遗留的 `jobpilot_ci` 由 owner 决定是否删除；本阶段
-  的 L4 与 C 单元都改用阶段自有的 compose 栈（`jobpilot-l4-0017` / `jobpilot-capture`）。
+  "独立 compose 项目/端口/卷" 宽松一档；本阶段的 L4 与 C 单元都改用阶段自有的 compose 栈
+  （`jobpilot-l4-0017` / `jobpilot-capture`）。
+  **追加（2026-10-10，owner 授权清理）：** 该遗留库已在逐表精确核对为 0 行（13/13 张表）后
+  `DROP DATABASE jobpilot_ci`，开发库与 `jobpilot_review_scratch` 复核不变（`jobpilot.jobs`
+  仍 4 行）。
 - **[0017-C 发现，真实缺陷，仅记录]** `publish-capture` 发出的 `published_at` 会被手工导入
   端点**静默丢弃**：`source_adapters/jobpilot_sources/capture/publisher.py:220-224` 会把
   capture 的发布日期归一化后放进 payload（并把它当作可发布字段，失败时还有 note），但
@@ -398,7 +450,8 @@ MySQL server on '127.0.0.1:13399' (111)`），属于拆栈后的操作顺序错�
   与端到端影响**未在本阶段测量**。修法二选一（属生产代码，本阶段不做）：(a) 把
   `published_at` 纳入手工导入契约 + 解析 + DAO；(b) 让 publisher 明确 note 并停止发送。
 - **仅 owner 可做**（本阶段只归档，不执行）：把仓库转为 public；填 About/描述/话题；
-  在 Actions 页确认最后一条运行；轮换此前用过的 PAT。
+  轮换此前用过的 PAT。**CI 确认已完成**：owner 提供了只读 fine-grained token，
+  `tools/dev/ci-status.sh` 取回的四次运行的结论与逐 job 耗时见 §10.3。
 - **A 的最终证据缺口**：本机无法读 Actions API（404，无 `gh`/token）。若 owner 愿意提供
   只读 token 或直接粘贴三次运行的总耗时，可把 §7 的 A 验收补成 runner 墙钟对比。
 - **0014 §19.5 的最终闭环**仍需要 owner 把真机 JSON 过一遍 C 的脚本；本阶段提供的是

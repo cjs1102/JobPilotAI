@@ -119,25 +119,24 @@ Key decisions:
 — closed and archived 2026-10-10; four independent units landed, each committed
 after its own targeted verification.
 
-**The stage's single L4 is environment-limited, not green.** The isolated
-harness (`build/l4-0017/run.sh`, gitignored: its own compose project
-`jobpilot-l4-0017` with MySQL `:13399` / Redis `:16399` and its own volumes, so
-neither the development database nor `jobpilot_review_scratch` was touched) got
-all builds green (debug/asan/ubsan configure+build rc=0, service and root
-release rc=0), both Python suites green (`Ran 446 tests` + `OK`, `Ran 190 tests`
-+ `OK`), and a Debug CTest of `97% tests passed, 9 tests failed out of 309` in
-267.68 s. All nine failures are the HTTP cases whose client socket timeout is
-2 seconds (`UserHttpTest.*`, `ResumeHttpTest.*`) failing with
-`"registration failed"`, and the cause is the host itself: the pure-CPU,
-database-free `test_bcrypt` binary takes **7.13 s in the 0016 L4 and 26.58 s
-now** (3.7× slower; probe: `/usr/bin/time ./build/presets/debug/backend/test_bcrypt`,
-healthy baseline 7.1 s), while the same HTTP cases passed at 2.16-2.22 s in
-0016, just under their timeout. This stage changed **no production code and no
-test code** (0017-B concluded k = 0), so the 0016 L4 on the same code stays the
-valid evidence per `docs/ai/agent-workflow.md` §2.1 rule 1, and the two
-review-backfill legs (dev SKIP + isolated scratch) still have to be run on a
-healthy host together with the rest of the matrix:
-`bash build/l4-0017/run.sh`. **Do not describe 0017's L4 as green.**
+**The stage's single L4 passed on a second attempt** (raw log
+`build/l4-0017/run2.log`; the isolated harness `build/l4-0017/run.sh` uses its
+own compose project `jobpilot-l4-0017` with MySQL `:13399` / Redis `:16399` and
+its own volumes, so neither the development database nor
+`jobpilot_review_scratch` was touched): debug / asan / ubsan each
+`100% tests passed, 0 tests failed out of 309` (114.83 s / 130.21 s / 74.41 s,
+sanitizer diagnostics 0), both Release builds rc=0, Python `Ran 446 tests` + `OK`
+and `Ran 190 tests` + `OK`, and the review-backfill isolation legs green (dev
+`REVIEW_DB_ISOLATION connected=jobpilot scratch_env=<unset>` + `[ SKIPPED ]`,
+scratch `connected=jobpilot_l4_scratch scratch_env=jobpilot_l4_scratch` +
+`[ PASSED ] 7 tests`). **The first attempt is kept as history**: the host was
+3.7× slower than at 0016 (pure-CPU `test_bcrypt` 7.13 s → 26.58 s), which turned
+nine 2-second-timeout HTTP cases red; the harness now refuses to run when the
+probe exceeds 14 s
+(`/usr/bin/time ./build/presets/debug/backend/test_bcrypt`, healthy ≈ 7.1 s).
+CI after the change is `success` on every push (`ci` + `image`); the
+`integration` job dropped from 5m21s to 1m16s–1m49s, and the new
+`Coverage map guard` step passed in all four runs.
 
 Delivered:
 
@@ -525,21 +524,27 @@ HTTP request
   rc=0. No defect surfaced after P3; the two the stage found (MySQL healthcheck,
   `main.cpp` wiring) are in the plan §17. Raw logs (gitignored): `build/l4-0016/`.
 - 0017 stage L4 (code frozen at `38f29fd`; the CI/docs commits after it do not
-  invalidate code tests): **environment-limited, not green.** With the stage's own
+  invalidate code tests): **green on the second attempt.** With the stage's own
   isolated compose stack (`jobpilot-l4-0017`, MySQL `:13399` / Redis `:16399`,
   own volumes): builds `debug rc=0`, `asan rc=0`, `ubsan rc=0`, `release rc=0`,
-  `root-release rc=0`; Python `source_adapters` `Ran 446 tests` + `OK` and
-  `ai_worker` `Ran 190 tests` + `OK`; Debug CTest
-  `97% tests passed, 9 tests failed out of 309` (267.68 s), where all nine
-  failures are the 2 s-socket-timeout HTTP cases (`UserHttpTest.*`,
-  `ResumeHttpTest.*`, `"registration failed"`). Cause: the host was 3.7× slower
-  than at 0016 on the same pure-CPU binary and preset (`bcrypt_test` 7.13 s →
-  26.58 s). 0017 changed no production or test code, so the 0016 L4 stays the
-  evidence for that code (agent-workflow §2.1 rule 1). The two review-backfill
-  legs were not obtained: the harness EXIT trap had already torn the stack down
-  before they were re-run. Re-run on a healthy host:
-  `bash build/l4-0017/run.sh`. Raw logs (gitignored): `build/l4-0017/`
-  (probe: `build/l4-0017/probe-bcrypt.log`).
+  `root-release rc=0`; Debug / ASan / UBSan each
+  `100% tests passed, 0 tests failed out of 309` (114.83 s / 130.21 s / 74.41 s,
+  sanitizer diagnostics 0); Python `source_adapters` `Ran 446 tests` + `OK` and
+  `ai_worker` `Ran 190 tests` + `OK`; review-backfill isolation dev
+  `REVIEW_DB_ISOLATION connected=jobpilot scratch_env=<unset>` + `[ SKIPPED ]`
+  and scratch `connected=jobpilot_l4_scratch scratch_env=jobpilot_l4_scratch` +
+  `[ PASSED ] 7 tests`. The first attempt was environment-limited (the host ran
+  3.7× slower than at 0016: pure-CPU `test_bcrypt` 7.13 s → 26.58 s, turning nine
+  2-second-timeout HTTP cases red, `97%` in Debug); the harness now refuses to
+  run above a 14 s probe. Raw logs (gitignored): `build/l4-0017/` (`run2.log`,
+  `test-summary.txt`, `probe-bcrypt*.log`).
+- CI after 0017-A (run ids verified with `tools/dev/ci-status.sh`): the four
+  0017 pushes are all `completed/success` — `38f29fd` ci 4m00s (build 2m44s +
+  suite 1m16s) + image 3m00s, `4a7995e` ci 5m40s + image 2m29s, `b2a55be` ci
+  4m38s + image 2m51s, `b1d1b89` ci 5m45s + image 2m49s. The same three jobs cost
+  11m26s per push at the pre-0017 baseline `a8dd333` (`38058123275`: build 3m17s
+  + suite 5m21s + image 2m48s), so the `integration` job alone went from 5m21s to
+  1m16s–1m49s and the new `Coverage map guard` step passed in every run.
 - Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
   all published with `complete=false` only where the 200-job limit required it.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test

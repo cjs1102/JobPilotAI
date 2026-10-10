@@ -15,11 +15,17 @@ machine-checked by `tools/checks/test_coverage_map.py` and enforced in CI),
 `tools/dev/capture-acceptance.sh` runs the bookmarklet publish/read-back
 acceptance in one command and prints the ExecPlan 0014 §19.5 evidence block, and
 `docs/RELEASE_CHECKLIST.md` + `tools/checks/release_preflight.py` make the release
-gate checkable. **Its single L4 is environment-limited, not green**: the host was
-3.7× slower than at 0016 (`bcrypt_test` 7.13 s → 26.58 s), so the nine HTTP cases
-with a 2-second client timeout failed; builds and both Python suites were green
-and 0017 changed no production or test code, so the 0016 L4 remains the evidence
-for that code (plan §10.2; re-run `bash build/l4-0017/run.sh` on a healthy host).
+gate checkable. **Its single L4 passed** on a second attempt, against a
+stage-owned isolated stack (`jobpilot-l4-0017`, MySQL `:13399` / Redis `:16399`,
+own volumes): Debug / ASan / UBSan each
+`100% tests passed, 0 tests failed out of 309`, sanitizer diagnostics 0, both
+Python suites green, and review-backfill isolation `[ SKIPPED ]` on the dev
+database with `[ PASSED ] 7 tests` on the isolated scratch one (plan §10.2 keeps
+the first, environment-limited attempt as history — the host ran 3.7× slower and
+nine 2-second-timeout HTTP cases went red; the harness now refuses to run when
+its `test_bcrypt` probe exceeds 14 s). CI after the change is green on every push
+and the `integration` job dropped from 5m21s to 1m16s–1m49s
+(`tools/dev/ci-status.sh`, plan §10.3).
 **No plan is active** and the recorded MVP roadmap is complete through
 packaging — 0013-0017 and the 0015A hardening are all archived under
 `docs/exec-plans/completed/`. Carried forward, not done:

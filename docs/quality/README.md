@@ -92,6 +92,13 @@ python3 tools/checks/release_preflight.py --allow-dirty   # preparation only
   and private-address scans, the README-for-outsiders checks, relative links,
   actionlint on every workflow, and repository hygiene. A `SKIP` (for example
   actionlint is not installed) is never reported as green.
+- `../dev/ci-status.sh` (0017, added when the owner supplied a read-only token)
+  reads GitHub Actions runs, per-job durations and conclusions without `gh`. The
+  token comes from `$GITHUB_TOKEN`/`$GH_TOKEN` or
+  `~/.config/jobpilot/github-token` (0600, outside the repository) and is handed
+  to curl through a shell-builtin `printf` process substitution, so it never
+  appears in argv, on disk or in the output. `--check`, `--limit`, `--sha`,
+  `--run` and `--json`; it is a maintainer tool, not part of the release gate.
 
 ## Open-source MVP Quality Gates
 
@@ -238,33 +245,34 @@ was updated before `condition.notify_one()` while the test could leave scope
 and destroy the condition variable. The fix updates completion state and
 signals while holding the same mutex. No P1 production code was changed.
 
-### 0017 (2026-10-10) — environment-limited L4, not green
+### 0017 (2026-10-10) — green on the second attempt (host-speed precondition)
 
 0017 changed no production code and no test code (its overlap audit concluded
-k = 0), so the 0016 L4 remains the evidence for that code per
-[`../ai/agent-workflow.md`](../ai/agent-workflow.md) §2.1 rule 1. The stage's own
-L4 was still attempted, against its isolated compose stack (`jobpilot-l4-0017`,
-MySQL `:13399` / Redis `:16399`, its own volumes; raw logs in `build/l4-0017/`),
-and it is **not green**:
+k = 0). Its single L4 ran against its isolated compose stack
+(`jobpilot-l4-0017`, MySQL `:13399` / Redis `:16399`, its own volumes; raw logs
+in `build/l4-0017/`, summary `run2.log` + `test-summary.txt`):
 
 | Check | Result |
 |---|---|
 | debug / asan / ubsan configure + build | rc=0 |
 | service release, root release configure + build | rc=0 |
-| Debug CTest | `97% tests passed, 9 tests failed out of 309` (267.68 s) |
-| ASan / UBSan CTest | not run (the run was stopped once the cause was established) |
+| Debug CTest | `100% tests passed, 0 tests failed out of 309` (114.83 s) |
+| ASan CTest | `100% tests passed, 0 tests failed out of 309` (130.21 s) |
+| UBSan CTest | `100% tests passed, 0 tests failed out of 309` (74.41 s) |
+| sanitizer diagnostics (debug / asan / ubsan) | 0 / 0 / 0 |
 | Python source adapter suite | `Ran 446 tests` + `OK` |
 | Python ai_worker suite | `Ran 190 tests` + `OK` |
-| Review-backfill isolation | not obtained (the harness EXIT trap had already torn the stack down) |
+| Review-backfill isolation | dev `connected=jobpilot scratch_env=<unset>` + `[ SKIPPED ]`; scratch `connected=jobpilot_l4_scratch scratch_env=jobpilot_l4_scratch` + `[ PASSED ] 7 tests` |
 
-All nine failures are the HTTP cases whose client socket timeout is 2 seconds
-(`UserHttpTest.*`, `ResumeHttpTest.*`, `"registration failed"`). The host was
-3.7× slower than during the 0016 L4 on the same pure-CPU binary and preset:
-`bcrypt_test` `Passed 7.13 sec` (0016) → `elapsed=26.58 user=26.05` (probe in
-`build/l4-0017/probe-bcrypt.log`). The health probe before a re-run is
-`/usr/bin/time ./build/presets/debug/backend/test_bcrypt` (healthy ≈ 7.1 s); the
-re-run is `bash build/l4-0017/run.sh`. Until that has been done on a healthy
-host, describe this L4 as environment-limited, never as green.
+**The first attempt is part of the record.** It reported
+`97% tests passed, 9 tests failed out of 309`, where every failure was an HTTP
+case behind a 2-second client socket timeout, because the host was running 3.7×
+slower than during the 0016 L4 on the same pure-CPU binary and preset
+(`test_bcrypt` `Passed 7.13 sec` → `elapsed=26.58`). The harness therefore now
+measures that probe first and refuses to run above **14 s** (healthy ≈ 7.1 s):
+`/usr/bin/time ./build/presets/debug/backend/test_bcrypt`, then
+`bash build/l4-0017/run.sh`. On the retry the probe read 9.05 s and the matrix
+was green.
 
 ## 0013 AI Task Tests
 

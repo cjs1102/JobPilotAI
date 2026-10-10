@@ -1,12 +1,25 @@
 # ExecPlan 0015A: Job List Usability + Pre-Ingest Data Quality
 
+> Status: **Completed and archived** (2026-10-10). The stage's single L4 passed:
+> Debug / ASan / UBSan **286/286 each** (sanitizer diagnostics 0); both `service/`
+> and root Release builds; Python `source_adapters` **446** and `ai_worker`
+> **190**; review-backfill isolation with the dev database explicitly SKIPped and
+> the scratch database **7/7**. The plan is frozen here as historical evidence.
+>
+> **The §13 step boxes below were not maintained while the stage ran**, so no box
+> may be read as a per-step acceptance record; the closure evidence is the recorded
+> L4 gate (`docs/ai/project-state.md` `## Completed Plan (0015A)`). In particular
+> Step 5's real-database backfill was **never applied** — apply/revert are proven
+> only against the scratch database.
+>
 > **Stage number: `0015A` — CONFIRMED by the owner (2026-10-10).** The project stage table
 > keeps **0015 = resume tailoring** and **0016 = open-source packaging**; this stage is a
 > *0014 follow-up hardening* and therefore uses the `0015A` sub-number. No renumbering, no
 > archived-plan numbering changes, no wide cross-reference edits. Rationale in §16.
 >
-> Status: Active — **design finalized and all five §15 decisions closed by the owner
-> (2026-10-10)**; no production code has been written.
+> Historical planning-phase status, preserved as written: "Status: Active — **design
+> finalized and all five §15 decisions closed by the owner (2026-10-10)**; no production
+> code has been written."
 >
 > Task level: **L4 at stage close** (touches the `jobs` schema, `docs/03`, the public
 > `docs/04` contract and ingestion validation across modules); implementation slices are

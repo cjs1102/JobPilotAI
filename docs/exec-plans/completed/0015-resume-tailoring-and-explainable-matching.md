@@ -1,13 +1,28 @@
 # ExecPlan 0015: Resume Tailoring + Candidate Data + Explainable Matching
 
+> Status: **Completed and archived** (2026-10-10). Phases A-C are complete and
+> Phase D landed through D5, with D6 **deferred by owner decision** (§17); the
+> stage's single L4 passed at HEAD `26e2069` (production code frozen at `576f436`,
+> tree clean) — builds `debug`/`asan`/`ubsan`/`release`/`root-release` each rc=0;
+> CTest `100% tests passed, 0 tests failed out of 309` in Debug (118.25 s), ASan
+> (131.29 s) and UBSan (76.48 s), sanitizer diagnostics 0; Python `Ran 446 tests`
+> + `OK` (`source_adapters`) and `Ran 190 tests` + `OK` (`ai_worker`); backfill
+> isolation dev `[  SKIPPED ]` + scratch `[  PASSED  ] 7 tests`. The first
+> full-matrix run at `576f436` caught one **test-only** defect
+> (`MatchExplanationTest.ClassifiesDeadlineUrgencyWithDateOnlyHandling` compared
+> `const char *` with `EXPECT_EQ`); it was fixed in test-only commit `26e2069` with
+> production code unchanged. §14's checked boxes are kept as written and the plan
+> is frozen here as historical evidence.
+>
 > **Stage number: `0015` — as fixed by the recorded stage table (2026-10-08).**
 > `0015` = resume tailoring (Chinese + ATS), `0016` = open-source packaging. The
 > `0015A` sub-number stays exactly as it is
-> (`active/0015A-job-list-usability-and-intake-quality.md`); **no renumbering, no
-> archived-plan edits** (§16).
+> (`completed/0015A-job-list-usability-and-intake-quality.md`); **no renumbering,
+> no archived-plan edits** (§16).
 >
-> Status: **Active — planning only.** This document is research + design. **No
-> production code, test, schema, configuration or commit is part of this task.**
+> Historical planning-phase status, preserved as written: "Status: **Active —
+> planning only.** This document is research + design. **No production code, test,
+> schema, configuration or commit is part of this task.**"
 >
 > Task level: **L4 at stage close** (touches `profiles` + one new artifact table
 > + the public `docs/04` contract + a candidate-data path that changes matching
@@ -26,7 +41,7 @@
 > competitive research. It reuses
 > `docs/research/2026-10-08-open-source-job-search-agents.md` §4 (the recorded
 > 0014/0015 tailoring requirements, L180-198), the **owner's verbatim roadmap
-> goal** recorded in `active/0015A-...md` §17 (L746-756), `docs/ai/project-state.md`
+> goal** recorded in `completed/0015A-...md` §17 (L746-756), `docs/ai/project-state.md`
 > (Completed Plan 0014 + Next Entry, L89-140, L282-318) and the 0015A plan's
 > Contracts/Testing structure (its §5, §8, §9). Only the specific `file:line`
 > facts cited below were confirmed against the current tree at HEAD `bd7d451`.
@@ -91,14 +106,14 @@ Verified at HEAD `bd7d451` (branch `main`, working tree clean at planning time).
 | The list payload (`/api/v1/jobs`) has **no** score, reasons or matched/missing skills at all; `/recommended` has score + skills but **no human-readable reasons** | writers at `job_controller.cpp:698` (list) vs `:953-974` (recommended); `docs/04:281` vs `:440` |
 | No deal-breaker concept and no deadline **veto/urgency** semantics; `deadline` is currently filter/sort-only | `docs/03:436` ("`deadline` 不参与可见性、排名或自动关闭"); `job_search_filter.h:39-41`; `openOnly` (`:41`) is a filter, not a veto |
 | No `reasons` / `explanation` in the public ranking path | `RankedJob` has no reasons field (`job_ranking.h:34-42`); `MatchResult` has `strengths`/`gaps` but they are only serialized into `ai_tasks.result` |
-| **PDF upload stores no text** → a PDF-only resume contributes nothing to matching | `resume_service.cpp:148-150` (`extension == ".pdf" ? std::nullopt : …`), documented in `active/0015A-...md:69` |
+| **PDF upload stores no text** → a PDF-only resume contributes nothing to matching | `resume_service.cpp:148-150` (`extension == ".pdf" ? std::nullopt : …`), documented in `completed/0015A-...md:69` |
 | No artifact table for a tailored resume / cover letter and no generation task | `04_application.sql:3-15` has no artifact; `ai_tasks.task_type` reserves `resume_optimize` (`05_ai.sql:6`) but the C++ side only knows `kJobMatchTaskType = "job_match"` (`ai_task.h:9`, `ai_task_dao.cpp:206-211`) and the worker's default is `("job_match",)` (`config.py:27`) |
 | No frontend of any kind | `find . -name '*.html'` → only `source_adapters/jobpilot_sources/tests/fixtures/cn_jsonld_page.html` (a test fixture); every response writes `Content-Type: application/json` (`job_controller.cpp:103`) |
 | `interview_records` / `notifications` are schema-only | `05_ai.sql:24-34`, `06_notification.sql:3-11`; the only references in code are `backend/tests/test_schema.cpp:186-187` and `:230-231` |
 
 ### 2.3 The owner's recorded intent (reused verbatim, not re-derived)
 
-`active/0015A-job-list-usability-and-intake-quality.md:746-756` records, verbatim:
+`completed/0015A-job-list-usability-and-intake-quality.md:746-756` records, verbatim:
 
 > 在现有确定性评分与候选人资料能力的实际审计结果基础上，规划只读岗位列表或报表，将匹配分数、可解释的匹配与差距、排序结果及原始岗位链接整合到完整的求职者工作流。
 
@@ -347,7 +362,7 @@ CREATE TABLE IF NOT EXISTS resume_artifacts (
 | `service/config/config.yaml` | comments | only if a switch is added (e.g. `with_match` default / artifact storage path) |
 | `docs/ai/project-state.md` | Current Stage / Next Entry / stage table | 0015 status |
 | `AGENTS.md` | "Current phase" | points at the active 0015 plan |
-| `active/0015A-...md` | **not edited** except its own progress checkboxes if the Lead chooses | 0015A is a separate active plan |
+| `completed/0015A-...md` | **not edited** except its own progress checkboxes if the Lead chooses | 0015A is a separate plan, archived alongside this one |
 
 `docs/03`/`docs/04` are locked contracts (`AGENTS.md` §"Hard Constraints"):
 the contract is updated first and reviewed, then code depends on it.
@@ -804,7 +819,7 @@ verified in isolation:**
 `0015` = resume tailoring and `0016` = open-source packaging stay exactly as the
 recorded stage table fixes them (`docs/ai/project-state.md:307-318`). The hardening
 stage keeps its `0015A` name and file
-(`active/0015A-job-list-usability-and-intake-quality.md`, §16 `:736-742`). This
+(`completed/0015A-job-list-usability-and-intake-quality.md`, §16 `:736-742`). This
 plan **renames nothing, renumbers nothing and edits no archived plan**; it also
 does not touch `0015A`'s content beyond noting (in §5.5) that its own plan is a
 separate artifact.

@@ -5,24 +5,25 @@
 C++17 Linux backend for an AI-assisted job application platform. `service/` is
 the canonical runnable entry; root CMake is the unified developer entry.
 
-Current phase: **0015 resume tailoring and explainable matching** is active
-(`docs/exec-plans/active/0015-resume-tailoring-and-explainable-matching.md`);
-Phases A-C are complete and Phase D is implemented through D5, whose L2
-verification passed (commit `ae85868`; D6 deferred by owner decision, plan §17),
-and the stage's single L4 passed at HEAD `26e2069` (Debug / ASan / UBSan
-`100% tests passed, 0 tests failed out of 309`, sanitizer diagnostics 0). The
-0015A job-list usability / intake-quality hardening is closed with a clean L4.
-0013 AI Matching (Steps 1-10) and 0014 China Campus Sources + Manual Capture
-(Steps 1-8) are complete and archived under `docs/exec-plans/completed/`. 0014's
-Step 5 (first real China source) is **environment-limited** and carried forward,
-not done: no compliant, reusable China list contract could be verified, so no
-China source adapter is implemented and no China `source` identifier is
-registered — the registered sources remain `greenhouse`/`lever`/`ashby` — and
-the real-browser bookmarklet acceptance is still UNVERIFIED (plan §19.5).
+Current phase: **0015 resume tailoring and explainable matching is complete and
+archived** (`docs/exec-plans/completed/0015-resume-tailoring-and-explainable-matching.md`),
+closing with a green L4 at HEAD `26e2069`: Debug / ASan / UBSan `100% tests
+passed, 0 tests failed out of 309` with sanitizer diagnostics 0 (Phase D landed
+through D5; D6 deferred by owner decision, plan §17). **No plan is active.** The
+0015A job-list usability / intake-quality hardening is also closed and archived
+(`docs/exec-plans/completed/0015A-job-list-usability-and-intake-quality.md`) with a
+clean L4, and 0013 AI Matching (Steps 1-10) and 0014 China Campus Sources + Manual
+Capture (Steps 1-8) are complete and archived under
+`docs/exec-plans/completed/`. 0014's Step 5 (first real China source) is
+**environment-limited** and carried forward, not done: no compliant, reusable
+China list contract could be verified, so no China source adapter is implemented
+and no China `source` identifier is registered — the registered sources remain
+`greenhouse`/`lever`/`ashby` — and the real-browser bookmarklet acceptance is
+still UNVERIFIED (plan §19.5).
 Product direction is China-first per
 `docs/adr/0011-china-first-sourcing-and-compliance.md` (public sources plus
 manual capture import, campus focus, company career pages, never auto-submit);
-**0016 open-source packaging** follows 0015. P1 network/HTTP remains
+**0016 open-source packaging** is next. P1 network/HTTP remains
 behaviorally frozen.
 
 Verification and agent workflow rules: `docs/ai/agent-workflow.md`. Read it

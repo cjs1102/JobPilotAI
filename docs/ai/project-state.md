@@ -8,19 +8,19 @@
 > 0010 Job Ingestion, the Architecture Re-Research, 0011 Job Search / Ranking,
 > 0012 Steps 1-8 (freshness schema, source observation domain, Source Sync
 > DAO/Service/API, freshness search, Python ATS adapters, end-to-end
-> integration), 0013 AI Matching, and 0014 China Campus Sources + Manual Capture
-> are complete and archived; the **0015A** job-list/intake hardening is closed.
-> **0015 resume tailoring and explainable matching is the active stage**: Phases
-> A-C are complete and Phase D is implemented through the D5 routes, which passed
-> their L2 verification (commit `ae85868`; D6 deferred by owner decision), and the
-> stage's single L4 passed at HEAD `26e2069` (`## Active Plan (0015)`, raw lines in
-> `## Verified Snapshot`). 0014's Step 5 is
-> environment-limited and carried forward (see the Completed Plan section and
-> `## Next Entry` items 6/7). 0016 open-source packaging follows 0015.
+> integration), 0013 AI Matching, 0014 China Campus Sources + Manual Capture, the
+> **0015A** job-list/intake hardening, and **0015** resume tailoring and
+> explainable matching are complete and archived. 0015's Phases A-C are complete,
+> Phase D landed through D5 (L2-verified at `ae85868`; D6 deferred by owner
+> decision) and the stage's single L4 passed at HEAD `26e2069`
+> (`## Completed Plan (0015)`; raw lines in `## Verified Snapshot`). **No plan is
+> active.** 0014's Step 5 is environment-limited and carried forward (see the
+> Completed Plan section and `## Next Entry` items 6/7). **0016 open-source
+> packaging** is next.
 
 Repository files and Git history are the cross-agent fact source. This concise
-state plus the active ExecPlan should be enough for a new Agent to continue
-without asking the user to replay project history.
+state plus the active or most recent ExecPlan should be enough for a new Agent to
+continue without asking the user to replay project history.
 
 This is the concise takeover entry. Detailed evidence and historical sections
 are preserved in
@@ -75,10 +75,11 @@ are preserved in
   capture channel (bookmarklet + local publisher through
   `/internal/jobs/import`). No real China source adapter exists yet and no China
   `source` identifier is registered.
-- **0015 (resume tailoring and explainable matching) is the active stage**, and
-  **0015A (job-list usability and intake quality) is closed**; 0014's Step 5
-  carry-forward is unchanged. Details: `## Active Plan (0015)` and
-  `## Completed Plan (0015A)` below.
+- **0015 (resume tailoring and explainable matching) is complete and archived**,
+  and **0015A (job-list usability and intake quality) is closed and archived**;
+  0014's Step 5 carry-forward is unchanged. Details: `## Completed Plan (0015)`
+  and `## Completed Plan (0015A)` below. **No plan is active**; **0016
+  open-source packaging** is next.
 
 The revised architecture direction is:
 [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md).
@@ -94,12 +95,13 @@ Key decisions:
 - Freshness lifecycle is introduced with 0012 Source Adapter, not 0011.
 - A single missing fetch never closes a Job.
 
-## Active Plan (0015)
+## Completed Plan (0015)
 
-[`active/0015-resume-tailoring-and-explainable-matching.md`](../exec-plans/active/0015-resume-tailoring-and-explainable-matching.md)
-— Phases A-C complete, Phase D implemented through D5 (D6 deferred by owner
-decision, plan §17); D5 passed its L2 verification (commit `ae85868`) and the
-stage's single L4 passed at HEAD `26e2069` (production code frozen at `576f436`).
+[`completed/0015-resume-tailoring-and-explainable-matching.md`](../exec-plans/completed/0015-resume-tailoring-and-explainable-matching.md)
+— archived 2026-10-10; Phases A-C complete, Phase D implemented through D5 (D6
+deferred by owner decision, plan §17); D5 passed its L2 verification (commit
+`ae85868`) and the stage's single L4 passed at HEAD `26e2069` (production code
+frozen at `576f436`).
 
 Delivered:
 
@@ -142,9 +144,11 @@ unchanged (raw lines below).
 
 ## Completed Plan (0015A)
 
-[`active/0015A-job-list-usability-and-intake-quality.md`](../exec-plans/active/0015A-job-list-usability-and-intake-quality.md)
-— **closed 2026-10-10** (the plan file is still under `active/`; see
-`## Next Entry` item 9).
+[`completed/0015A-job-list-usability-and-intake-quality.md`](../exec-plans/completed/0015A-job-list-usability-and-intake-quality.md)
+— **closed and archived 2026-10-10**; its §13 step boxes were never maintained
+during the stage, so the closure evidence is the recorded L4 gate below, and
+Step 5's real-database backfill was never applied (apply/revert are proven only
+against the scratch database).
 
 Progress:
 
@@ -225,7 +229,7 @@ Remaining work / next steps:
 Note: `## Next Entry` items 1-5 and the stage-numbering table below were written on
 2026-10-08 as the recorded stage-numbering decision and are preserved verbatim
 (items 6/7 are the 0014 carry-forward added when 0014 closed; items 8/9 record
-the 0015 opening); the current status is this section.
+the 0015 close); the current status is this section.
 
 ## Stage Handoff Map
 
@@ -405,15 +409,16 @@ Performance baseline:
 7. **0014 carry-forward — the real-browser bookmarklet acceptance is still
    UNVERIFIED.** The plan's §19.5 holds the redacted-evidence template; this is
    owned by the product owner and is not a stage blocker.
-8. **0015 is implementation-complete.** Phases A-C are complete; Phase D is
-   implemented through D5 (L2-verified at `ae85868`, D6 deferred) and the stage's
-   single L4 is green at `26e2069` (`## Verified Snapshot`); the docs sync that
-   records it is committed with this snapshot. Open: the stage-close decision
-   (archiving this plan under `completed/`, together with item 9) and then
-   **0016** open-source packaging.
-9. **0015A is closed but its plan file still sits under `active/`** with its own
-   status header and §13 checkboxes unupdated; updating them and archiving the
-   file is the Lead's call (plan §5.5 assigns that file to the Lead).
+8. **0015 is closed with a green L4** — both plans are archived: 0015 at
+   `completed/0015-resume-tailoring-and-explainable-matching.md` (L4 green at
+   `26e2069`; D6 deferred by owner decision) and 0015A at
+   `completed/0015A-job-list-usability-and-intake-quality.md`. The archival is
+   committed with this snapshot; **0016** open-source packaging is next.
+9. **Resolved — both plans are archived under `completed/`.** 0015A's §13 step
+   boxes remain unticked on purpose (never maintained during the stage); its
+   status header now records the closure evidence, and Step 5's real-database
+   backfill was never applied (apply/revert are proven only against the scratch
+   database).
 
 Stage numbering (decided 2026-10-08). It supersedes older references inside the
 archived completed plans, which are historical evidence and are never rewritten:
@@ -429,8 +434,17 @@ Note added 2026-10-09 when 0014 closed: the 0014 row above records the
 [`completed/0014-china-campus-sources-and-manual-capture.md`](../exec-plans/completed/0014-china-campus-sources-and-manual-capture.md).
 
 Note added 2026-10-10 when 0015 opened: **0015 is now active** (Phases A-C
-complete, Phase D implemented through D5 — see `## Active Plan (0015)`), and
+complete, Phase D implemented through D5 — see `## Completed Plan (0015)`), and
 **0015A is closed**; the table rows above are preserved verbatim.
+
+Note added 2026-10-10 when 0015 closed: **0015 is complete and archived with a
+green L4** (HEAD `26e2069`; see `## Completed Plan (0015)`), **0015A is closed and
+archived**, and **both plans moved to `completed/`** —
+[`completed/0015-resume-tailoring-and-explainable-matching.md`](../exec-plans/completed/0015-resume-tailoring-and-explainable-matching.md)
+and
+[`completed/0015A-job-list-usability-and-intake-quality.md`](../exec-plans/completed/0015A-job-list-usability-and-intake-quality.md).
+**No plan is active**; **0016 open-source packaging** is next. The table rows
+above stay preserved verbatim.
 
 0011 must remain:
 
@@ -450,8 +464,8 @@ Do not start a new P2 module without its own approved plan.
 ## Key Entry Points
 
 - AI routing: [README.md](README.md)
-- Active ExecPlan (0015):
-  [../exec-plans/active/0015-resume-tailoring-and-explainable-matching.md](../exec-plans/active/0015-resume-tailoring-and-explainable-matching.md)
+- Most recent archived ExecPlan (0015):
+  [../exec-plans/completed/0015-resume-tailoring-and-explainable-matching.md](../exec-plans/completed/0015-resume-tailoring-and-explainable-matching.md)
 - Full historical state:
   [references/project-state-full.md](references/project-state-full.md)
 - Current architecture:

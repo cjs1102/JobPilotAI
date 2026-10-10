@@ -701,6 +701,16 @@ Stop and report to the Lead (do not widen scope) if:
         Both parameters require a session, accept only `true|false`, and `with_match` absent
         is byte-identical (asserted in `test_job_http`).
 - [ ] Phase C: decision 2 (C1) → implement (C2) → docs (C3)
+  - [x] C1: owner default decision 2 = **C1 offline self-contained report**. Data source is the
+        existing authenticated `GET /api/v1/jobs?with_match=true` (or a captured response body);
+        no server surface, no new auth mechanism, no frontend tooling, no new dependency.
+        Ordering is the API's own order with a positional rank; the original link is in every row.
+  - [x] C2: `tools/job_report/render_report.py` (stdlib only) writes ONE self-contained HTML file
+        (inline CSS, no external asset, no script); a row without reasons renders the explicit
+        `无匹配理由` marker; `--input` mode performs zero network I/O and `--url` mode performs a
+        single `GET` with the existing Bearer token (never a mutating verb, never the database).
+  - [x] C3: documented in `docs/04` §8 + `tools/job_report/README.md`; deterministic fixture tests
+        in `tools/job_report/tests/test_render_report.py` (10 cases, all green).
 - [ ] Phase D: decisions 1/3 (D0) → contract (D1) → `tailor_rule_v1` (D2) →
       artifact persistence (D3) → fact gate (D4) → confirmation boundary (D5) →
       worker (D6, conditional) → docs + single L4 (D7)

@@ -1197,3 +1197,37 @@ GET  /internal/ai/tasks/{id}/input?worker_id=...
 - worker **不得直接访问业务表**（ADR-0009）：其输入全部来自 `/input`。
 - 默认 `lease_seconds=120`、`max_attempts=3`，由 `ai.lease_seconds` /
   `ai.max_attempts` 配置。
+
+---
+
+## 8. 只读岗位匹配报告（0015 阶段 C，决策 2 = C1）
+
+**访问模型**：离线、自包含单文件报告；**不新增服务端接口**、不新增鉴权机制、不引入前端
+构建工具、不新增依赖（仅 Python 标准库）：
+
+```bash
+# 离线模式（零网络 I/O、不需要会话）：渲染已抓取的响应体
+python3 tools/job_report/render_report.py --input captured_jobs.json --output job_report.html
+
+# 联网模式：用既有 Bearer token 只发一次只读 GET
+python3 tools/job_report/render_report.py \
+  --url 'http://127.0.0.1:8080/api/v1/jobs?with_match=true&page_size=50' \
+  --token "$JOBPILOT_TOKEN" --output job_report.html
+```
+
+- **数据来源**：`GET /api/v1/jobs?with_match=true`（§5.1 的增量键；`strict=true` 时用其过滤后
+  的结果）或该响应的离线副本。报告**只渲染 API 已经返回的内容**——不重新打分、不重新排序、
+  不补数据（C1 的唯一契约）。
+- **确定性排序**：行的顺序 = 响应 `list` 的顺序（即 `sort=`/评分顺序），`rank` 为位置序号 1..N；
+  生成器从不重排。可选 `--sort-basis "<文本>"` **只在报告头部记录**排序基准（默认
+  `API 返回顺序（未重排）`），工具不解析也不应用它。
+- **每行字段**：`rank`、`score` + `score_version`、`matched_skills`、`missing_skills`、
+  `reasons[]`（`code`/`text`/`evidence`）、`deal_breakers[]`、`deadline_urgency`、
+  **原始岗位链接 `source_url`**（§5.1 已暴露）、公司/职位/地点/`freshness`。
+- **显式缺失语义**：无 `reasons[]` 的行渲染 `无匹配理由`（绝不空白）；无 `deal_breakers[]` 渲染
+  `无`；无 `source_url` 渲染 `—`；空列表渲染显式空态。
+- **自包含**：单个 HTML 文件，内联 CSS，**无外部资源、无脚本**。
+- **只读**：`--input` 模式零网络 I/O；`--url` 模式仅一次 `GET`（无 POST/PUT/DELETE），
+  不访问数据库，不改任何状态。缺少数据时报告显式留白，绝不触发写路径。
+- 生成方式与内容说明见 `tools/job_report/README.md`；测试见
+  `tools/job_report/tests/test_render_report.py`。

@@ -1,20 +1,20 @@
 name: ci
 
-# 0016 P4. Three jobs, deliberately separate:
+# 0016 P4, revised by 0017-A. Two jobs, deliberately separate:
 #
 #   build       - provision the pinned dependencies, configure and compile the
-#                 whole tree on a clean runner. Compile only: the suite has no
+#                 whole tree on a clean runner, then ship that build tree to
+#                 `integration` as one artifact. Compile only: the suite has no
 #                 reliable "needs a database" label (309 tests, only 17 carry
 #                 `external`/`integration`, 59 carry no label at all), so
 #                 splitting it by label would run database-backed tests without a
-#                 database. The tests run in the jobs below instead.
+#                 database. The tests run in the job below instead.
 #   integration - MySQL + Redis service containers, an isolated CI database with
 #                 its own credentials, then the full CTest suite and both Python
-#                 suites.
-#   image       - build the committed Dockerfile on a runner that can reach a
-#                 registry, then run the end-to-end gate against that image.
-#                 This is where the container path gets its real evidence; the
-#                 development host cannot pull base images.
+#                 suites - against the tree `build` compiled, which is why this
+#                 job no longer compiles anything itself.
+#   image       - moved to .github/workflows/image.yml (0017-A) so it is charged
+#                 only for changes that can affect the image, and always on main.
 #
 # No job needs an AI provider key, and TSan is deliberately not part of the
 # required matrix (0016 section 11 decision 8).
@@ -59,9 +59,28 @@ jobs:
           cmake --preset release
           cmake --build --preset release -j"$(nproc)"
 
+      # 0017-A. One tar.gz rather than the directory: actions/upload-artifact
+      # does not guarantee the executable bit, and the integration job has to
+      # exec these test binaries. `-C build presets/release` keeps the archive
+      # rooted at build/, so extracting it under build/ restores the exact path
+      # the tests were configured with.
+      - name: Package the release build tree
+        run: tar -czf release-build.tar.gz -C build presets/release
+
+      - name: Upload the release build tree
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build
+          path: release-build.tar.gz
+          # The payload is already compressed; recompressing only burns runner
+          # time.
+          compression-level: 0
+          retention-days: 1
+
   integration:
     name: full test suite (MySQL + Redis)
     runs-on: ubuntu-24.04
+    needs: build
 
     services:
       mysql:
@@ -106,26 +125,28 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install build prerequisites
+      # 0017-A. No compiler and no Conan: this job executes binaries the `build`
+      # job already produced. cmake stays because it is what ships `ctest`; the
+      # MySQL client library and client are runtime needs of the tests and of the
+      # schema load below.
+      - name: Install test prerequisites
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake pkg-config libmysqlclient-dev \
-            default-mysql-client python3 python3-pip python3-venv
+            cmake libmysqlclient-dev default-mysql-client python3
 
-      - name: Install Conan 2
+      # 0017-A. The tar round trip restores the tree with the permissions it was
+      # built with. The test binaries link their Conan dependencies statically,
+      # so this job needs neither a Conan cache nor a virtualenv.
+      - name: Download the release build tree
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+
+      - name: Extract the release build tree
         run: |
-          python3 -m venv "$HOME/.conan-venv"
-          "$HOME/.conan-venv/bin/pip" install --no-cache-dir "conan>=2,<3"
-          echo "$HOME/.conan-venv/bin" >> "$GITHUB_PATH"
-
-      - name: Bootstrap the pinned dependency graph
-        run: tools/dev/bootstrap.sh
-
-      - name: Configure and build
-        run: |
-          cmake --preset release
-          cmake --build --preset release -j"$(nproc)"
+          mkdir -p build
+          tar -xzf release-build.tar.gz -C build
 
       - name: Load the schema into the CI database
         run: |
@@ -161,22 +182,3 @@ jobs:
         run: |
           (cd source_adapters && python3 -m unittest discover -s jobpilot_sources/tests -t .)
           (cd ai_worker && python3 -m unittest discover -s jobpilot_ai/tests -t .)
-
-  image:
-    name: container image and the end-to-end gate
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-
-      # The documented local flow, and the reason this step exists: compose
-      # refuses to interpolate the service at all without the variables .env
-      # provides (`required variable MYSQL_PASSWORD is missing`), so building the
-      # image straight from a checkout fails before it can pull anything.
-      - name: Provide the compose environment
-        run: cp .env.example .env
-
-      - name: Build the committed image
-        run: docker compose --profile app build backend
-
-      - name: Run the gate against that image
-        run: tools/dev/demo-gate.sh

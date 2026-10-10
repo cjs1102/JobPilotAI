@@ -1,0 +1,47 @@
+name: image
+
+# 0017-A: the container job moved here from ci.yml so it is no longer charged on
+# every push. It always runs on main - the container path keeps its evidence and
+# the check name `container image and the end-to-end gate` stays available to
+# branch protection - and on a pull request only when a file the image or the
+# end-to-end gate actually reads changed. Native triggers are enough; no
+# third-party path-filter action is involved.
+#
+# Consequence to remember when branch protection is configured: on a pull request
+# that touches none of the paths below, this check is not reported at all, so it
+# must not be required unconditionally.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - docker/**
+      - tools/dev/**
+      - .github/workflows/image.yml
+
+permissions:
+  contents: read
+
+jobs:
+
+  image:
+    name: container image and the end-to-end gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      # The documented local flow, and the reason this step exists: compose
+      # refuses to interpolate the service at all without the variables .env
+      # provides (`required variable MYSQL_PASSWORD is missing`), so building the
+      # image straight from a checkout fails before it can pull anything.
+      - name: Provide the compose environment
+        run: cp .env.example .env
+
+      - name: Build the committed image
+        run: docker compose --profile app build backend
+
+      - name: Run the gate against that image
+        run: tools/dev/demo-gate.sh

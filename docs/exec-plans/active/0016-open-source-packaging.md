@@ -1,10 +1,13 @@
 # ExecPlan 0016: Open-source Packaging, Demo Gate and CI
 
-> Status: **DRAFT — awaiting owner review** (written 2026-10-10). This document is
-> research + design only. **No production code, build entry, compose file, CI
-> workflow or documentation rewrite may be written before the owner approves this
-> plan at step P0** (§9). Approval, partial approval or rejection is expected as
-> the review answer to the commit that adds this file.
+> Status: **APPROVED — P0 closed by the owner (2026-10-10).** All eight §11
+> decisions are ruled and recorded there. Implementation proceeds step by step
+> from P1 (§9); each unit is committed and pushed only after its targeted
+> verification, and the stage closes with the single L4 of §8.3. The plan was
+> regrouped on approval: the former P2 run-story work (Dockerfile, compose
+> service, storage volume) merged into P1 so the `resume_storage` declaration
+> gets its owner and its verification in the same unit; the later steps were
+> renumbered P2-P6 with no change of content.
 >
 > Task level: **L4 at stage close** (the stage touches the build entry, the local
 > run path, the database bootstrap story and CI; the individual slices are
@@ -96,6 +99,13 @@ Runtime
   `source_adapters/README.md:597-601`) from the repository root with
   `service/config/config.yaml` (`:41-45`); the worker is
   `python3 -m jobpilot_ai worker --config config.yaml` (`ai_worker/README.md:57-63`).
+- Resume files are written by the service itself through
+  `MakeLocalFileStorage(config.storage.root)` (`service/src/main.cpp:131-133`),
+  with `storage.root` defaulting to the CWD-relative `storage`
+  (`service/config/config.yaml`, the `storage:` block), and the documented run
+  command starts the service from the repository root; a container therefore has
+  to mount a volume at that path — which is what the unattached `resume_storage`
+  declaration was for.
 - `.env.example:2-26` documents MySQL/Redis variables, host/port overrides,
   `INTERNAL_API_TOKEN` (empty), storage limits and `APP_ENV`.
 
@@ -150,8 +160,9 @@ Documentation state
    Conan cache to a built `jobpilot_service` plus green targeted tests, using
    only committed files and public registries (§8 CE-1/CE-2).
 3. **Local run story**: one documented way to start MySQL + Redis + the service
-   (and optionally the worker) from a clean checkout, including the storage
-   volume fix, `.env` handling and a health check.
+   (and optionally the worker) from a clean checkout, including the `resume_storage`
+   volume actually attached to the container path the service writes resumes to,
+   `.env` handling and a health check.
 4. **Database bootstrap and upgrade documentation**: the fresh-database path and
    the numbered additive-`ALTER` upgrade convention, written so a newcomer can
    apply them without guessing.
@@ -253,41 +264,48 @@ behaviour, that is a stop condition (§13), not a licence to change it.
 
 ## 6. Selected Design
 
-- **P1 dependency acquisition.** Keep Conan 2 and the existing exact pins; add a
-  committed `conan.lock` generated from `service/conanfile.txt`, a committed
-  Conan profile (or explicit `-s` settings) pinning `compiler.cppstd=17` and
-  `build_type`, and `tools/dev/bootstrap.sh` that runs `conan install` with
-  `--output-folder` at the path each entry's presets expect. Rationale: it is the
-  smallest change that turns a generated, machine-specific artifact into a
-  documented, reproducible one, and it keeps the door open for a container build
-  without vendoring dependencies (decision 2, §11).
-- **P2 run story.** Fix the unattached `resume_storage` volume, add the service
+- **P1 build and run contract.** Keep Conan 2 and the existing exact pins; add a
+  committed `conan.lock` generated from `service/conanfile.txt`, pin
+  `compiler.cppstd=17` and `build_type=Release` explicitly in the bootstrap step
+  (matching what the current generated toolchain already resolves to), and add
+  `tools/dev/bootstrap.sh`, which resolves the Conan binary (it lives outside
+  `PATH` for non-interactive shells on this host) and runs `conan install` with
+  `--output-folder` at the path both entries' presets expect. On the same unit,
+  add one multi-stage `Dockerfile` (builder = bootstrap + build; runtime = binary
+  + config) that reuses that script rather than duplicating it, add the service
   as a compose service behind a profile so `docker compose up -d` still gives an
-  infra-only stack by default, and add one multi-stage `Dockerfile` (builder =
-  bootstrap + build; runtime = binary + config) that reuses P1's script rather
-  than duplicating it. The worker stays optional and documented, not required.
-- **P3 database.** Document the two real paths (fresh initdb mount; numbered
+  infra-only stack by default, and attach `resume_storage` to the path the
+  service writes resumes to (`service/src/main.cpp:131-133`). The worker stays
+  optional and documented, not required. Rationale: the script is the smallest
+  change that turns a generated, machine-specific artifact into a documented,
+  reproducible one, and the container is what gives the storage declaration an
+  owner (decision 1 and 2, §11).
+- **P2 database.** Document the two real paths (fresh initdb mount; numbered
   additive `ALTER`s for an existing database) in one place, name the
   duplicate-column behaviour explicitly, and give the demo a dedicated database
   name created by the demo itself.
-- **P4 gate script.** One shell entry point under `tools/dev/` (stdlib + curl +
+- **P3 gate script.** One shell entry point under `tools/dev/` (stdlib + curl +
   the compose CLI only) with `set -euo pipefail`, an isolated compose project
   name, its own database, a trap that tears the isolated stack down, and a
   committed sample dataset derived from `docs/examples/job-import.json`
   (`docs/examples/job-import.json:1-11`, whose URLs are `example.invalid`, so the
   demo stays offline).
-- **P5 CI.** One workflow with two jobs: a build+unit job (no services) and a
-  DB-backed job using `mysql:8.0` + `redis:7` service containers, both running
-  the same bootstrap path as C1 and no AI key. The workflow's command list is
-  replayed locally in the same order before it is committed, because the first
-  real run happens on GitHub after the push.
-- **P6 hygiene.** Add an English "Quick start" to `README.md` above the existing
+- **P4 CI.** One workflow with two jobs: a build+unit job (no services) and a
+  DB-backed job using `mysql:8.0` + `redis:7` service containers with an isolated
+  database name and dedicated credentials, both running the same bootstrap path
+  as C1 and no AI key. The workflow's command list is replayed locally in the
+  same order before it is committed, because the first real run happens on GitHub
+  after the push; TSan is fixed but stays out of the required matrix
+  (decision 8).
+- **P5 hygiene.** Add an English "Quick start" to `README.md` above the existing
   Chinese content rather than rewriting it; move the internal acceptance
-  paragraphs to `docs/ai/project-state.md`; add `THIRD_PARTY_NOTICES.md`
-  summarising `third_party/libbcrypt` (from its `PROVENANCE.md`) and the Conan
-  and Python runtime dependencies; add dated correction blocks to `docs/07` and
-  `docs/08` pointing at the quickstart; correct the stale Conan-reachability
-  record in `docs/quality/README.md:12-16`.
+  paragraphs to `docs/ai/project-state.md`; add a short orientation note for
+  `AGENTS.md`/`docs/ai/*` and verify those files carry no secret or local-only
+  private detail (decision 6); add `THIRD_PARTY_NOTICES.md` summarising
+  `third_party/libbcrypt` (from its `PROVENANCE.md`) and the Conan and Python
+  runtime dependencies; add dated correction blocks to `docs/07` and `docs/08`
+  pointing at the quickstart; correct the stale Conan-reachability record in
+  `docs/quality/README.md:12-16`.
 
 ## 7. Invariants
 
@@ -328,7 +346,7 @@ one L4.
 | CE-2 | The build does not depend on this host's Conan cache | run bootstrap with an isolated `CONAN_HOME` (fresh cache) and network available | raw `conan install` summary line, package count, exit code |
 | CE-3 | A newcomer can start and use the stack | isolated compose project + empty volumes, then C2 and C3 | `/health` response, gate script output, per-leg assertions |
 | CE-4 | CI's command list is not fiction | replay the workflow's exact command sequence locally, in order | per-command exit codes |
-| CE-5 | The container path builds | `docker build` of the P2 Dockerfile (network at image-build time) | image id + a container run answering `/health` |
+| CE-5 | The container path builds | `docker build` of the P1 Dockerfile (network at image-build time) | image id + a container run answering `/health` |
 
 CE-2/CE-5 are the only network-dependent steps: if the network fails, the step is
 recorded **environment-limited with the raw error** and the stage continues — it
@@ -338,19 +356,19 @@ the stale "cannot reach Conan Center" record was disproved by a 200 from
 
 ### 8.2 Targeted slices
 
-- P1: CE-1 + CE-2 + a configure-only run of both entries (root and service) and
-  the TSan decision from §11/§17.
-- P2: CE-5 + `docker compose config` validation + the infra-only default stack
-  still coming up.
-- P3: a fresh isolated database bootstrapped from `database/schema/*.sql` and the
+- P1: CE-1 + CE-2 + a configure-only run of both entries (root and service) + the
+  TSan configure + CE-5 + `docker compose config` showing the storage volume
+  attached, and the infra-only default stack still coming up.
+- P2: a fresh isolated database bootstrapped from `database/schema/*.sql` and the
   documented upgrade path applied to a copy — no test in the existing suites is
   re-run for this (their evidence stands).
-- P4: CE-3, plus a deliberately failing assertion to prove the script's exit code
+- P3: CE-3, plus a deliberately failing assertion to prove the script's exit code
   is non-zero on failure (the negative control).
-- P5: CE-4 + YAML lint/`actionlint` if available locally; the first real CI run
+- P4: CE-4 + YAML lint/`actionlint` if available locally; the first real CI run
   is reported by the owner after the push, not claimed here.
-- P6: L0 (`git diff --check`) + a link check over the changed documents, in the
-  shape already used for the 0015 archival (28 links, 0 missing).
+- P5: L0 (`git diff --check`) + a link check over the changed documents, in the
+  shape already used for the 0015 archival (28 links, 0 missing) + the
+  secret/private-detail scan decision 6 asks for.
 
 ### 8.3 Stage close
 
@@ -364,14 +382,13 @@ gate is fixed and only the affected levels are re-run.
 
 | Step | Work | Depends on | Acceptance criteria |
 |---|---|---|---|
-| **P0** | Owner reviews this plan and answers §11 | — | an explicit approval (or a change request); **no implementation before it** |
-| **P1** | Dependency acquisition + clean build contract (C1): `conan.lock`, committed profile/settings, `tools/dev/bootstrap.sh`, docs of prerequisites; TSan target-order decision | P0 | CE-1 and CE-2 pass; bootstrap is idempotent; both entries configure and build; evidence archived |
-| **P2** | Local run story (C2): compose profile for the service, Dockerfile, `resume_storage` fix, `.env` handling, `/health` check, worker documented as optional | P1 | CE-5 passes; `docker compose up -d` still starts infra only; `/health` returns 200; the isolated stack tears down cleanly |
-| **P3** | Database bootstrap + upgrade documentation, demo database isolation | P2 | a fresh isolated database reaches the expected 13 tables from committed files; the upgrade path is documented and applied once to a copy; the dev database is verified untouched |
-| **P4** | Demo gate (C3): `tools/dev/` gate script + committed sample dataset + assertions | P2, P3 | CE-3 passes end to end with no AI key and no outbound network; the negative control exits non-zero; raw output archived |
-| **P5** | CI workflow: build job + DB-backed job, no AI key | P1, P4 | CE-4 passes (workflow command list replayed locally); the workflow file validates; the owner confirms the first GitHub run afterwards |
-| **P6** | Open-source hygiene: README quickstart (en) + internal state moved out, `THIRD_PARTY_NOTICES.md`, `docs/07`/`docs/08` dated corrections, `docs/quality:12-16` correction, reading-order index | P4 | L0 + link check clean; an outsider can follow README to a running demo without reading any agent document |
-| **P7** | Docs sync + the stage's single L4 + archive | P1-P6 | full L4 green on a frozen commit; README/AGENTS/project-state/this plan consistent; plans archived under `docs/exec-plans/completed/` |
+| **P0** | Owner reviewed this plan and ruled §11 (done, 2026-10-10) | — | approval recorded in §11; no implementation started before it |
+| **P1** | Build and run contract (C1, C2): `conan.lock`, pinned settings, `tools/dev/bootstrap.sh`, the TSan target-order fix, multi-stage `Dockerfile`, compose service behind a profile, `resume_storage` attached to the service's storage root, `.env` handling, `/health`; worker documented as optional | P0 | CE-1, CE-2 and CE-5 pass; `cmake --preset tsan` configures; bootstrap is idempotent; both entries configure and build; `docker compose config` shows the volume attached and the default stack still starts infra only; `/health` returns 200; the isolated stack tears down cleanly |
+| **P2** | Database bootstrap + upgrade documentation, demo database isolation | P1 | a fresh isolated database reaches the expected 13 tables from committed files; the upgrade path is documented and applied once to a copy; the dev database is verified untouched |
+| **P3** | Demo gate (C3): `tools/dev/` gate script + extended `docs/examples/job-import.json` + assertions | P1, P2 | CE-3 passes end to end with no AI key and no outbound network; the negative control exits non-zero; raw output archived |
+| **P4** | CI workflow: build job + DB-backed job with an isolated CI database and dedicated credentials, no AI key, TSan out of the required matrix | P1, P3 | CE-4 passes (workflow command list replayed locally); the workflow file validates; the owner confirms the first GitHub run afterwards |
+| **P5** | Open-source hygiene: README quickstart (en) + internal state moved out, `AGENTS.md`/`docs/ai` orientation note + secret/private-detail check, `THIRD_PARTY_NOTICES.md`, `docs/07`/`docs/08` dated corrections, `docs/quality:12-16` correction, reading-order index | P3 | L0 + link check clean; an outsider can follow README to a running demo without reading any agent document; no secret or local-only detail in the public docs |
+| **P6** | Docs sync + the stage's single L4 + archive | P1-P5 | full L4 green on a frozen commit; README/AGENTS/project-state/this plan consistent; plans archived under `docs/exec-plans/completed/` |
 
 ## 10. Compatibility and Rollback
 
@@ -384,28 +401,45 @@ gate is fixed and only the affected levels are re-run.
 - The demo's isolated database/volumes are disposable by construction; the
   developer's `jobpilot` database is never part of the stage's writes.
 
-## 11. Open Decisions (owner-level only)
+## 11. Decisions (owner-level, CLOSED 2026-10-10 at P0)
 
-1. **Distribution shape**: Dockerfile(s) + compose profile for the app
-   (recommended; it doubles as the clean-environment proof) versus documented
-   local build only.
-2. **Dependency acquisition**: pinned `conan.lock` + documented remote
-   (recommended) versus vendoring the dependencies into the tree (heavier, and it
-   adds per-dependency licence/notice work).
-3. **CI scope**: GitHub Actions with MySQL/Redis service containers
-   (recommended), build-only, or no CI.
-4. **README language**: add an English quickstart above the existing Chinese
-   content (recommended) versus a full bilingual rewrite or English-only.
-5. **Demo dataset**: extend `docs/examples/job-import.json` (recommended) versus
-   a new dedicated demo dataset.
-6. **Agent-facing documents**: keep `AGENTS.md`, `docs/ai/*` and the archived
-   plans in the public tree with a one-line orientation note in the README
-   (recommended) versus moving them under a developer-only path.
-7. **Schema upgrades**: keep the documented hand-applied numbered `ALTER`s
-   (recommended; a runner is a new feature) versus adding a migration runner.
-8. **TSan**: fix the target-order defect in P1 and add a TSan job (recommended
-   only if the owner wants CI breadth) versus leaving TSan out and recording the
-   defect in §17.
+All eight decisions were ruled by the owner when approving this plan. They are
+recorded here verbatim in substance, together with what each ruling forbids, so a
+later reader can tell a decision from an accident.
+
+1. **Distribution shape — Dockerfile + Docker Compose profile.** The service is
+   packaged as a multi-stage image and added as a compose service behind a
+   profile; documented local build remains supported. *Forbids:* a
+   documentation-only run story with no container, and any container that starts
+   by default and changes the existing infra-only `docker compose up -d`.
+2. **Dependency acquisition — commit `conan.lock`, document the remote, do not
+   vendor.** No dependencies are copied into the tree. *Forbids:* a lockfile-free
+   build that depends on the host cache, and any vendoring that would drag in
+   per-dependency notice work this stage did not plan for.
+3. **CI — GitHub Actions with MySQL/Redis service containers, an isolated CI
+   database and dedicated credentials.** *Forbids:* CI that points at a developer
+   or shared database, reuses developer credentials, or needs an AI key; and
+   claiming a green CI run before the owner reports the first real run.
+4. **README language — keep the Chinese README, add an English Quick Start, no
+   full bilingual rewrite.** *Forbids:* translating or restructuring the existing
+   Chinese content wholesale, or deleting it.
+5. **Demo dataset — extend `docs/examples/job-import.json`.** *Forbids:* adding a
+   second competing primary example dataset.
+6. **Agent-facing documents — keep `AGENTS.md` and `docs/ai/*` in the public
+   tree, with a short orientation note in the README, and check them for secrets
+   and local-environment private detail.** *Forbids:* publishing agent routing or
+   local paths/credentials without review, and moving or deleting those documents.
+7. **Schema upgrades — keep the documented, hand-applied numbered additive
+   `ALTER`s; no migration runner in this stage.** *Forbids:* adding a runner, a
+   schema-version table, or any automatic migration that could touch an existing
+   database without a human reading it.
+8. **TSan — fix the `JP_ENABLE_TSAN` target-definition-order defect; do not put
+   TSan into the required CI matrix.** *Forbids:* leaving the configure defect in
+   place, and requiring TSan for CI to be considered green.
+
+Two consequences of the rulings are binding on execution: the storage volume gets
+its owner in P1 (ruling 1, see §9), and the CI database isolation of ruling 3 is
+the same isolation invariant §7.2 already imposes on every demo run.
 
 ## 12. Risks
 
@@ -446,23 +480,25 @@ Stop and report to the owner (do not widen scope) if:
 
 ## 14. Progress Checkboxes
 
-- [ ] P0 Owner review of this plan (approval gate; nothing else may start)
-- [ ] P1 Dependency acquisition + clean build contract (CE-1, CE-2)
-- [ ] P2 Local run story (CE-5, compose profile, `/health`)
-- [ ] P3 Database bootstrap + upgrade documentation + demo isolation
-- [ ] P4 Demo gate script + sample dataset (CE-3, negative control)
-- [ ] P5 CI workflow (CE-4; first GitHub run confirmed by the owner)
-- [ ] P6 Open-source hygiene (quickstart, notices, dated doc corrections, index)
-- [ ] P7 Docs sync + the stage's single L4 + archive
+- [x] P0 Owner review of this plan — **approved 2026-10-10, all eight §11
+      decisions ruled**
+- [ ] P1 Build and run contract (CE-1, CE-2, CE-5, TSan configure, storage volume)
+- [ ] P2 Database bootstrap + upgrade documentation + demo isolation
+- [ ] P3 Demo gate script + extended sample dataset (CE-3, negative control)
+- [ ] P4 CI workflow (CE-4; first GitHub run confirmed by the owner)
+- [ ] P5 Open-source hygiene (quickstart, orientation note + secret check, notices, dated corrections, index)
+- [ ] P6 Docs sync + the stage's single L4 + archive
 
 ## 15. Smallest First Implementable Unit
 
 **P1 is the smallest unit that unblocks everything else and can be verified
-alone.** Concretely: commit the pinned `conan.lock` (and profile/settings) plus
-`tools/dev/bootstrap.sh`, run CE-1 and CE-2, and record the raw output. Until
-that works, no other packaging claim — one-command start, demo gate or CI — is
-honest, because every one of them starts from a build that a clean machine
-currently cannot reproduce.
+alone**, and it runs as two commits. First: commit the pinned `conan.lock` plus
+`tools/dev/bootstrap.sh` and the TSan target-order fix, run CE-1 and CE-2, and
+record the raw output. Second: the multi-stage `Dockerfile`, the compose service
+behind a profile and the `resume_storage` attachment, verified by CE-5 and
+`docker compose config`. Until the first commit works, no other packaging claim —
+one-command start, demo gate or CI — is honest, because every one of them starts
+from a build that a clean machine currently cannot reproduce.
 
 ## 16. Stage Numbering (unchanged)
 
@@ -477,10 +513,15 @@ rewritten (archived/historical text is never rewritten here). This plan is the
 
 - `JP_ENABLE_TSAN` names two targets before they are defined
   (`service/CMakeLists.txt:465-466` vs `:528,:545`): any TSan configure of the
-  current tree fails. Fixed in P1 only if §11 decision 8 keeps TSan in scope;
-  otherwise it stays recorded here.
-- `docker-compose.yml:40-42` declares `resume_storage` with no service attached;
-  P2 either attaches it or removes it, and says which.
+  current tree fails. **Decision 8: fixed in P1, TSan stays out of the required
+  CI matrix.**
+- `docker-compose.yml:40-42` declares `resume_storage` with no service attached.
+  **In P1 scope by owner instruction**: the real write path is
+  `MakeLocalFileStorage(config.storage.root)` (`service/src/main.cpp:131-133`),
+  so the volume is attached to the service container at that storage root, and
+  P1 verifies it by writing and reading a resume file back through the isolated
+  stack; if that verification shows the container never writes there, the
+  declaration is removed instead and the reason recorded.
 - `docs/quality/README.md:12-16`'s "cannot reach Conan Center" record is stale
   (200 from `center2.conan.io/v1/ping`, 2026-10-10); P6 corrects it with a dated
   note rather than deleting the original.
@@ -491,8 +532,9 @@ rewritten (archived/historical text is never rewritten here). This plan is the
 - The README is Chinese-only and carries internal acceptance state; P6 adds an
   English quickstart and moves the internal state to `docs/ai/project-state.md`.
 - There is no root Python packaging, so `python3 -m jobpilot_sources …` only works
-  from `source_adapters/`; P6 either documents that or asks the owner whether root
-  packaging belongs in scope (§11 decision 6 is adjacent).
+  from `source_adapters/`; **P5 documents that explicitly** (root packaging is a
+  packaging decision the owner did not ask for, and adding it is out of scope
+  under §3.2.1).
 - The first CI run can only happen on GitHub after a push; until the owner
   reports it, the workflow's status must be described as "commands replayed
   locally", never as "CI green".

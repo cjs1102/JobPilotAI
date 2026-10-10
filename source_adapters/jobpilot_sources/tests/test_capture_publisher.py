@@ -23,10 +23,12 @@ from jobpilot_sources.capture import (
     build_import_payloads,
     parse_artifact,
     parse_captures,
+    publish_captures,
     resolve_publish_token,
 )
 from jobpilot_sources.client import HttpError
 from jobpilot_sources.config import ConfigError
+from jobpilot_sources.registry import PlatformNameRegistry
 from jobpilot_sources.tests.support import load_fixture
 
 FRESHNESS_KEYS = (
@@ -272,6 +274,91 @@ class DuplicateTest(unittest.TestCase):
         payloads, _notes = build_import_payloads(captures)
 
         self.assertEqual(len(payloads), 100)
+
+
+class DescriptionCapTest(unittest.TestCase):
+    """0015A 5.5.3: 48 KiB in bytes, rejected instead of omitted/truncated."""
+
+    def test_an_accepted_description_is_published_verbatim(self) -> None:
+        value = "a" * 49152
+        built = build_import_payload(
+            CapturedJob(
+                source_url="https://x/1",
+                title="T",
+                company="C",
+                description=value,
+            )
+        )
+
+        self.assertEqual(built.payload["description"], value)
+        self.assertFalse(
+            any("description" in note and "omitted" in note
+                for note in built.notes)
+        )
+
+    def test_an_over_cap_description_is_never_omitted_or_truncated(self) -> None:
+        value = "a" * 49153
+        built = build_import_payload(
+            CapturedJob(
+                source_url="https://x/1",
+                title="T",
+                company="C",
+                description=value,
+            )
+        )
+
+        # Line 1 of defence: the payload keeps it verbatim.
+        self.assertEqual(built.payload["description"], value)
+
+        # Line 2: publishing refuses it with the byte counts, before any request.
+        transport = RecordingTransport()
+
+        with self.assertRaises(PublishError) as context:
+            publisher(transport).publish([built.payload])
+
+        message = str(context.exception)
+
+        self.assertIn("49153", message)
+        self.assertIn("49152", message)
+        self.assertIn("never truncated", message)
+        self.assertEqual(transport.calls, [])
+
+    def test_publish_captures_refuses_an_item_the_engine_would_reject(self) -> None:
+        capture = CapturedJob(source_url="https://x/1", title="T", company="")
+        transport = RecordingTransport()
+
+        with self.assertRaises(CaptureError) as context:
+            publish_captures(
+                [capture],
+                base_url="http://127.0.0.1:8080",
+                token="test-token",
+                transport=transport,
+                registry=PlatformNameRegistry.from_names(["牛客"]),
+            )
+
+        self.assertEqual(context.exception.code, "company_missing")
+        self.assertEqual(context.exception.field, "company")
+        self.assertEqual(transport.calls, [])
+
+    def test_publish_captures_still_publishes_a_needs_review_item(self) -> None:
+        # A homepage-looking URL is storable (hidden + queued), not rejected.
+        capture = CapturedJob(
+            source_url="https://www.example.invalid/",
+            title="T",
+            company="C",
+        )
+        transport = RecordingTransport()
+
+        outcome = publish_captures(
+            [capture],
+            base_url="http://127.0.0.1:8080",
+            token="test-token",
+            transport=transport,
+            registry=PlatformNameRegistry.from_names(["牛客"]),
+        )
+
+        self.assertTrue(outcome.ok)
+        self.assertEqual(len(transport.calls), 1)
 
 
 class RequestConstructionTest(unittest.TestCase):

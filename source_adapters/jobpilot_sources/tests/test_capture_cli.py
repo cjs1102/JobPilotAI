@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from jobpilot_sources import cli
+from jobpilot_sources.registry import PlatformNameRegistry
 from jobpilot_sources.tests.support import FIXTURES, load_fixture
 
 TOKEN = "unit-test-internal-token-value"
@@ -166,9 +167,20 @@ class PublishSuccessTest(unittest.TestCase):
 
         self.assertEqual(code, 0)
         result = json.loads(stdout.getvalue())
-        self.assertEqual(
-            result, {"ok": True, "submitted": 1, "created": 1, "updated": 0, "total": 1}
-        )
+        for key, value in (
+            ("ok", True),
+            ("submitted", 1),
+            ("created", 1),
+            ("updated", 0),
+            ("total", 1),
+        ):
+            self.assertEqual(result[key], value)
+
+        # Additive 0015A pre-flight keys (Step 7): counters, per-item findings
+        # and the registry that was consulted.
+        self.assertIn("counters", result)
+        self.assertIn("items", result)
+        self.assertIn("registry", result)
 
         self.assertEqual(len(transport.calls), 1)
         call = transport.calls[0]
@@ -198,6 +210,210 @@ class PublishSuccessTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("created=1", stdout.getvalue())
         self.assertIn("total=1", stdout.getvalue())
+
+
+class QualityFindingsTest(unittest.TestCase):
+    """0015A Step 7: the --json pre-flight shows why an item would be refused."""
+
+    def run_publish(
+        self,
+        path: str | None = None,
+        *,
+        registry: PlatformNameRegistry | None = None,
+        dry_run: bool = False,
+        as_json: bool = True,
+        transport: RecordingTransport | None = None,
+        environ: dict[str, str] | None = None,
+    ) -> tuple[int, str]:
+        stdout = io.StringIO()
+
+        code = cli.run_publish_capture(
+            path=path or capture_file(),
+            config_path=None,
+            base_url="http://127.0.0.1:8080",
+            token_env=TOKEN_ENV,
+            dry_run=dry_run,
+            as_json=as_json,
+            log=stdout.write,
+            environ=environ if environ is not None else {TOKEN_ENV: TOKEN},
+            transport=transport or RecordingTransport(),
+            registry=(
+                registry
+                if registry is not None
+                else PlatformNameRegistry.from_names(["牛客"])
+            ),
+        )
+
+        return code, stdout.getvalue()
+
+    def test_dry_run_reports_counters_and_a_clean_item(self) -> None:
+        code, output = self.run_publish(dry_run=True)
+        result = json.loads(output)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            result["counters"],
+            {"clean": 1, "needs_review": 0, "rejected": 0, "advisory": 0},
+        )
+
+        item = result["items"][0]
+
+        self.assertEqual(item["outcome"], "clean")
+        self.assertEqual(item["review_status"], 0)
+        self.assertEqual(item["findings"], [])
+        self.assertEqual(result["registry"]["size"], 1)
+        self.assertNotIn(TOKEN, output)
+
+    def test_dry_run_surfaces_a_needs_review_platform_match(self) -> None:
+        document = {
+            "title": "T",
+            "company": "牛客网",
+            "source_url": "https://x.invalid/campus/1001",
+        }
+
+        with tempfile_json(json.dumps(document)) as path:
+            code, output = self.run_publish(path=path, dry_run=True)
+
+        result = json.loads(output)
+
+        self.assertEqual(code, 0)  # needs_review is storable, not a refusal
+        self.assertEqual(result["counters"]["needs_review"], 1)
+
+        finding = result["items"][0]["findings"][0]
+
+        self.assertEqual(finding["code"], "employer_is_platform")
+        self.assertEqual(finding["outcome"], "needs_review")
+        self.assertEqual(finding["review_status"], 1)
+
+    def test_human_readable_dry_run_explains_the_flag(self) -> None:
+        document = {
+            "title": "T",
+            "company": "牛客网",
+            "source_url": "https://x.invalid/campus/1001",
+        }
+
+        with tempfile_json(json.dumps(document)) as path:
+            code, output = self.run_publish(
+                path=path, dry_run=True, as_json=False
+            )
+
+        self.assertEqual(code, 0)
+        self.assertIn("employer_is_platform", output)
+        self.assertIn("needs_review", output)
+
+    def test_a_needs_review_item_is_still_published(self) -> None:
+        document = {
+            "title": "T",
+            "company": "某公司",
+            "source_url": "https://www.example.invalid/",
+        }
+        transport = RecordingTransport()
+
+        with tempfile_json(json.dumps(document)) as path:
+            code, output = self.run_publish(path=path, transport=transport)
+
+        result = json.loads(output)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(len(transport.calls), 1)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["counters"]["needs_review"], 1)
+        self.assertEqual(
+            result["items"][0]["findings"][0]["code"], "source_url_not_detail"
+        )
+
+    def test_over_cap_description_is_rejected_before_any_request(self) -> None:
+        document = {
+            "title": "T",
+            "company": "C",
+            "source_url": "https://x.invalid/campus/1001",
+            "description": "a" * 49153,
+        }
+        transport = RecordingTransport()
+
+        with tempfile_json(json.dumps(document)) as path:
+            code, output = self.run_publish(path=path, transport=transport)
+
+        result = json.loads(output)
+
+        self.assertEqual(code, 2)
+        self.assertEqual(transport.calls, [])
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["stage"], "quality")
+        self.assertEqual(result["counters"]["rejected"], 1)
+        self.assertIn("description_too_large", result["error"])
+
+        finding = result["items"][0]["findings"][0]
+
+        self.assertEqual(finding["code"], "description_too_large")
+        self.assertEqual(finding["field"], "description")
+        self.assertEqual(finding["limit_bytes"], 49152)
+        self.assertEqual(finding["actual_bytes"], 49153)
+        self.assertEqual(finding["outcome"], "rejected")
+
+    def test_exactly_49152_bytes_is_accepted_by_the_pre_flight(self) -> None:
+        document = {
+            "title": "T",
+            "company": "C",
+            "source_url": "https://x.invalid/campus/1001",
+            "description": "a" * 49152,
+        }
+
+        with tempfile_json(json.dumps(document)) as path:
+            code, output = self.run_publish(path=path, dry_run=True)
+
+        result = json.loads(output)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(result["counters"]["clean"], 1)
+        self.assertEqual(
+            len(result["jobs"][0]["description"].encode("utf-8")), 49152
+        )
+
+    def test_multibyte_description_boundary_is_bytes_not_characters(self) -> None:
+        document = {
+            "title": "T",
+            "company": "C",
+            "source_url": "https://x.invalid/campus/1001",
+            "description": "汉" * 16385,
+        }
+
+        with tempfile_json(json.dumps(document)) as path:
+            code, output = self.run_publish(path=path, dry_run=True)
+
+        result = json.loads(output)
+
+        self.assertEqual(code, 2)
+        self.assertEqual(result["stage"], "quality")
+        self.assertEqual(
+            result["items"][0]["findings"][0]["actual_bytes"], 49155
+        )
+
+    def test_a_parse_level_reject_carries_a_finding_too(self) -> None:
+        code, output = self.run_publish(
+            path=capture_path("capture_missing_company.json")
+        )
+        result = json.loads(output)
+
+        self.assertEqual(code, 2)
+        self.assertEqual(result["stage"], "capture")
+
+        finding = result["findings"][0]
+
+        self.assertEqual(finding["code"], "company_missing")
+        self.assertEqual(finding["field"], "company")
+        self.assertEqual(finding["outcome"], "rejected")
+
+    def test_missing_registry_file_fails_open_with_a_warning(self) -> None:
+        registry = PlatformNameRegistry.load("/nonexistent/platform_names.yaml")
+
+        code, output = self.run_publish(dry_run=True, registry=registry)
+        result = json.loads(output)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(result["registry"]["size"], 0)
+        self.assertIn("unavailable", result["registry"]["warning"])
+        self.assertEqual(result["counters"]["clean"], 1)
 
 
 class PublishFailureTest(unittest.TestCase):

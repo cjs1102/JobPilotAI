@@ -30,7 +30,10 @@ source_adapters/
     ├── timestamps.py (0014)    # Beijing-time (F13) date/time normalization
     ├── salary.py     (0014)    # 月薪千元 conversion, ambiguous forms omitted
     ├── normalize_cn.py (0014)  # education / nature / experience / city / deadline
+    ├── registry.py   (0015A)   # single-source platform-name registry + C++ parity
+    ├── data/         (0015A)   # platform_names.yaml — the ONE platform list
     ├── capture/      (0014)    # bookmarklet.js + artifact parser + local publisher
+    │                           #   (+ quality.py: 0015A pre-flight mirror)
     ├── providers/              # greenhouse.py, lever.py, ashby.py, base.py,
     │                           #   public_page.py (0014 generic public page)
     └── tests/                  # unittest suite + recorded fixtures
@@ -170,6 +173,8 @@ browser page (user's own logged-in session)
 
 local publisher: publish-capture
   artifact.py     : parse + validate the untrusted artifact (shape, sizes, enums)
+  quality.py      : 0015A pre-flight mirror (same stable codes as the C++ engine,
+                    byte-based 48 KiB cap, platform-name registry)
   publisher.py    : normalize with the SAME modules the adapters use
                     (fetch.normalize_url, normalize_cn, salary, timestamps/F13)
                     -> /internal/jobs/import payload, source="manual", 1..100 jobs
@@ -229,6 +234,124 @@ enforcement is the C++ observation upsert, proven by
 - Server-side failures are reported with the HTTP status and the server's
   `{code,message}`; unparsable or inconsistent response bodies are failures.
 - `--dry-run` validates and prints the payload without calling the API.
+
+## Pre-ingest quality pre-flight (0015A Step 7)
+
+`publish-capture` mirrors the deterministic C++ quality engine
+(`service/src/job/job_quality.cpp`) **before** it publishes, so an operator sees
+why an item would be rejected or flagged instead of discovering it in an ingest
+response. The mirror is UX only and **never authoritative**: the C++ gate
+decides, and the same stable codes come back from the server.
+
+The pre-flight runs on the normalized import payload (what the server actually
+receives) and reports, per item, the same vocabulary as the engine:
+
+| Code | Outcome | Trigger |
+|---|---|---|
+| `company_missing` | reject | employer empty after trim |
+| `description_too_large` | reject | description > 49,152 UTF-8 **bytes** |
+| `source_url_unusable` | reject | not an absolute `http(s)` URL |
+| `employer_is_platform` | needs_review | normalized employer is in the registry |
+| `source_url_not_detail` | needs_review | site root / `/jobs` `/job` `/search` `/list` / `/positions` / query-only |
+| `title_equals_company` | needs_review | normalized title equals normalized employer |
+| `duplicate_content_in_batch` | needs_review | equal employer+title+location under a different URL (all items) |
+| `employer_implausible` | advisory (stays visible) | employer < 2 bytes or all ASCII digits |
+| `description_polluted` | needs_review | ≥ 3 distinct nav markers **and** marker bytes ≥ 20 % |
+| `description_marker_minor` | advisory (stays visible) | 1–2 markers, or share < 20 % |
+| `source_url_shape_unrecognised` | advisory (stays visible) | no detail marker and no ≥ 4-digit segment |
+
+An unknown platform name or URL shape is **clean** (fail-open). A `reject` stops
+the whole batch before any request (exit `2`); `needs_review` items are still
+published — the server stores them hidden and queues them, which is the designed
+behaviour. Parsing failures (missing `title`/`company`, an over-long
+`company`/`title`/`location`/`source_url`) carry the same code vocabulary in a
+`findings` array.
+
+### Platform-name registry (single source of truth)
+
+```text
+source_adapters/jobpilot_sources/data/platform_names.yaml
+```
+
+One file, read by **both** the C++ `PlatformNameRegistry` and
+`jobpilot_sources.registry`. There is no second list in either language
+(`tests/test_registry.py` asserts that for Python and C++). The path is resolved
+the same way on both sides:
+
+1. `JOB_QUALITY_PLATFORM_NAMES_FILE` when set and non-empty;
+2. otherwise the repo-relative default
+   `source_adapters/jobpilot_sources/data/platform_names.yaml` (the service is
+   documented to run from the repository root);
+3. Python only: the packaged copy of the *same* file, so an installed wheel can
+   still resolve it (`pyproject.toml` ships `data/*.yaml` as package data).
+
+A missing/unreadable/invalid file yields an **empty** registry plus a warning in
+the `registry` block of the JSON output — fail-open, exactly like C++.
+
+Normalization mirrors `PlatformNameRegistry::Normalize` byte for byte: trim the
+six ASCII whitespace characters (`std::isspace` in the C locale — a U+3000
+ideographic space is *not* trimmed), fold `A`-`Z` only, then strip the suffixes
+`招聘网` / `人才网` / `官网` / `招聘` / `网` repeatedly (never to an empty
+string). Membership normalizes its argument, so `牛客网` matches the registered
+`牛客`. Parity is demonstrated by
+`tools/verify_platform_name_parity.cpp` (opt-in; see Tests) and pinned by
+`tests/test_registry.py::NormalizationParityTest`, which asserts the canonical
+normalized set and the exact normalisation table.
+
+### Description cap: 48 KiB of UTF-8 bytes
+
+- The application-layer hard cap is **49,152 bytes** (`48 * 1024`) of UTF-8,
+  checked as `len(value.encode("utf-8")) > 49152` — **bytes, never characters**.
+  A 16,385-character CJK description is 49,155 bytes and is rejected.
+- Over-cap is always a **rejection** with `description_too_large` plus
+  `limit_bytes` and `actual_bytes`; a description is never truncated, clamped or
+  silently dropped. `ManualPublisher.publish` independently refuses to send an
+  over-cap description (last line of defence before the network).
+- The layering is deliberate: `artifact.py` reads the description **verbatim**
+  (structure and the column caps for `company`/`title`/`location`/`source_url`),
+  `capture/quality.py` owns the 0015A cap and the stable finding, and the CLI
+  refuses to publish a rejected batch.
+- The bookmarklet's extraction default is **unchanged at 4,000 characters**
+  (`DEFAULT_MAX_DESCRIPTION` in `capture/bookmarklet.js`); browser collection is
+  not widened. Because it counts characters while the platform counts bytes, a
+  capture near the cap can still be refused at ingest — the finding carries both
+  byte counts so it is diagnosable.
+
+### `--json` output (additive)
+
+Existing keys keep their meaning; the pre-flight adds a `registry` block, a
+`counters` block and per-item `items`:
+
+```json
+{
+  "ok": true,
+  "submitted": 1,
+  "created": 1, "updated": 0, "total": 1,
+  "registry": {"path": ".../data/platform_names.yaml", "size": 18, "warning": null},
+  "counters": {"clean": 0, "needs_review": 1, "rejected": 0, "advisory": 0},
+  "items": [
+    {
+      "index": 0,
+      "source_url": "https://x.invalid/campus/1001",
+      "outcome": "needs_review",
+      "review_status": 1,
+      "findings": [
+        {"code": "employer_is_platform",
+         "reason": "employer equals a registered platform name (\"牛客网\"); the platform is not the employer",
+         "outcome": "needs_review", "review_status": 1,
+         "field": "company", "limit_bytes": null, "actual_bytes": null}
+      ]
+    }
+  ]
+}
+```
+
+`counters.advisory` counts items that carry at least one advisory finding, so it
+**overlaps** `clean`/`needs_review`/`rejected` (which are disjoint). A rejected
+pre-flight batch exits `2` with `"stage": "quality"`; a payload-level parse
+rejection keeps `"stage": "capture"` and adds a `findings` array. The publisher
+contract is untouched: `source="manual"`, `POST /internal/jobs/import`, token
+only in the `X-Internal-Token` header, and still no `--token` value option.
 
 ## Access discipline (0014)
 
@@ -379,6 +502,12 @@ INTERNAL_API_TOKEN=dummy python3 -m jobpilot_sources sync \
   --config /tmp/live-config.yaml --dry-run
 ```
 
+The 0015A pre-flight has its own suites: `tests/test_capture_quality.py`
+(mirrored codes, thresholds and the 48 KiB byte boundary incl. a multi-byte CJK
+case), `tests/test_registry.py` (platform-name parity with the C++ engine,
+single-source guard), plus additions to `test_capture_artifact.py`,
+`test_capture_publisher.py` and `test_capture_cli.py`.
+
 ### Opt-in source verification (not CI)
 
 The register above was produced with a robots-first, low-volume probe built on
@@ -418,6 +547,25 @@ MYSQL_PASSWORD=... INTERNAL_API_TOKEN=... \
 E2E_TOKEN=... python3 tools/verify_manual_capture_e2e.py \
   --base-url http://127.0.0.1:18080 --token-env E2E_TOKEN
 ```
+
+### Opt-in cross-language platform-name parity check (not CI)
+
+`tools/verify_platform_name_parity.cpp` prints the C++ normalisation table, the
+registry size and membership so the Python expectations can be produced from the
+real `PlatformNameRegistry` instead of being assumed:
+
+```bash
+g++ -std=c++17 -I service/include -I backend/include \
+    -o /tmp/verify_platform_name_parity \
+    source_adapters/tools/verify_platform_name_parity.cpp \
+    service/src/job/job_quality.cpp
+cd <repository root> && /tmp/verify_platform_name_parity   # N|SIZE|C|F|SET rows
+```
+
+Its `N|…` rows are byte-identical to `tests/test_registry.py`'s normalisation
+table; `tests/test_registry.py` also compares the env-var name and the default
+path against `job_quality.h` when the C++ tree is present (and skips otherwise).
+The default Python suite never compiles or runs C++.
 
 ### Browser evidence is still pending
 

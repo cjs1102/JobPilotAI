@@ -24,5 +24,10 @@ packages = [
 # The bookmarklet is shipped as data so the installed package can print it
 # (ExecPlan 0014 Step 6). Keeping it a real .js file means one source of truth
 # that is also executable by the test suite.
+#
+# The platform-name registry is the single source of truth shared with the C++
+# service (ExecPlan 0015A decision 4); it ships as package data so an installed
+# wheel resolves the same file, never a second copy of the list.
 [tool.setuptools.package-data]
 "jobpilot_sources.capture" = ["*.js"]
+"jobpilot_sources" = ["data/*.yaml"]

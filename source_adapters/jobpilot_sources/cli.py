@@ -222,12 +222,14 @@ def run_publish_capture(
     log: Callable[[str], None] = print,
     environ: Mapping[str, str] | None = None,
     transport: Transport | None = None,
+    registry: Any = None,
 ) -> int:
     """Validate and publish a local capture file; returns an exit code.
 
     Exit codes: ``0`` only after a verified publish (or a dry run), ``1`` when a
     publish attempt failed, ``2`` for input/config problems detected before any
-    request. A failure is never reported as a success.
+    request, including a mirrored 0015A pre-flight rejection. A failure is never
+    reported as a success.
     """
 
     from .capture import (
@@ -235,9 +237,12 @@ def run_publish_capture(
         ManualPublisher,
         PublishError,
         build_import_payloads,
+        capture_error_finding,
+        evaluate_batch_quality,
         parse_captures,
         resolve_publish_token,
     )
+    from .registry import PlatformNameRegistry
 
     def emit(payload: dict[str, Any], text: str) -> None:
         log(json.dumps(payload, ensure_ascii=False) if as_json else text)
@@ -250,6 +255,28 @@ def run_publish_capture(
 
         for note in notes:
             log(f"note: {note}")
+
+    def emit_quality(report: Any, active_registry: Any) -> None:
+        """Surface why an item is rejected or flagged, in text mode."""
+
+        if as_json:
+            return
+
+        if active_registry.warning:
+            log(f"note: {active_registry.warning}")
+
+        for item in report.items:
+            for finding in item.findings:
+                log(
+                    f"quality: capture[{item.index}] {finding.outcome}: "
+                    f"{finding.code}: {finding.reason}"
+                )
+
+        if report.counters.needs_review:
+            log(
+                f"quality: {report.counters.needs_review} capture(s) will be "
+                "stored hidden and queued for review"
+            )
 
     if path == "-":
         raw = sys.stdin.read()
@@ -323,9 +350,52 @@ def run_publish_capture(
         captures = parse_captures(document)
         payloads, notes = build_import_payloads(captures)
     except CaptureError as error:
+        payload: dict[str, Any] = {
+            "ok": False,
+            "stage": "capture",
+            "error": str(error),
+        }
+        finding = capture_error_finding(error)
+
+        if finding is not None:
+            payload["findings"] = [finding]
+
+        emit(payload, f"capture rejected: {error}")
+        return 2
+
+    # Mirrored 0015A pre-flight (ExecPlan 0015A Step 7): the same stable codes as
+    # the C++ gate, so the operator sees what the server would do before a
+    # request is made. It is UX only; the C++ gate stays authoritative.
+    active_registry = registry
+
+    if active_registry is None:
+        active_registry = PlatformNameRegistry.load_from_environment(environ)
+
+    report = evaluate_batch_quality(payloads, registry=active_registry)
+    quality_json = report.to_json()
+    registry_json = {
+        "path": active_registry.source_path,
+        "size": active_registry.size,
+        "warning": active_registry.warning or None,
+    }
+
+    if report.counters.rejected:
+        first = report.rejected_items[0]
+        message = (
+            f"capture[{first.index}] would be rejected: "
+            f"{first.diagnostic_code} - {first.diagnostic_reason}"
+        )
         emit(
-            {"ok": False, "stage": "capture", "error": str(error)},
-            f"capture rejected: {error}",
+            {
+                "ok": False,
+                "stage": "quality",
+                "error": message,
+                "registry": registry_json,
+                **quality_json,
+                "notes": list(notes),
+            },
+            f"capture rejected: {first.diagnostic_code}: "
+            f"{first.diagnostic_reason}",
         )
         return 2
 
@@ -335,12 +405,18 @@ def run_publish_capture(
                 "ok": True,
                 "dry_run": True,
                 "submitted": len(payloads),
+                "registry": registry_json,
+                **quality_json,
                 "jobs": payloads,
                 "notes": notes,
             },
-            f"[dry-run] {len(payloads)} capture(s) validated; nothing sent",
+            f"[dry-run] {len(payloads)} capture(s) validated; nothing sent "
+            f"(clean={report.counters.clean}, "
+            f"needs_review={report.counters.needs_review}, "
+            f"rejected={report.counters.rejected})",
         )
 
+        emit_quality(report, active_registry)
         emit_notes(notes)
 
         return 0
@@ -365,12 +441,15 @@ def run_publish_capture(
             "created": outcome.created,
             "updated": outcome.updated,
             "total": outcome.total,
+            "registry": registry_json,
+            **quality_json,
         },
         f"published {outcome.submitted} capture(s): "
         f"created={outcome.created} updated={outcome.updated} "
         f"total={outcome.total}",
     )
 
+    emit_quality(report, active_registry)
     emit_notes(outcome.notes)
 
     return 0

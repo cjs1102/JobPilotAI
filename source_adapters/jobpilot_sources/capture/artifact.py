@@ -44,7 +44,6 @@ MAX_COMPANY_BYTES = 128
 MAX_TITLE_BYTES = 128
 MAX_LOCATION_BYTES = 64
 MAX_SOURCE_URL_BYTES = 255
-MAX_DESCRIPTION_BYTES = 65535
 
 _OPTIONAL_TEXT_FIELDS = (
     "location",
@@ -59,7 +58,28 @@ _OPTIONAL_TEXT_FIELDS = (
 
 
 class CaptureError(Exception):
-    """The capture artifact is unusable; the message says why."""
+    """The capture artifact is unusable; the message says why.
+
+    A rejection that maps onto a stable 0015A quality code carries it here
+    (``code``, ``field`` and, for a byte cap, ``limit_bytes``/``actual_bytes``)
+    so the CLI can show the operator the same machine-readable finding the C++
+    gate would report. The plain message stays human readable.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        field: str | None = None,
+        limit_bytes: int | None = None,
+        actual_bytes: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.field = field
+        self.limit_bytes = limit_bytes
+        self.actual_bytes = actual_bytes
 
 
 @dataclass(frozen=True)
@@ -97,12 +117,18 @@ def _text(
     *,
     label: str,
     required: bool = False,
+    code: str | None = None,
+    field: str | None = None,
 ) -> str | None:
     value = document.get(key)
 
     if value is None:
         if required:
-            raise CaptureError(f"{label} is required but missing")
+            raise CaptureError(
+                f"{label} is required but missing",
+                code=code,
+                field=field,
+            )
 
         return None
 
@@ -115,31 +141,54 @@ def _text(
 
     if not cleaned:
         if required:
-            raise CaptureError(f"{label} must not be empty")
+            raise CaptureError(
+                f"{label} must not be empty",
+                code=code,
+                field=field,
+            )
 
         return None
 
     return cleaned
 
 
-def _bounded(value: str, max_bytes: int, label: str) -> str:
+def _bounded(
+    value: str,
+    max_bytes: int,
+    label: str,
+    *,
+    code: str,
+    field: str,
+) -> str:
     size = len(value.encode("utf-8"))
 
     if size > max_bytes:
         raise CaptureError(
             f"{label} is {size} bytes, over the {max_bytes} byte limit; "
-            "shorten it before publishing (it is never truncated for you)"
+            "shorten it before publishing (it is never truncated for you)",
+            code=code,
+            field=field,
+            limit_bytes=max_bytes,
+            actual_bytes=size,
         )
 
     return value
 
 
-def _absolute_http_url(value: str, label: str) -> str:
+def _absolute_http_url(
+    value: str,
+    label: str,
+    *,
+    code: str | None = None,
+    field: str | None = None,
+) -> str:
     parts = urllib.parse.urlsplit(value)
 
     if parts.scheme not in {"http", "https"} or not parts.netloc:
         raise CaptureError(
-            f"{label} must be an absolute http(s) URL, got {value!r}"
+            f"{label} must be an absolute http(s) URL, got {value!r}",
+            code=code,
+            field=field,
         )
 
     return value
@@ -221,23 +270,58 @@ def parse_artifact(document: Any) -> CapturedJob:
     if source_url is None:
         raise CaptureError(
             "job.source_url (or page_url) is required: it is the platform's "
-            "idempotency key"
+            "idempotency key",
+            code="source_url_unusable",
+            field="source_url",
         )
 
-    source_url = _absolute_http_url(source_url, "job.source_url")
-    source_url = _bounded(source_url, MAX_SOURCE_URL_BYTES, "job.source_url")
+    source_url = _absolute_http_url(
+        source_url,
+        "job.source_url",
+        code="source_url_unusable",
+        field="source_url",
+    )
+    source_url = _bounded(
+        source_url,
+        MAX_SOURCE_URL_BYTES,
+        "job.source_url",
+        code="source_url_too_large",
+        field="source_url",
+    )
 
     title = _text(
-        job_document, "title", label="job.title", required=True
+        job_document,
+        "title",
+        label="job.title",
+        required=True,
+        code="title_missing",
+        field="title",
     )
     company = _text(
-        job_document, "company", label="job.company", required=True
+        job_document,
+        "company",
+        label="job.company",
+        required=True,
+        code="company_missing",
+        field="company",
     )
 
     assert title is not None and company is not None  # required=True above
 
-    title = _bounded(title, MAX_TITLE_BYTES, "job.title")
-    company = _bounded(company, MAX_COMPANY_BYTES, "job.company")
+    title = _bounded(
+        title,
+        MAX_TITLE_BYTES,
+        "job.title",
+        code="title_too_large",
+        field="title",
+    )
+    company = _bounded(
+        company,
+        MAX_COMPANY_BYTES,
+        "job.company",
+        code="company_too_large",
+        field="company",
+    )
 
     optional: dict[str, str | None] = {}
 
@@ -245,13 +329,20 @@ def parse_artifact(document: Any) -> CapturedJob:
         value = _text(job_document, key, label=f"job.{key}")
 
         if key == "location" and value is not None:
-            value = _bounded(value, MAX_LOCATION_BYTES, "job.location")
-
-        if key == "description" and value is not None:
             value = _bounded(
-                value, MAX_DESCRIPTION_BYTES, "job.description"
+                value,
+                MAX_LOCATION_BYTES,
+                "job.location",
+                code="location_too_large",
+                field="location",
             )
 
+        # NOTE: the description is deliberately NOT bounded here. The 48 KiB
+        # UTF-8 byte cap is a 0015A *quality* check (capture/quality.py), so an
+        # operator sees the stable `description_too_large` finding with
+        # limit/actual bytes, and the pre-flight refuses the batch. The value is
+        # never truncated; ManualPublisher.publish additionally refuses to send
+        # an over-cap description.
         optional[key] = value
 
     return CapturedJob(
@@ -311,7 +402,15 @@ def parse_captures(document: Any) -> list[CapturedJob]:
         try:
             capture = parse_artifact(entry)
         except CaptureError as error:
-            raise CaptureError(f"capture[{index}]: {error}") from error
+            # Preserve the stable 0015A code/field/byte diagnostic so the CLI
+            # can report it as a machine-readable finding.
+            raise CaptureError(
+                f"capture[{index}]: {error}",
+                code=error.code,
+                field=error.field,
+                limit_bytes=error.limit_bytes,
+                actual_bytes=error.actual_bytes,
+            ) from error
 
         folded = capture.source_url.casefold()
 
@@ -332,6 +431,10 @@ def parse_captures(document: Any) -> list[CapturedJob]:
 __all__ = [
     "MAX_CAPTURE_VERSION",
     "MAX_CAPTURES_PER_RUN",
+    "MAX_COMPANY_BYTES",
+    "MAX_LOCATION_BYTES",
+    "MAX_SOURCE_URL_BYTES",
+    "MAX_TITLE_BYTES",
     "CaptureError",
     "CapturedJob",
     "parse_artifact",

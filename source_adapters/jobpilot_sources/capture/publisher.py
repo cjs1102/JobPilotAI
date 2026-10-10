@@ -9,7 +9,8 @@ Responsibilities, in order:
    key -- which is what makes F14 (manual wins) reachable at all.
 2. **Validate** the resulting payload against the documented
    ``POST /internal/jobs/import`` contract (``docs/04`` section 5.4) before any
-   network call.
+   network call, including the mirrored 0015A pre-flight checks
+   (:mod:`jobpilot_sources.capture.quality`) and the 48 KiB UTF-8 byte cap.
 3. **Publish** it through that existing endpoint with ``source="manual"``, then
    verify the response counters. A publish is reported as successful *only*
    after a ``200`` whose ``created + updated == total ==`` the number of jobs
@@ -39,16 +40,17 @@ from ..config import ConfigError, JobPilotConfig, resolve_internal_token
 from ..fetch import normalize_url
 from ..normalizer import html_to_text
 from ..normalize_cn import MAX_EXPERIENCE_YEARS
+from ..registry import PlatformNameRegistry, load_platform_registry
 from ..salary import parse_monthly_salary_thousand, parse_salary_currency
 from .. import normalize_cn
 from ..timestamps import BEIJING_TZ, normalize_published_at
 from .artifact import CapturedJob, CaptureError
+from .quality import MAX_DESCRIPTION_BYTES, evaluate_batch_quality
 
 IMPORT_PATH = "/internal/jobs/import"
 MANUAL_SOURCE = "manual"
 MAX_IMPORT_BATCH_SIZE = 100
 
-MAX_DESCRIPTION_BYTES = 65535
 MAX_LOCATION_BYTES = 64
 
 ABSOLUTE_MAX_EXPERIENCE_YEARS = MAX_EXPERIENCE_YEARS
@@ -149,14 +151,14 @@ def build_import_payload(
             "thousands and nothing is guessed)"
         )
 
-    description = _bounded(
-        html_to_text(capture.description),
-        MAX_DESCRIPTION_BYTES,
-        "description",
-        notes,
-    )
+    description = html_to_text(capture.description)
 
     if description:
+        # Passed through verbatim: the 0015A 48 KiB UTF-8 byte cap is a *quality*
+        # check (capture/quality.py), so an operator sees the stable
+        # `description_too_large` finding with limit/actual bytes. An over-cap
+        # value is never omitted, trimmed or truncated here - and
+        # ManualPublisher.publish refuses to send one.
         payload["description"] = description
 
     education = normalize_cn.normalize_education(capture.education)
@@ -352,6 +354,23 @@ class ManualPublisher:
                 "manual import batch limit"
             )
 
+        # Last line of defence before the network: the 48 KiB cap is enforced in
+        # UTF-8 bytes and an over-cap description is refused, never truncated.
+        for index, payload in enumerate(payloads):
+            description = payload.get("description")
+
+            if not isinstance(description, str):
+                continue
+
+            size = len(description.encode("utf-8"))
+
+            if size > MAX_DESCRIPTION_BYTES:
+                raise PublishError(
+                    f"job[{index}].description is {size} bytes, over the "
+                    f"{MAX_DESCRIPTION_BYTES} byte cap; refusing to send it "
+                    "(it is never truncated)"
+                )
+
         note_tuple = tuple(notes)
 
         if dry_run:
@@ -483,10 +502,29 @@ def publish_captures(
     transport: Transport | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     dry_run: bool = False,
+    registry: PlatformNameRegistry | None = None,
 ) -> PublishOutcome:
-    """Convenience wrapper: normalize then publish one batch of captures."""
+    """Convenience wrapper: normalize, pre-flight, then publish one batch.
+
+    The mirrored 0015A pre-flight runs first; an item that the C++ gate would
+    reject (missing employer, over-cap description, unusable URL) stops the batch
+    before any request is made, with the stable code in the message.
+    """
 
     payloads, notes = build_import_payloads(captures)
+    active_registry = (
+        registry if registry is not None else load_platform_registry()
+    )
+    report = evaluate_batch_quality(payloads, registry=active_registry)
+
+    if report.counters.rejected:
+        first = report.rejected_items[0]
+        raise CaptureError(
+            f"capture[{first.index}] would be rejected at ingest: "
+            f"{first.diagnostic_code} - {first.diagnostic_reason}",
+            code=first.diagnostic_code,
+            field=first.diagnostic_field,
+        )
 
     publisher = ManualPublisher(
         base_url=base_url,

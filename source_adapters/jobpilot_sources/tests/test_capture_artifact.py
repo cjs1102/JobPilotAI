@@ -139,11 +139,14 @@ class RejectionTest(unittest.TestCase):
                     parse_artifact(document)
 
     def test_over_long_fields_are_rejected_never_truncated(self) -> None:
+        # The description is covered by the 0015A quality pre-flight
+        # (test_capture_quality.py / test_capture_publisher.py): the parser
+        # deliberately does not pre-empt the stable `description_too_large`
+        # finding.
         cases = (
             ("title", "x" * 129),
             ("company", "x" * 129),
             ("location", "x" * 65),
-            ("description", "x" * 65536),
         )
 
         for key, value in cases:
@@ -191,6 +194,116 @@ class RejectionTest(unittest.TestCase):
             with self.subTest(document=document):
                 with self.assertRaises(CaptureError):
                     parse_artifact(document)
+
+
+class DescriptionIsReadVerbatimTest(unittest.TestCase):
+    """The 48 KiB cap is a 0015A *quality* pre-flight, not a parser bound.
+
+    ``jobpilot_sources.capture.quality`` owns the stable
+    ``description_too_large`` finding (limit/actual bytes) and the publisher
+    refuses to send an over-cap value; the parser must neither pre-empt that
+    finding nor truncate anything. The boundary tests live in
+    ``test_capture_quality.py`` and the refusal test in
+    ``test_capture_publisher.py``.
+    """
+
+    def base(self, description: str) -> dict:
+        return {
+            "title": "T",
+            "company": "C",
+            "source_url": "https://x/1",
+            "description": description,
+        }
+
+    def test_an_over_cap_description_is_read_verbatim(self) -> None:
+        value = "a" * 49153
+        capture = parse_artifact(self.base(value))
+
+        self.assertEqual(capture.description, value)
+        self.assertEqual(len(capture.description.encode("utf-8")), 49153)
+
+    def test_a_multibyte_description_is_not_cut_by_characters(self) -> None:
+        value = "汉" * 16385
+        capture = parse_artifact(self.base(value))
+
+        self.assertEqual(capture.description, value)
+        self.assertEqual(len(value), 16385)  # characters
+        self.assertEqual(
+            len(capture.description.encode("utf-8")), 49155
+        )  # bytes
+
+
+class StructuredRejectionCodeTest(unittest.TestCase):
+    """Every reject carries the stable 0015A code so the CLI can report it."""
+
+    def test_missing_company(self) -> None:
+        with self.assertRaises(CaptureError) as context:
+            parse_artifact(load_fixture("capture_missing_company.json"))
+
+        self.assertEqual(context.exception.code, "company_missing")
+        self.assertEqual(context.exception.field, "company")
+        self.assertIn("job.company", str(context.exception))
+
+    def test_missing_title(self) -> None:
+        with self.assertRaises(CaptureError) as context:
+            parse_artifact({"company": "C", "source_url": "https://x/1"})
+
+        self.assertEqual(context.exception.code, "title_missing")
+        self.assertEqual(context.exception.field, "title")
+
+    def test_missing_source_url(self) -> None:
+        with self.assertRaises(CaptureError) as context:
+            parse_artifact({"title": "T", "company": "C"})
+
+        self.assertEqual(context.exception.code, "source_url_unusable")
+        self.assertEqual(context.exception.field, "source_url")
+
+    def test_unusable_source_url(self) -> None:
+        for url in ("/jobs/1", "ftp://x/1", "javascript:alert(1)"):
+            with self.subTest(url=url):
+                with self.assertRaises(CaptureError) as context:
+                    parse_artifact(
+                        {"title": "T", "company": "C", "source_url": url}
+                    )
+
+                self.assertEqual(
+                    context.exception.code, "source_url_unusable"
+                )
+
+    def test_field_byte_caps(self) -> None:
+        cases = (
+            ("title", "x" * 129, "title_too_large"),
+            ("company", "x" * 129, "company_too_large"),
+            ("location", "x" * 65, "location_too_large"),
+            ("source_url", "https://x.invalid/" + "a" * 300,
+             "source_url_too_large"),
+        )
+
+        for key, value, code in cases:
+            with self.subTest(key=key):
+                document = {
+                    "title": "T",
+                    "company": "C",
+                    "source_url": "https://x/1",
+                    key: value,
+                }
+
+                with self.assertRaises(CaptureError) as context:
+                    parse_artifact(document)
+
+                error = context.exception
+
+                self.assertEqual(error.code, code)
+                self.assertEqual(error.field, key)
+                self.assertIsNotNone(error.limit_bytes)
+                self.assertIsNotNone(error.actual_bytes)
+
+    def test_unstructured_errors_have_no_code(self) -> None:
+        with self.assertRaises(CaptureError) as context:
+            parse_artifact({"title": 7, "company": "C",
+                            "source_url": "https://x/1"})
+
+        self.assertIsNone(context.exception.code)
 
 
 class BatchTest(unittest.TestCase):

@@ -40,6 +40,18 @@ namespace jobpilot::service
             result.created = applied.created;
             result.updated = applied.updated;
             result.seen = applied.seen;
+            result.skippedManual = applied.skippedManual;
+            result.skippedManualUrls =
+                applied.skippedManualUrls;
+
+            // F14: the skip must be diagnosable outside the HTTP response too.
+            for (const std::string &sourceUrl :
+                 applied.skippedManualUrls)
+            {
+                jobpilot::core::Logger::Get()->warn(
+                    "source sync skipped manual job for source_url: {}",
+                    sourceUrl);
+            }
 
             if (observation.complete)
             {

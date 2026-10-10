@@ -926,4 +926,301 @@ namespace jobpilot::service
         EXPECT_TRUE(IsNull(other, 3));
     }
 
+    TEST_F(SourceSyncHttpTest, ParsesAndRejectsThe0014ExtraFields)
+    {
+        nlohmann::json validJob =
+            MakeJobJson("greenhouse", scope, "extra-valid");
+        validJob["education_required"] = 3;
+        validJob["experience_years_min"] = 0;
+        validJob["experience_years_max"] = 3;
+        validJob["job_nature"] = 1;
+        validJob["deadline"] = "2026-10-31 04:00:00";
+        validJob["deadline_date_only"] = true;
+
+        const auto accepted =
+            SendRequest(
+                "POST",
+                "/internal/jobs/source-sync",
+                MakeObservationBody(
+                    "greenhouse",
+                    scope,
+                    "2026-10-01 00:00:00",
+                    false,
+                    nlohmann::json::array({validJob})),
+                internalToken);
+
+        ASSERT_TRUE(accepted.has_value());
+        ASSERT_TRUE(accepted->hasJson);
+        EXPECT_EQ(accepted->statusCode, 200);
+        EXPECT_EQ(accepted->jsonBody["created"], 1);
+
+        const jobpilot::core::Result stored =
+            pool->Query(
+                "SELECT education_required, experience_years_min, "
+                "experience_years_max, job_nature, deadline, "
+                "deadline_date_only FROM jobs WHERE source_url = ?",
+                {JobUrl(scope, "extra-valid")});
+
+        ASSERT_EQ(stored.rowCount(), 1U);
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 0)),
+            "3");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 1)),
+            "0");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 2)),
+            "3");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 3)),
+            "1");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 4)),
+            "2026-10-31 04:00:00");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 5)),
+            "1");
+
+        auto statusFor =
+            [this](nlohmann::json job)
+        {
+            const auto response =
+                SendRequest(
+                    "POST",
+                    "/internal/jobs/source-sync",
+                    MakeObservationBody(
+                        "greenhouse",
+                        scope,
+                        "2026-10-01 00:00:00",
+                        false,
+                        nlohmann::json::array({job})),
+                    internalToken);
+
+            return response.has_value()
+                       ? response->statusCode
+                       : 0;
+        };
+
+        nlohmann::json educationOutOfRange =
+            MakeJobJson("greenhouse", scope, "extra-education");
+        educationOutOfRange["education_required"] = 6;
+        EXPECT_EQ(statusFor(educationOutOfRange), 400);
+
+        nlohmann::json natureOutOfRange =
+            MakeJobJson("greenhouse", scope, "extra-nature");
+        natureOutOfRange["job_nature"] = 4;
+        EXPECT_EQ(statusFor(natureOutOfRange), 400);
+
+        nlohmann::json invertedYears =
+            MakeJobJson("greenhouse", scope, "extra-years");
+        invertedYears["experience_years_min"] = 5;
+        invertedYears["experience_years_max"] = 3;
+        EXPECT_EQ(statusFor(invertedYears), 400);
+
+        nlohmann::json malformedDeadline =
+            MakeJobJson("greenhouse", scope, "extra-deadline");
+        malformedDeadline["deadline"] = "2026-10-31";
+        EXPECT_EQ(statusFor(malformedDeadline), 400);
+
+        nlohmann::json dateOnlyWithInstant =
+            MakeJobJson("greenhouse", scope, "extra-kind");
+        dateOnlyWithInstant["deadline"] = "2026-10-31 10:30:00";
+        dateOnlyWithInstant["deadline_date_only"] = true;
+        EXPECT_EQ(statusFor(dateOnlyWithInstant), 400);
+
+        nlohmann::json flagWithoutDeadline =
+            MakeJobJson("greenhouse", scope, "extra-flag");
+        flagWithoutDeadline["deadline_date_only"] = false;
+        EXPECT_EQ(statusFor(flagWithoutDeadline), 400);
+    }
+
+    TEST_F(SourceSyncHttpTest, KeepsObservedDeadlineWhenANewFetchOmitsIt)
+    {
+        nlohmann::json first =
+            MakeJobJson("greenhouse", scope, "coalesce");
+        first["deadline"] = "2026-10-31 04:00:00";
+        first["deadline_date_only"] = true;
+        first["job_nature"] = 1;
+
+        const auto created =
+            SendRequest(
+                "POST",
+                "/internal/jobs/source-sync",
+                MakeObservationBody(
+                    "greenhouse",
+                    scope,
+                    "2026-10-01 00:00:00",
+                    false,
+                    nlohmann::json::array({first})),
+                internalToken);
+
+        ASSERT_TRUE(created.has_value());
+        ASSERT_EQ(created->statusCode, 200);
+        EXPECT_EQ(created->jsonBody["created"], 1);
+
+        // A later fetch that cannot see those facts must not erase them.
+        nlohmann::json second =
+            MakeJobJson("greenhouse", scope, "coalesce");
+        second["title"] = "Backend coalesce v2";
+
+        const auto updated =
+            SendRequest(
+                "POST",
+                "/internal/jobs/source-sync",
+                MakeObservationBody(
+                    "greenhouse",
+                    scope,
+                    "2026-10-02 00:00:00",
+                    false,
+                    nlohmann::json::array({second})),
+                internalToken);
+
+        ASSERT_TRUE(updated.has_value());
+        ASSERT_EQ(updated->statusCode, 200);
+        EXPECT_EQ(updated->jsonBody["updated"], 1);
+
+        const jobpilot::core::Result stored =
+            pool->Query(
+                "SELECT deadline, deadline_date_only, job_nature "
+                "FROM jobs WHERE source_url = ?",
+                {JobUrl(scope, "coalesce")});
+
+        ASSERT_EQ(stored.rowCount(), 1U);
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 0)),
+            "2026-10-31 04:00:00");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 1)),
+            "1");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 2)),
+            "1");
+    }
+
+    TEST_F(SourceSyncHttpTest, ManualRecordWinsOverObservation)
+    {
+        const std::string manualUrl = JobUrl(scope, "manual-owner");
+
+        const std::uint64_t manualJobId =
+            jobpilot::test::InsertJob(
+                pool.get(),
+                "Manual Company",
+                "Manual Job",
+                std::string("Beijing"),
+                std::string("Manual description"),
+                manualUrl,
+                1,
+                "");
+
+        pool->Execute(
+            "UPDATE jobs SET education_required = 5, job_nature = 2, "
+            "deadline = '2026-12-01 04:00:00', deadline_date_only = 1 "
+            "WHERE id = ?",
+            {manualJobId});
+
+        jobpilot::test::InsertJobRequirement(
+            pool.get(),
+            manualJobId,
+            "ManualSkill",
+            3);
+
+        nlohmann::json observed =
+            MakeJobJson("greenhouse", scope, "manual-owner");
+        observed["education_required"] = 1;
+        observed["job_nature"] = 3;
+        observed["deadline"] = "2026-11-15 10:30:00";
+        observed["deadline_date_only"] = false;
+        observed["requirements"] =
+            nlohmann::json::array(
+                {{{"skill", "ObservedSkill"}, {"level", 1}}});
+
+        const auto response =
+            SendRequest(
+                "POST",
+                "/internal/jobs/source-sync",
+                MakeObservationBody(
+                    "greenhouse",
+                    scope,
+                    "2026-10-01 00:00:00",
+                    true,
+                    nlohmann::json::array({observed})),
+                internalToken);
+
+        ASSERT_TRUE(response.has_value());
+        ASSERT_TRUE(response->hasJson);
+        ASSERT_EQ(response->statusCode, 200);
+        EXPECT_EQ(response->jsonBody["created"], 0);
+        EXPECT_EQ(response->jsonBody["updated"], 0);
+        EXPECT_EQ(response->jsonBody["seen"], 1);
+        EXPECT_EQ(response->jsonBody["skipped_manual"], 1);
+        ASSERT_EQ(
+            response->jsonBody["skipped_manual_urls"].size(),
+            1U);
+        EXPECT_EQ(
+            response->jsonBody["skipped_manual_urls"][0],
+            manualUrl);
+
+        const jobpilot::core::Result stored =
+            pool->Query(
+                "SELECT company, title, description, source, "
+                "source_scope, education_required, job_nature, "
+                "deadline, deadline_date_only, status, "
+                "missing_count, source_status, closed_at, last_seen_at "
+                "FROM jobs WHERE id = ?",
+                {manualJobId});
+
+        ASSERT_EQ(stored.rowCount(), 1U);
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 0)),
+            "Manual Company");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 1)),
+            "Manual Job");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 2)),
+            "Manual description");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 3)),
+            "manual");
+        EXPECT_FALSE(stored.value(0, 4).has_value());
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 5)),
+            "5");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 6)),
+            "2");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 7)),
+            "2026-12-01 04:00:00");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 8)),
+            "1");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 9)),
+            "1");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 10)),
+            "0");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 11)),
+            "unknown");
+        EXPECT_FALSE(stored.value(0, 12).has_value());
+        // The observation must not have refreshed the manual row's freshness.
+        EXPECT_FALSE(stored.value(0, 13).has_value());
+
+        const jobpilot::core::Result requirements =
+            pool->Query(
+                "SELECT skill FROM job_requirements "
+                "WHERE job_id = ? ORDER BY skill",
+                {manualJobId});
+
+        ASSERT_EQ(requirements.rowCount(), 1U);
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(
+                requirements.value(0, 0)),
+            "ManualSkill");
+
+        jobpilot::test::CleanupJob(pool.get(), manualJobId);
+    }
+
 } // namespace jobpilot::service

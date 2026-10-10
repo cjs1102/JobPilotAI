@@ -32,6 +32,16 @@ namespace jobpilot::service
         std::optional<std::string> lastVerifiedAt;
         std::optional<std::string> sourceStatus;
         std::optional<FreshnessState> freshness;
+
+        // 0014 incremental projection (docs/03 section 9). deadline is the
+        // stored UTC instant; deadlineDateOnly is std::nullopt when the kind is
+        // unknown, so the response never fabricates precision.
+        std::optional<std::uint32_t> educationRequired;
+        std::optional<std::uint32_t> experienceYearsMin;
+        std::optional<std::uint32_t> experienceYearsMax;
+        std::optional<std::uint32_t> jobNature;
+        std::optional<std::string> deadline;
+        std::optional<bool> deadlineDateOnly;
     };
 
     struct JobRequirement

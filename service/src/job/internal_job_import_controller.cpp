@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "jobpilot/error.h"
+#include "jobpilot/service/job/job_extra_fields.h"
 
 namespace jobpilot::service
 {
@@ -211,6 +212,30 @@ namespace jobpilot::service
             return true;
         }
 
+        bool GetOptionalBool(
+            const Json &object,
+            const char *key,
+            std::optional<bool> *value)
+        {
+            const auto iterator =
+                object.find(key);
+
+            if (iterator == object.end() ||
+                iterator->is_null())
+            {
+                value->reset();
+                return true;
+            }
+
+            if (!iterator->is_boolean())
+            {
+                return false;
+            }
+
+            *value = iterator->get<bool>();
+            return true;
+        }
+
         bool ParseRequirements(
             const Json &object,
             std::vector<JobRequirementImportData> *requirements)
@@ -324,7 +349,31 @@ namespace jobpilot::service
                 !GetOptionalUnsigned(
                     value,
                     "salary_max",
-                    &job.salaryMax))
+                    &job.salaryMax) ||
+                !GetOptionalUnsigned(
+                    value,
+                    "education_required",
+                    &job.educationRequired) ||
+                !GetOptionalUnsigned(
+                    value,
+                    "experience_years_min",
+                    &job.experienceYearsMin) ||
+                !GetOptionalUnsigned(
+                    value,
+                    "experience_years_max",
+                    &job.experienceYearsMax) ||
+                !GetOptionalUnsigned(
+                    value,
+                    "job_nature",
+                    &job.jobNature) ||
+                !GetOptionalString(
+                    value,
+                    "deadline",
+                    &job.deadline) ||
+                !GetOptionalBool(
+                    value,
+                    "deadline_date_only",
+                    &job.deadlineDateOnly))
             {
                 return false;
             }
@@ -343,6 +392,8 @@ namespace jobpilot::service
                 job.salaryCurrency =
                     currency->get<std::string>();
             }
+
+            NormalizeJobExtraFields(&job);
 
             return ParseRequirements(
                 value,

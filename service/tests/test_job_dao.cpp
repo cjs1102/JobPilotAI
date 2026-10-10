@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include "jobpilot/database/mysql_pool.h"
+#include "jobpilot/service/job/job_ingestion_dao.h"
 #include "test_job_support.h"
 #include "test_user_support.h"
 
@@ -56,13 +57,38 @@ namespace jobpilot::service
             return id;
         }
 
+        // 0014: write through the real manual upsert so the read-back path is
+        // exercised end to end (parser/DTO construction happens elsewhere).
+        std::uint64_t UpsertExtraJob(
+            const JobImportData &job)
+        {
+            auto transaction = pool->BeginTransaction();
+            JobIngestionDao ingestionDao;
+            const JobUpsertResult result =
+                ingestionDao.UpsertJob(transaction, job);
+            transaction.Commit();
+            jobIds.push_back(result.jobId);
+            return result.jobId;
+        }
+
+        static JobImportData MakeExtraJob(
+            const std::string &title,
+            const std::string &sourceUrl)
+        {
+            JobImportData job;
+            job.company = "Extra Company";
+            job.title = title;
+            job.source = "manual";
+            job.sourceUrl = sourceUrl;
+            return job;
+        }
+
         std::unique_ptr<
             jobpilot::core::ConnectionPool>
             pool;
         std::unique_ptr<JobDao> dao;
         std::vector<std::uint64_t> jobIds;
     };
-
     TEST_F(JobDaoTest, SearchesFiltersAndSortsActiveJobs)
     {
         const std::string token =
@@ -471,5 +497,145 @@ namespace jobpilot::service
         EXPECT_EQ(
             dao->SearchJobs(filter, 20, 0).size(),
             2U);
+    }
+
+    TEST_F(JobDaoTest, ReadsBackThe0014FieldsForBothDeadlineKinds)
+    {
+        const std::string token =
+            jobpilot::test::UniqueJobToken("extra-fields");
+
+        JobImportData dateOnly =
+            MakeExtraJob(
+                token + " date-only",
+                token + "-date-only");
+        dateOnly.educationRequired = 3;
+        dateOnly.experienceYearsMin = 0;
+        dateOnly.experienceYearsMax = 3;
+        dateOnly.jobNature = 1;
+        dateOnly.deadline = "2026-10-31 04:00:00";
+        dateOnly.deadlineDateOnly = true;
+
+        const std::uint64_t dateOnlyId =
+            UpsertExtraJob(dateOnly);
+
+        JobImportData explicitTime =
+            MakeExtraJob(
+                token + " explicit",
+                token + "-explicit");
+        explicitTime.deadline = "2026-10-31 10:30:00";
+        explicitTime.deadlineDateOnly = false;
+
+        const std::uint64_t explicitId =
+            UpsertExtraJob(explicitTime);
+
+        // Kind undetermined (administrative/legacy write): the DAO stores NULL
+        // and the read-back must not fabricate a kind.
+        JobImportData unknownKind =
+            MakeExtraJob(
+                token + " unknown",
+                token + "-unknown");
+        unknownKind.deadline = "2026-10-31 10:30:00";
+
+        const std::uint64_t unknownId =
+            UpsertExtraJob(unknownKind);
+
+        JobImportData noDeadline =
+            MakeExtraJob(
+                token + " empty",
+                token + "-empty");
+
+        const std::uint64_t emptyId =
+            UpsertExtraJob(noDeadline);
+
+        const std::optional<JobDetail> dateOnlyDetail =
+            dao->FindActiveJobById(dateOnlyId);
+
+        ASSERT_TRUE(dateOnlyDetail.has_value());
+        EXPECT_EQ(
+            dateOnlyDetail->summary.educationRequired,
+            std::optional<std::uint32_t>(3));
+        EXPECT_EQ(
+            dateOnlyDetail->summary.experienceYearsMin,
+            std::optional<std::uint32_t>(0));
+        EXPECT_EQ(
+            dateOnlyDetail->summary.experienceYearsMax,
+            std::optional<std::uint32_t>(3));
+        EXPECT_EQ(
+            dateOnlyDetail->summary.jobNature,
+            std::optional<std::uint32_t>(1));
+        // The DAO returns the stored UTC instant; Beijing rendering is the API
+        // boundary's job (docs/03 section 9.1).
+        EXPECT_EQ(
+            dateOnlyDetail->summary.deadline,
+            std::optional<std::string>("2026-10-31 04:00:00"));
+        EXPECT_EQ(
+            dateOnlyDetail->summary.deadlineDateOnly,
+            std::optional<bool>(true));
+
+        const std::optional<JobDetail> explicitDetail =
+            dao->FindActiveJobById(explicitId);
+
+        ASSERT_TRUE(explicitDetail.has_value());
+        EXPECT_EQ(
+            explicitDetail->summary.deadline,
+            std::optional<std::string>("2026-10-31 10:30:00"));
+        EXPECT_EQ(
+            explicitDetail->summary.deadlineDateOnly,
+            std::optional<bool>(false));
+
+        const std::optional<JobDetail> unknownDetail =
+            dao->FindActiveJobById(unknownId);
+
+        ASSERT_TRUE(unknownDetail.has_value());
+        EXPECT_EQ(
+            unknownDetail->summary.deadline,
+            std::optional<std::string>("2026-10-31 10:30:00"));
+        EXPECT_FALSE(
+            unknownDetail->summary.deadlineDateOnly.has_value());
+
+        const std::optional<JobDetail> emptyDetail =
+            dao->FindActiveJobById(emptyId);
+
+        ASSERT_TRUE(emptyDetail.has_value());
+        EXPECT_FALSE(
+            emptyDetail->summary.deadline.has_value());
+        EXPECT_FALSE(
+            emptyDetail->summary.deadlineDateOnly.has_value());
+        EXPECT_FALSE(
+            emptyDetail->summary.educationRequired.has_value());
+
+        JobSearchFilter filter;
+        filter.keyword = token;
+
+        const std::vector<JobSummary> jobs =
+            dao->SearchJobs(filter, 20, 0);
+
+        ASSERT_EQ(jobs.size(), 4U);
+
+        bool sawDateOnly = false;
+
+        for (const JobSummary &job : jobs)
+        {
+            if (job.id != dateOnlyId)
+            {
+                continue;
+            }
+
+            sawDateOnly = true;
+            EXPECT_EQ(
+                job.educationRequired,
+                std::optional<std::uint32_t>(3));
+            EXPECT_EQ(
+                job.jobNature,
+                std::optional<std::uint32_t>(1));
+            EXPECT_EQ(
+                job.deadline,
+                std::optional<std::string>("2026-10-31 04:00:00"));
+            EXPECT_EQ(
+                job.deadlineDateOnly,
+                std::optional<bool>(true));
+        }
+
+        EXPECT_TRUE(sawDateOnly);
     }
 } // namespace jobpilot::service

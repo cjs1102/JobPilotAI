@@ -111,7 +111,7 @@ CREATE TABLE jobs (
     salary_max     INT UNSIGNED DEFAULT NULL COMMENT '月薪上限(千元)',
     salary_currency VARCHAR(8)   NOT NULL DEFAULT 'CNY' COMMENT '币种',
     description    TEXT         DEFAULT NULL COMMENT '岗位描述',
-    source         VARCHAR(32)  NOT NULL DEFAULT 'manual' COMMENT 'manual/import/crawler',
+    source         VARCHAR(32)  NOT NULL DEFAULT 'manual' COMMENT 'manual/import/crawler 或 allowlist 观测来源标识(0014)',
     source_url     VARCHAR(255) DEFAULT NULL COMMENT '来源链接(去重键)',
     status         TINYINT      NOT NULL DEFAULT 1 COMMENT '1有效 0下线',
     source_scope   VARCHAR(128) DEFAULT NULL COMMENT '来源 board/scope 标识(0012)',
@@ -122,6 +122,12 @@ CREATE TABLE jobs (
     closed_at      DATETIME     DEFAULT NULL COMMENT '软关闭时间(0012)',
     missing_count  INT          NOT NULL DEFAULT 0 COMMENT '连续完整观测缺失次数(0012)',
     source_status  VARCHAR(32)  NOT NULL DEFAULT 'unknown' COMMENT 'unknown/ok/missing/closed(0012)',
+    education_required   TINYINT   DEFAULT NULL COMMENT '最低学历:1不限/2大专/3本科/4硕士/5博士(0014)',
+    experience_years_min SMALLINT  DEFAULT NULL COMMENT '最低经验年限(0014)',
+    experience_years_max SMALLINT  DEFAULT NULL COMMENT '最高经验年限(0014)',
+    job_nature           TINYINT   DEFAULT NULL COMMENT '岗位性质:1校招/2社招/3实习(0014)',
+    deadline             DATETIME  DEFAULT NULL COMMENT '投递截止时间(UTC瞬时;格式约定见§9.1,0014)',
+    deadline_date_only   TINYINT   DEFAULT NULL COMMENT 'deadline是否仅来源日期:1是/0否/NULL未知(0014)',
     create_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_source_url (source_url),
@@ -230,6 +236,12 @@ CREATE TABLE notifications (
 | ai_tasks | 用户查任务 + Worker 捞待办 + 租约扫描 | `idx_user_status` `idx_status` `idx_type_status` `idx_status_lease` |
 | notifications | 用户查未读 | `idx_user_status` |
 
+> 0014 的 6 个新列（`education_required` / `experience_years_*` / `job_nature` /
+> `deadline` / `deadline_date_only`）本阶段**不新增索引**：计划曾提议
+> `idx_job_nature_education`，按确认决定延后（新字段本阶段不进入检索/排名消费，
+> 见 §9.4 与 `docs/04` §5.1）。其中 `deadline_date_only` 是 F13 落地时派生的
+> 类型标志（见 §9.1/§9.6）。
+
 > 岗位搜索初期用 `LIKE '%kw%'`，数据量大后引入全文索引或 ES（见架构文档 §12 演进路径）。
 
 ## 6. 数据初始化
@@ -315,7 +327,7 @@ ALTER TABLE jobs
 Step 1 落地：列与索引已写入 §3 建表 DDL 与 `database/schema/05_ai.sql`。
 
 对齐来源：
-[`exec-plans/active/0013-ai-matching.md`](exec-plans/active/0013-ai-matching.md) §5.1
+[`exec-plans/completed/0013-ai-matching.md`](exec-plans/completed/0013-ai-matching.md) §5.1
 与 [`adr/0009-ai-pipeline-and-provider-strategy.md`](adr/0009-ai-pipeline-and-provider-strategy.md)。
 
 ### 8.1 `ai_tasks` 新增列（已落地）
@@ -356,3 +368,147 @@ ALTER TABLE ai_tasks
 
 1. [x] 0013 Step 1：列与索引已写入 §3 DDL 与 `database/schema/05_ai.sql`。
 2. 再实现 `match_rule_v1` 领域、AI Task DAO / Service / 内部 API 与 worker。
+
+## 9. 0014 Additive Job Field Migration Contract（增量契约）
+
+本节登记 0014 China Campus Sources + Manual Capture 对 `jobs` 的**增量字段契约**，
+并定义 `deadline` 的格式与时区语义。列已作为 0014 Step 4 写入 §3 建表 DDL 与
+`database/schema/03_job.sql`（新库由初始化脚本直接创建）。
+
+对齐来源：
+[`exec-plans/completed/0014-china-campus-sources-and-manual-capture.md`](exec-plans/completed/0014-china-campus-sources-and-manual-capture.md)
+§5.1/§9 Step 4/§15.4（F13/F14 已决定；该计划已于 2026-10-09 归档，Step 5 环境受限
+并结转）与
+[`adr/0011-china-first-sourcing-and-compliance.md`](adr/0011-china-first-sourcing-and-compliance.md) §4。
+
+### 9.1 `deadline` 格式与时区约定（唯一权威，四端一致）
+
+**本节是唯一权威。** DB、Python 归一化器、C++ DTO、API 响应都引用本节，
+任何模块不得自行解释 `deadline` 的时区或格式。
+
+```text
+权威时区: Asia/Shanghai（UTC+8）。中国自 1991 年起不再实行夏令时，
+          因此实现为固定偏移 +08:00；任何模块都不得使用**服务器本地时区**
+          （禁止 localtime/mktime/系统 TZ 参与 deadline 换算）。
+
+DB 列 jobs.deadline      DATETIME，UTC 瞬时，文本 "YYYY-MM-DD HH:MM:SS"
+                         （与 published_at 的存储格式一致）。
+DB 列 jobs.deadline_date_only TINYINT NULL:
+                         1 = 来源只给了日期（date-only）
+                         0 = 来源给了具体时刻（explicit time）
+                         NULL = 无 deadline / 未知
+```
+
+- **date-only 存储约定**：来源只给日期（如 `2026-10-08`）时，存 **北京本地正午
+  12:00** 对应的 UTC 瞬时，即 `2026-10-08 04:00:00`（= 北京 12:00）。
+  因此 `deadline_date_only = 1` 时**必须**满足 `deadline` 的 UTC 时间部分
+  等于 `04:00:00`；这是可校验的存储不变量。
+  **正午只是存储约定，不是到期时刻**：它不得被当作、也不得被渲染成过期时间。
+- **explicit-time**：来源给了具体时刻时保留真实瞬时，由 Python 归一化器按该值的
+  来源时区换算成 UTC 写入；C++ 只做格式与范围校验，不重算时区、绝不把真实时刻
+  改写成正午。
+- **读回（日期往返）**：读取时把 UTC 加 `+08:00` 还原为北京本地时间，date-only
+  值因此回到 `12:00` 并**原样回到原日期**，不会跨天漂移。
+- **C++ DTO**：`JobImportData::deadline` / `deadlineDateOnly` 与 DB 同构
+  （UTC 文本 + 可空布尔）；`JobSummary::deadline` / `deadlineDateOnly` 读回同样的
+  UTC 文本 + 标志。时区换算只在 API 边界发生一次
+  （`job_controller.cpp` 的响应映射），其余模块搬运原始值。
+- **未知类型（不臆造精度）**：`deadline` 非空但 `deadline_date_only = NULL` 时，
+  该值的类型**未知**（pre-0014 既有行、或运维/SQL 直写只给了 `deadline`）。
+  处理规则：**不默认成任一类型**——保留已存的 UTC 瞬时，响应按北京本地
+  `"YYYY-MM-DD HH:MM:SS"` 原样输出真实瞬时，并输出 `deadline_date_only: null`
+  表示类型未知。写入路径（两条 HTTP 路径）不会产生这种组合：`deadline` 非空时
+  缺省 `deadline_date_only=false`（见下）。选择该「显式 NULL」规则而不是给
+  legacy 行补 `0`/`1`，是因为两种补法都会臆造精度：补 `0` 会把日历语义谎报成
+  精确时刻，补 `1` 会把真实时刻谎报成日期并掩盖真实时间。
+- **API 响应**（`docs/04` §5.1/§5.2）：`deadline` 输出**北京本地**值——
+  `deadline_date_only = true` 时输出裸日期 `"YYYY-MM-DD"`（**不输出 12:00**，
+  避免被读成到期时刻）；`false` 或 `NULL` 时输出 `"YYYY-MM-DD HH:MM:SS"`（UTC+8）；
+  `deadline_date_only` 键为 `true`/`false`/`null`（无 `deadline` 时为 `null`）。
+- **写入校验**：两条写入路径（`POST /internal/jobs/import`、`POST /internal/jobs/source-sync`）
+  统一按上表校验，非法值返回 `400`（`kInvalidParam`），绝不静默丢弃、改写或截断。
+- **本阶段不做的消费**：`deadline` 不参与可见性、排名或自动关闭；本阶段不新增
+  「过期自动关闭」规则（`docs/04` §5.1 记录该可见性限制）。
+
+### 9.2 `jobs` 新增列（已落地）
+
+写入 §3 建表 DDL 与 `database/schema/03_job.sql`：
+
+```sql
+education_required   TINYINT  NULL   -- 最低学历: 1不限/2大专/3本科/4硕士/5博士
+experience_years_min SMALLINT NULL   -- 最低经验年限（非负整年）
+experience_years_max SMALLINT NULL   -- 最高经验年限（非负整年）
+job_nature           TINYINT  NULL   -- 岗位性质: 1校招/2社招/3实习
+deadline             DATETIME NULL   -- 投递截止时间（UTC 瞬时，见 §9.1）
+deadline_date_only   TINYINT  NULL   -- deadline 是否仅日期（见 §9.1）
+```
+
+**未新增索引**（含计划曾提议的 `idx_job_nature_education`，本阶段延后）。
+
+`jobs.source` 的取值注释同步修正：`manual`/`import`/`crawler` 是人工路径取值；
+观测路径取值由 C++ allowlist `IsSupportedObservationSource`
+（`service/src/job/source_observation.cpp`）决定。China 来源标识按 0014 Step 3
+在实测登记后加入 allowlist，本阶段**不预先扩大** allowlist。
+
+### 9.3 不变量
+
+- 6 个新列（`education_required` / `experience_years_min` / `experience_years_max` /
+  `job_nature` / `deadline` / `deadline_date_only`）全部可空、无默认值（`DEFAULT NULL`），
+  既有行升级后全部 `NULL`，**无需回填**，旧代码继续可读。
+  既有行的 `deadline_date_only = NULL` 语义是「类型未知」，响应输出 `null`
+  （见 §9.1），**不回填**为 `0`/`1`。
+- 枚举值域：`education_required ∈ 1..5`、`job_nature ∈ 1..3`；
+  未枚举出的整数一律拒绝（不写 `1` 兜底）；来源未提供或无法确定时**省略该键**。
+- `experience_years_min/max ∈ 0..32767`（`SMALLINT`），且
+  `min <= max`（两者都存在时）。
+- `deadline` 非空时必须通过 `IsValidDbTimestamp`
+  （`YYYY-MM-DD HH:MM:SS`，1000..9999，月长/闰年校验）；`deadline_date_only`
+  非空时 `deadline` 必须非空；`deadline_date_only = 1` 时必须满足 §9.1 的
+  `04:00:00` 不变量。
+- `uk_source_url` 仍是唯一幂等键；`status` / freshness 列语义不变。
+- **人工采集胜出（F14）**：`POST /internal/jobs/source-sync` 不得覆盖
+  `source='manual'` 的行——不更新其任何列、不改 `source`、不改生命周期字段、
+  不替换其 `job_requirements`、不关闭它；该观测被跳过并计入可诊断计数
+  （`docs/04` §5.5）。
+- 观测路径对来源可缺省的新字段沿用 0012 的 `COALESCE(VALUES(x), x)` 保护：
+  本次观测未带 `deadline`/`deadline_date_only` 时不得抹掉已观测值；人工路径保持
+  整组覆盖语义。
+
+### 9.4 既有库升级
+
+`database/schema/*.sql` 使用 `CREATE TABLE IF NOT EXISTS`，对已存在的库不会自动
+加列。既有自建库按下述**增量 ALTER** 升级；重复执行会报 duplicate column，属预期
+行为，运维侧跳过即可：
+
+```sql
+ALTER TABLE jobs
+    ADD COLUMN education_required   TINYINT  DEFAULT NULL COMMENT '最低学历:1不限/2大专/3本科/4硕士/5博士(0014)',
+    ADD COLUMN experience_years_min SMALLINT DEFAULT NULL COMMENT '最低经验年限(0014)',
+    ADD COLUMN experience_years_max SMALLINT DEFAULT NULL COMMENT '最高经验年限(0014)',
+    ADD COLUMN job_nature           TINYINT  DEFAULT NULL COMMENT '岗位性质:1校招/2社招/3实习(0014)',
+    ADD COLUMN deadline             DATETIME DEFAULT NULL COMMENT '投递截止时间(UTC瞬时;格式约定见§9.1,0014)',
+    ADD COLUMN deadline_date_only   TINYINT  DEFAULT NULL COMMENT 'deadline是否仅来源日期:1是/0否/NULL未知(0014)';
+```
+
+既有行无需回填；升级路径必须在**pre-0014 库**上实跑一次并复验 §3 形状断言
+（0014 Step 4 的附加证据，非 CI 门禁）。
+
+### 9.5 实施顺序
+
+1. [x] 0014 Step 4：本契约（§9.1/§9.2/§9.3/§9.4）先行；列已写入 §3 DDL 与
+   `database/schema/03_job.sql`。
+2. 再让 C++ 两条写入路径（解析 → 校验 → upsert → 读回 → 响应）依赖本契约；
+   Python 归一化器按 §9.1 产出 `deadline`/`deadline_date_only`。
+3. 新字段的检索/排名消费属后续匹配阶段，**不在 0014**。
+
+### 9.6 派生决定记录：为什么需要 `deadline_date_only`
+
+F13 确认的第 3/4 条要求：(a) date-only 值按北京正午的 UTC 瞬时存储并能按日期
+往返；(b) 正午只是存储约定，**不得被渲染成到期时刻**；(c) 来源给了具体时刻时
+保留真实瞬时、绝不改写为正午。
+
+只存一个 UTC 瞬时无法同时满足 (b) 与 (c)：读回时无法区分「date-only 的 04:00:00
+存储约定」与「恰好落在 04:00:00 UTC 的真实时刻」，响应层也就无法在只给日期时
+避免输出一个看似到期时刻的 12:00。因此 `deadline_date_only` 是 (b)/(c) 在
+存储+响应链路上的**逻辑必需**，作为派生决定记录于此。若产品否决该派生，
+可退回「只存瞬时」，但必须同时放弃 (b) 的区分能力。

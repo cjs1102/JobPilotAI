@@ -29,6 +29,7 @@ add_library(jobpilot_service_core STATIC
     src/application/application_service.cpp
     src/job/job_controller.cpp
     src/job/job_dao.cpp
+    src/job/job_extra_fields.cpp
     src/job/job_ingestion_dao.cpp
     src/job/job_ingestion_service.cpp
     src/job/job_ranking.cpp
@@ -240,6 +241,18 @@ add_executable(
 
 target_link_libraries(
     test_source_observation
+    PRIVATE
+        jobpilot_service_core
+        GTest::gtest_main
+)
+
+add_executable(
+    test_deadline_time
+    tests/test_deadline_time.cpp
+)
+
+target_link_libraries(
+    test_deadline_time
     PRIVATE
         jobpilot_service_core
         GTest::gtest_main
@@ -515,6 +528,12 @@ gtest_discover_tests(
 
 gtest_discover_tests(
     test_source_observation
+    PROPERTIES
+        LABELS "job"
+)
+
+gtest_discover_tests(
+    test_deadline_time
     PROPERTIES
         LABELS "job"
 )

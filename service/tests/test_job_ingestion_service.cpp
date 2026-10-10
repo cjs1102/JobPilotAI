@@ -331,4 +331,95 @@ namespace jobpilot::service
         }
     }
 
+    TEST_F(JobIngestionServiceTest, ValidatesThe0014ExtraFields)
+    {
+        RecordingJobIngestionDao dao;
+        JobIngestionService service(dao, *pool);
+
+        JobIngestionItem valid =
+            MakeItem(
+                jobpilot::test::UniqueJobToken(
+                    "extra-valid"));
+        valid.job.educationRequired = 3;
+        valid.job.experienceYearsMin = 0;
+        valid.job.experienceYearsMax = 3;
+        valid.job.jobNature = 1;
+        valid.job.deadline = "2026-10-31 04:00:00";
+        valid.job.deadlineDateOnly = true;
+        EXPECT_EQ(
+            service.Import({valid}).code,
+            ErrorCode::kSuccess);
+
+        JobIngestionItem explicitTime =
+            MakeItem(
+                jobpilot::test::UniqueJobToken(
+                    "extra-explicit"));
+        explicitTime.job.deadline = "2026-10-31 10:30:00";
+        explicitTime.job.deadlineDateOnly = false;
+        EXPECT_EQ(
+            service.Import({explicitTime}).code,
+            ErrorCode::kSuccess);
+
+        auto rejects = [&service](JobIngestionItem item)
+        {
+            EXPECT_EQ(
+                service.Import({item}).code,
+                ErrorCode::kInvalidParam);
+        };
+
+        JobIngestionItem educationTooHigh =
+            MakeItem(
+                jobpilot::test::UniqueJobToken(
+                    "extra-education"));
+        educationTooHigh.job.educationRequired = 6;
+        rejects(educationTooHigh);
+
+        JobIngestionItem natureTooHigh =
+            MakeItem(
+                jobpilot::test::UniqueJobToken(
+                    "extra-nature"));
+        natureTooHigh.job.jobNature = 4;
+        rejects(natureTooHigh);
+
+        JobIngestionItem yearsOverflow =
+            MakeItem(
+                jobpilot::test::UniqueJobToken(
+                    "extra-years"));
+        yearsOverflow.job.experienceYearsMax = 32768;
+        rejects(yearsOverflow);
+
+        JobIngestionItem invertedYears =
+            MakeItem(
+                jobpilot::test::UniqueJobToken(
+                    "extra-years-inverted"));
+        invertedYears.job.experienceYearsMin = 5;
+        invertedYears.job.experienceYearsMax = 3;
+        rejects(invertedYears);
+
+        JobIngestionItem malformedDeadline =
+            MakeItem(
+                jobpilot::test::UniqueJobToken(
+                    "extra-deadline"));
+        malformedDeadline.job.deadline = "2026-10-31T10:30:00";
+        rejects(malformedDeadline);
+
+        JobIngestionItem dateOnlyWithInstant =
+            MakeItem(
+                jobpilot::test::UniqueJobToken(
+                    "extra-kind"));
+        dateOnlyWithInstant.job.deadline = "2026-10-31 10:30:00";
+        dateOnlyWithInstant.job.deadlineDateOnly = true;
+        rejects(dateOnlyWithInstant);
+
+        JobIngestionItem flagWithoutDeadline =
+            MakeItem(
+                jobpilot::test::UniqueJobToken(
+                    "extra-flag"));
+        flagWithoutDeadline.job.deadlineDateOnly = true;
+        rejects(flagWithoutDeadline);
+
+        // Only the two valid batches reached the DAO.
+        EXPECT_EQ(dao.upsertCalls, 2U);
+    }
+
 } // namespace jobpilot::service

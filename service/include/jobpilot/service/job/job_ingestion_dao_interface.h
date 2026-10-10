@@ -20,6 +20,16 @@ namespace jobpilot::service
         std::optional<std::string> description;
         std::string source;
         std::string sourceUrl;
+
+        // 0014 incremental fields (docs/03 section 9). deadline is a UTC
+        // "YYYY-MM-DD HH:MM:SS" instant; deadlineDateOnly marks the date-only
+        // storage convention instead of writing an expiry moment.
+        std::optional<std::uint32_t> educationRequired;
+        std::optional<std::uint32_t> experienceYearsMin;
+        std::optional<std::uint32_t> experienceYearsMax;
+        std::optional<std::uint32_t> jobNature;
+        std::optional<std::string> deadline;
+        std::optional<bool> deadlineDateOnly;
     };
 
     struct JobRequirementImportData
@@ -31,7 +41,11 @@ namespace jobpilot::service
     enum class JobUpsertStatus
     {
         kCreated,
-        kUpdated
+        kUpdated,
+        // F14 (0014): a source-sync observation hit a source="manual" row and
+        // was skipped instead of overwriting it. Only the observation path can
+        // return this; the manual import path never does.
+        kSkippedManual
     };
 
     struct JobUpsertResult

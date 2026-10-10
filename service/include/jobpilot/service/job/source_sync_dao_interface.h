@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
+#include <vector>
 
 #include "jobpilot/database/mysql_pool.h"
 #include "jobpilot/service/job/source_observation.h"
@@ -12,6 +14,12 @@ namespace jobpilot::service
         std::size_t created = 0;
         std::size_t updated = 0;
         std::size_t seen = 0;
+
+        // F14 (0014): observations skipped because a source="manual" record
+        // owns the collided source_url. The URLs keep the conflict
+        // diagnosable in the response and in the service log.
+        std::size_t skippedManual = 0;
+        std::vector<std::string> skippedManualUrls;
     };
 
     struct SourceObservationCloseResult

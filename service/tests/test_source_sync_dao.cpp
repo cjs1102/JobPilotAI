@@ -519,6 +519,185 @@ namespace jobpilot::service
         jobpilot::test::CleanupJob(pool.get(), manualJobId);
     }
 
+    TEST_F(SourceSyncDaoTest, ManualRecordIsUnchangedByACollidingObservation)
+    {
+        const std::string manualUrl = Url(scopeA, "manual-owner");
+
+        const std::uint64_t manualJobId =
+            jobpilot::test::InsertJob(
+                pool.get(),
+                "Manual Company",
+                "Manual Title",
+                std::string("Beijing"),
+                std::string("Manual description"),
+                manualUrl,
+                1,
+                "");
+
+        pool->Execute(
+            "UPDATE jobs SET education_required = 5, job_nature = 2, "
+            "deadline = '2026-12-01 04:00:00', deadline_date_only = 1 "
+            "WHERE id = ?",
+            {manualJobId});
+
+        jobpilot::test::InsertJobRequirement(
+            pool.get(),
+            manualJobId,
+            "ManualSkill",
+            3);
+
+        const auto snapshot =
+            [this, manualJobId]()
+        {
+            return pool->Query(
+                "SELECT company, title, location, description, source, "
+                "source_scope, source_url, status, education_required, "
+                "experience_years_min, experience_years_max, job_nature, "
+                "deadline, deadline_date_only, missing_count, "
+                "source_status, closed_at, last_seen_at, "
+                "last_verified_at, published_at, external_id, update_time "
+                "FROM jobs WHERE id = ?",
+                {manualJobId});
+        };
+
+        const jobpilot::core::Result before = snapshot();
+
+        ASSERT_EQ(before.rowCount(), 1U);
+        ASSERT_EQ(before.row(0).size(), 22U);
+
+        SourceObservation observation =
+            MakeObservation(scopeA, "2026-10-01 00:00:00");
+        SourceObservationJob observed =
+            MakeObservedJob(scopeA, "manual-owner");
+        observed.job.educationRequired = 1;
+        observed.job.jobNature = 3;
+        observed.job.deadline = "2026-11-15 10:30:00";
+        observed.job.deadlineDateOnly = false;
+        observed.requirements = {{"ObservedSkill", 1}};
+        observation.jobs.push_back(observed);
+
+        const SourceObservationApplyResult applied =
+            Apply(observation);
+
+        EXPECT_EQ(applied.created, 0U);
+        EXPECT_EQ(applied.updated, 0U);
+        EXPECT_EQ(applied.seen, 1U);
+        EXPECT_EQ(applied.skippedManual, 1U);
+        ASSERT_EQ(applied.skippedManualUrls.size(), 1U);
+        EXPECT_EQ(applied.skippedManualUrls[0], manualUrl);
+
+        const jobpilot::core::Result after = snapshot();
+
+        ASSERT_EQ(after.rowCount(), 1U);
+
+        for (std::size_t column = 0;
+             column < before.row(0).size();
+             ++column)
+        {
+            EXPECT_EQ(
+                before.value(0, column).has_value(),
+                after.value(0, column).has_value())
+                << "column " << column;
+
+            if (before.value(0, column).has_value())
+            {
+                EXPECT_EQ(
+                    before.value(0, column).value(),
+                    after.value(0, column).value())
+                    << "column " << column;
+            }
+        }
+
+        const jobpilot::core::Result requirements =
+            pool->Query(
+                "SELECT skill FROM job_requirements "
+                "WHERE job_id = ? ORDER BY skill",
+                {manualJobId});
+
+        ASSERT_EQ(requirements.rowCount(), 1U);
+        EXPECT_EQ(Text(requirements, 0, 0), "ManualSkill");
+
+        // A complete absence in the same scope must not mark or close the
+        // manual row either.
+        const SourceObservationCloseResult closed =
+            CloseUnseen(
+                MakeObservation(scopeA, "2026-10-03 01:00:00"));
+
+        EXPECT_EQ(closed.missing, 0U);
+        EXPECT_EQ(closed.closed, 0U);
+
+        const jobpilot::core::Result untouched = snapshot();
+        ASSERT_EQ(untouched.rowCount(), 1U);
+        EXPECT_EQ(Text(untouched, 0, 7), "1");
+        EXPECT_EQ(Text(untouched, 0, 14), "0");
+        EXPECT_EQ(Text(untouched, 0, 15), "unknown");
+        EXPECT_TRUE(IsNull(untouched, 0, 16));
+
+        jobpilot::test::CleanupJob(pool.get(), manualJobId);
+    }
+
+    TEST_F(SourceSyncDaoTest, KeepsObserved0014FieldsWhenALaterFetchOmitsThem)
+    {
+        SourceObservation first =
+            MakeObservation(scopeA, "2026-10-01 00:00:00");
+        SourceObservationJob item = MakeObservedJob(scopeA, "extra");
+        item.job.educationRequired = 2;
+        item.job.experienceYearsMin = 1;
+        item.job.experienceYearsMax = 4;
+        item.job.jobNature = 3;
+        item.job.deadline = "2026-10-31 04:00:00";
+        item.job.deadlineDateOnly = true;
+        first.jobs.push_back(item);
+
+        ASSERT_EQ(Apply(first).created, 1U);
+
+        SourceObservation second =
+            MakeObservation(scopeA, "2026-10-02 00:00:00");
+        second.jobs.push_back(MakeObservedJob(scopeA, "extra"));
+
+        const SourceObservationApplyResult updated =
+            Apply(second);
+
+        EXPECT_EQ(updated.updated, 1U);
+        EXPECT_EQ(updated.skippedManual, 0U);
+
+        const jobpilot::core::Result stored =
+            pool->Query(
+                "SELECT education_required, experience_years_min, "
+                "experience_years_max, job_nature, deadline, "
+                "deadline_date_only FROM jobs WHERE source_url = ?",
+                {Url(scopeA, "extra")});
+
+        ASSERT_EQ(stored.rowCount(), 1U);
+        EXPECT_EQ(Text(stored, 0, 0), "2");
+        EXPECT_EQ(Text(stored, 0, 1), "1");
+        EXPECT_EQ(Text(stored, 0, 2), "4");
+        EXPECT_EQ(Text(stored, 0, 3), "3");
+        EXPECT_EQ(Text(stored, 0, 4), "2026-10-31 04:00:00");
+        EXPECT_EQ(Text(stored, 0, 5), "1");
+
+        // A later fetch that provides an explicit instant replaces the kind in
+        // lockstep with the value instead of leaving a stale kind behind.
+        SourceObservation third =
+            MakeObservation(scopeA, "2026-10-03 00:00:00");
+        SourceObservationJob replaced = MakeObservedJob(scopeA, "extra");
+        replaced.job.deadline = "2026-12-24 10:30:00";
+        replaced.job.deadlineDateOnly = false;
+        third.jobs.push_back(replaced);
+
+        ASSERT_EQ(Apply(third).updated, 1U);
+
+        const jobpilot::core::Result replacedStored =
+            pool->Query(
+                "SELECT deadline, deadline_date_only "
+                "FROM jobs WHERE source_url = ?",
+                {Url(scopeA, "extra")});
+
+        ASSERT_EQ(replacedStored.rowCount(), 1U);
+        EXPECT_EQ(Text(replacedStored, 0, 0), "2026-12-24 10:30:00");
+        EXPECT_EQ(Text(replacedStored, 0, 1), "0");
+    }
+
     TEST_F(SourceSyncDaoTest, RollbackDiscardsObservation)
     {
         SourceObservation observation =

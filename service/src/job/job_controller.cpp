@@ -12,6 +12,7 @@
 
 #include "jobpilot/error.h"
 #include "jobpilot/service/auth/session_authenticator.h"
+#include "jobpilot/service/job/job_extra_fields.h"
 #include "jobpilot/service/job/job_ranking_service.h"
 
 namespace jobpilot::service
@@ -56,6 +57,8 @@ namespace jobpilot::service
                 return 409;
             case ErrorCode::kInternalError:
             case ErrorCode::kDatabaseError:
+                return 500;
+            default:
                 return 500;
             }
 
@@ -502,9 +505,68 @@ namespace jobpilot::service
                        : Json(nullptr);
         }
 
+        // docs/03 section 9.1: the response publishes Beijing-local values.
+        // A date-only deadline renders as a bare calendar date so the noon
+        // storage convention is never rendered as an expiry moment; an unknown
+        // kind keeps the real instant and reports the kind as null. Both keys
+        // are null together when no conversion is representable.
+        void WriteDeadlineFields(
+            const std::optional<std::string> &deadline,
+            const std::optional<bool> &dateOnly,
+            Json *deadlineJson,
+            Json *dateOnlyJson)
+        {
+            *deadlineJson = Json(nullptr);
+            *dateOnlyJson = Json(nullptr);
+
+            if (!deadline.has_value())
+            {
+                return;
+            }
+
+            if (dateOnly.value_or(false))
+            {
+                const std::optional<std::string> beijingDate =
+                    DeadlineToBeijingDate(deadline.value());
+
+                if (!beijingDate.has_value())
+                {
+                    return;
+                }
+
+                *deadlineJson = Json(beijingDate.value());
+            }
+            else
+            {
+                const std::optional<std::string> beijingLocal =
+                    DeadlineToBeijingLocal(deadline.value());
+
+                if (!beijingLocal.has_value())
+                {
+                    return;
+                }
+
+                *deadlineJson = Json(beijingLocal.value());
+            }
+
+            if (dateOnly.has_value())
+            {
+                *dateOnlyJson = Json(dateOnly.value());
+            }
+        }
+
         Json SummaryToJson(
             const JobSummary &summary)
         {
+            Json deadlineJson;
+            Json deadlineDateOnlyJson;
+
+            WriteDeadlineFields(
+                summary.deadline,
+                summary.deadlineDateOnly,
+                &deadlineJson,
+                &deadlineDateOnlyJson);
+
             return Json{
                 {"id", summary.id},
                 {"company", summary.company},
@@ -533,7 +595,17 @@ namespace jobpilot::service
                            summary.freshness.value()))
                      : Json(nullptr)},
                 {"source_status",
-                 NullableString(summary.sourceStatus)}};
+                 NullableString(summary.sourceStatus)},
+                {"education_required",
+                 NullableUnsigned(summary.educationRequired)},
+                {"experience_years_min",
+                 NullableUnsigned(summary.experienceYearsMin)},
+                {"experience_years_max",
+                 NullableUnsigned(summary.experienceYearsMax)},
+                {"job_nature",
+                 NullableUnsigned(summary.jobNature)},
+                {"deadline", deadlineJson},
+                {"deadline_date_only", deadlineDateOnlyJson}};
         }
 
         std::optional<std::uint64_t> AuthenticateRequest(

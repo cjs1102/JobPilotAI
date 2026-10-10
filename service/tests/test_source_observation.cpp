@@ -126,6 +126,47 @@ namespace jobpilot::service
         }
     }
 
+    TEST(SourceObservationSources, KeepsTheAllowlistClosedUntilASourceIsVerified)
+    {
+        // 0014 Step 1: no China identifier may be pre-registered before the
+        // per-source verification (Step 2) and registration (Step 3) land, so
+        // an unknown string can never reach the observation pipeline. When a
+        // later step widens the allowlist, this list must be revised item by
+        // item instead of being relaxed wholesale.
+        for (const char *source :
+             {"moka", "mokahr", "beisen", "echeng", "campus_web",
+              "iguopin", "workday", "cn_campus", "Greenhouse",
+              "greenhouse ", " greenhouse", "greenhouse\n", "greenHOUSE"})
+        {
+            EXPECT_FALSE(IsSupportedObservationSource(source))
+                << source;
+        }
+    }
+
+    TEST(SourceObservationValidation, RequiresEveryJobToCarryTheObservationSource)
+    {
+        // Same-source semantics (0014 Step 1 regression): a batch belongs to
+        // exactly one source, and every job in it must repeat that identity.
+        for (const char *source :
+             {"greenhouse", "lever", "ashby"})
+        {
+            SourceObservation matching = MakeObservation();
+            matching.source = source;
+            matching.jobs[0].job.source = source;
+
+            EXPECT_TRUE(ValidateSourceObservation(matching))
+                << source;
+
+            SourceObservation mismatched = MakeObservation();
+            mismatched.source = source;
+            mismatched.jobs[0].job.source =
+                std::string(source) == "lever" ? "ashby" : "lever";
+
+            EXPECT_FALSE(ValidateSourceObservation(mismatched))
+                << source;
+        }
+    }
+
     TEST(SourceObservationValidation, RejectsSourceTooLong)
     {
         SourceObservation observation = MakeObservation();
@@ -290,6 +331,54 @@ namespace jobpilot::service
         SourceObservation malformedPublishedAt = MakeObservation();
         malformedPublishedAt.jobs[0].publishedAt = "2026-10-01T09:30:00";
         EXPECT_FALSE(ValidateSourceObservation(malformedPublishedAt));
+    }
+
+    TEST(SourceObservationValidation, ValidatesThe0014ExtraFields)
+    {
+        SourceObservation valid = MakeObservation();
+        valid.jobs[0].job.educationRequired = 3;
+        valid.jobs[0].job.experienceYearsMin = 0;
+        valid.jobs[0].job.experienceYearsMax = 3;
+        valid.jobs[0].job.jobNature = 1;
+        valid.jobs[0].job.deadline = "2026-10-31 04:00:00";
+        valid.jobs[0].job.deadlineDateOnly = true;
+        EXPECT_TRUE(ValidateSourceObservation(valid));
+
+        // An explicit Beijing instant is preserved, never rewritten to noon.
+        SourceObservation explicitTime = MakeObservation();
+        explicitTime.jobs[0].job.deadline = "2026-10-31 10:30:00";
+        explicitTime.jobs[0].job.deadlineDateOnly = false;
+        EXPECT_TRUE(ValidateSourceObservation(explicitTime));
+
+        SourceObservation educationOutOfRange = MakeObservation();
+        educationOutOfRange.jobs[0].job.educationRequired = 6;
+        EXPECT_FALSE(ValidateSourceObservation(educationOutOfRange));
+
+        SourceObservation natureOutOfRange = MakeObservation();
+        natureOutOfRange.jobs[0].job.jobNature = 4;
+        EXPECT_FALSE(ValidateSourceObservation(natureOutOfRange));
+
+        SourceObservation invertedYears = MakeObservation();
+        invertedYears.jobs[0].job.experienceYearsMin = 5;
+        invertedYears.jobs[0].job.experienceYearsMax = 2;
+        EXPECT_FALSE(ValidateSourceObservation(invertedYears));
+
+        SourceObservation yearsOverflow = MakeObservation();
+        yearsOverflow.jobs[0].job.experienceYearsMax = 32768;
+        EXPECT_FALSE(ValidateSourceObservation(yearsOverflow));
+
+        SourceObservation malformedDeadline = MakeObservation();
+        malformedDeadline.jobs[0].job.deadline = "2026-10-31T10:30:00";
+        EXPECT_FALSE(ValidateSourceObservation(malformedDeadline));
+
+        SourceObservation dateOnlyWrongInstant = MakeObservation();
+        dateOnlyWrongInstant.jobs[0].job.deadline = "2026-10-31 10:30:00";
+        dateOnlyWrongInstant.jobs[0].job.deadlineDateOnly = true;
+        EXPECT_FALSE(ValidateSourceObservation(dateOnlyWrongInstant));
+
+        SourceObservation flagWithoutDeadline = MakeObservation();
+        flagWithoutDeadline.jobs[0].job.deadlineDateOnly = true;
+        EXPECT_FALSE(ValidateSourceObservation(flagWithoutDeadline));
     }
 
     TEST(SourceObservationValidation, RejectsInvalidRequirements)

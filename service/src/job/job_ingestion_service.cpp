@@ -11,6 +11,7 @@
 
 #include "jobpilot/core/logger.h"
 #include "jobpilot/database/mysql_pool.h"
+#include "jobpilot/service/job/job_extra_fields.h"
 
 namespace jobpilot::service
 {
@@ -117,6 +118,11 @@ namespace jobpilot::service
                 job.salaryMax.has_value() &&
                 job.salaryMax.value() <
                     job.salaryMin.value())
+            {
+                return false;
+            }
+
+            if (!ValidateJobExtraFields(job))
             {
                 return false;
             }

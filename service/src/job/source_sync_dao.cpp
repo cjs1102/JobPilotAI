@@ -36,6 +36,72 @@ namespace jobpilot::service
                 value.value());
         }
 
+        // TINYINT/SMALLINT columns (0014) travel as signed integers; the
+        // shared validator bounds them before the DAO sees them.
+        jobpilot::core::SqlParam OptionalSmallUnsignedParam(
+            const std::optional<std::uint32_t> &value)
+        {
+            if (!value.has_value())
+            {
+                return nullptr;
+            }
+
+            return static_cast<std::int64_t>(
+                value.value());
+        }
+
+        jobpilot::core::SqlParam OptionalBoolParam(
+            const std::optional<bool> &value)
+        {
+            if (!value.has_value())
+            {
+                return nullptr;
+            }
+
+            return static_cast<std::int64_t>(
+                value.value() ? 1 : 0);
+        }
+
+        // F14 (0014): a human-captured record owns its source attribution and
+        // lifecycle. When a source-sync observation collides on source_url with
+        // a source="manual" row, the observation is skipped entirely: no column
+        // is updated, source stays "manual", freshness/closed_at/missing_count
+        // are untouched, and the manual row's requirements are not replaced.
+        //
+        // FOR UPDATE makes the check-then-act atomic: a plain read would leave
+        // a window in which a manual record could commit between the check and
+        // the upsert and then be overwritten. The lock is held only for this
+        // short transaction.
+        std::optional<JobUpsertResult> SkippedForManualRecord(
+            jobpilot::core::ConnectionPool::Transaction &transaction,
+            const std::string &sourceUrl)
+        {
+            const jobpilot::core::Result manual =
+                transaction.Query(
+                    "SELECT id FROM jobs WHERE source_url = ? "
+                    "AND source = 'manual' LIMIT 1 FOR UPDATE",
+                    {sourceUrl});
+
+            if (manual.rowCount() == 0)
+            {
+                return std::nullopt;
+            }
+
+            const jobpilot::core::Result::Value &value =
+                manual.value(0, 0);
+
+            if (!value.has_value())
+            {
+                throw std::runtime_error(
+                    "manual job row returned a null id");
+            }
+
+            return JobUpsertResult{
+                JobUpsertStatus::kSkippedManual,
+                static_cast<std::uint64_t>(
+                    std::stoull(value.value()))};
+        }
+
         JobUpsertResult UpsertObservedJob(
             jobpilot::core::ConnectionPool::Transaction &transaction,
             const SourceObservation &observation,
@@ -43,18 +109,35 @@ namespace jobpilot::service
         {
             const JobImportData &job = item.job;
 
+            const std::optional<JobUpsertResult> skipped =
+                SkippedForManualRecord(
+                    transaction,
+                    job.sourceUrl);
+
+            if (skipped.has_value())
+            {
+                return skipped.value();
+            }
+
             // published_at and external_id are source-provided facts: a later
             // fetch that omits them must not erase what was already observed.
+            // The 0014 fields follow the same rule, and deadline plus its
+            // date-kind flag are treated as one unit so an omitted deadline
+            // keeps both and a provided one carries its own kind (possibly
+            // NULL = unknown, never fabricated).
             const jobpilot::core::ExecutionResult result =
                 transaction.Execute(
                     "INSERT INTO jobs "
                     "(company, title, location, salary_min, salary_max, "
                     "salary_currency, description, source, source_url, status, "
                     "source_scope, external_id, published_at, "
+                    "education_required, experience_years_min, "
+                    "experience_years_max, job_nature, deadline, "
+                    "deadline_date_only, "
                     "last_seen_at, last_verified_at, closed_at, "
                     "missing_count, source_status) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, "
-                    "NULL, 0, 'ok') "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, "
+                    "?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 'ok') "
                     "ON DUPLICATE KEY UPDATE "
                     "id = LAST_INSERT_ID(id), "
                     "company = VALUES(company), "
@@ -69,6 +152,17 @@ namespace jobpilot::service
                     "source_scope = VALUES(source_scope), "
                     "external_id = COALESCE(VALUES(external_id), external_id), "
                     "published_at = COALESCE(VALUES(published_at), published_at), "
+                    "education_required = COALESCE(VALUES(education_required), "
+                    "education_required), "
+                    "experience_years_min = COALESCE(VALUES(experience_years_min), "
+                    "experience_years_min), "
+                    "experience_years_max = COALESCE(VALUES(experience_years_max), "
+                    "experience_years_max), "
+                    "job_nature = COALESCE(VALUES(job_nature), job_nature), "
+                    "deadline = COALESCE(VALUES(deadline), deadline), "
+                    "deadline_date_only = CASE "
+                    "WHEN VALUES(deadline) IS NULL THEN deadline_date_only "
+                    "ELSE VALUES(deadline_date_only) END, "
                     "last_seen_at = VALUES(last_seen_at), "
                     "last_verified_at = VALUES(last_verified_at), "
                     "closed_at = NULL, "
@@ -87,6 +181,12 @@ namespace jobpilot::service
                      observation.sourceScope,
                      OptionalStringParam(item.externalId),
                      OptionalStringParam(item.publishedAt),
+                     OptionalSmallUnsignedParam(job.educationRequired),
+                     OptionalSmallUnsignedParam(job.experienceYearsMin),
+                     OptionalSmallUnsignedParam(job.experienceYearsMax),
+                     OptionalSmallUnsignedParam(job.jobNature),
+                     OptionalStringParam(job.deadline),
+                     OptionalBoolParam(job.deadlineDateOnly),
                      observation.observedAt,
                      observation.observedAt});
 
@@ -130,6 +230,17 @@ namespace jobpilot::service
                     transaction,
                     observation,
                     item);
+
+            // F14: a skipped collision is neither an update nor a create, and
+            // the manual row's requirements must not be replaced.
+            if (upserted.status ==
+                JobUpsertStatus::kSkippedManual)
+            {
+                ++result.skippedManual;
+                result.skippedManualUrls.push_back(
+                    item.job.sourceUrl);
+                continue;
+            }
 
             if (upserted.status == JobUpsertStatus::kCreated)
             {

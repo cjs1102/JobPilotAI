@@ -774,4 +774,347 @@ namespace jobpilot::service
         }
     }
 
+    TEST_F(JobIngestionHttpTest, Validates0014ExtraFieldValues)
+    {
+        auto statusFor =
+            [this](nlohmann::json job)
+        {
+            sourceUrls.push_back(
+                job["source_url"].get<std::string>());
+
+            const auto response =
+                SendRequest(
+                    "POST",
+                    "/internal/jobs/import",
+                    nlohmann::json{
+                        {"jobs",
+                         nlohmann::json::array({job})}}
+                        .dump(),
+                    internalToken);
+
+            return response.has_value()
+                       ? response->statusCode
+                       : 0;
+        };
+
+        nlohmann::json base = MakeJobJson(
+            jobpilot::test::UniqueJobToken("extra-base"),
+            "Extra Base");
+
+        nlohmann::json educationTooHigh = base;
+        educationTooHigh["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-education-high");
+        educationTooHigh["education_required"] = 6;
+        EXPECT_EQ(statusFor(educationTooHigh), 400);
+
+        nlohmann::json educationTooLow = base;
+        educationTooLow["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-education-low");
+        educationTooLow["education_required"] = 0;
+        EXPECT_EQ(statusFor(educationTooLow), 400);
+
+        nlohmann::json educationNegative = base;
+        educationNegative["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-education-negative");
+        educationNegative["education_required"] = -1;
+        EXPECT_EQ(statusFor(educationNegative), 400);
+
+        nlohmann::json natureTooHigh = base;
+        natureTooHigh["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-nature-high");
+        natureTooHigh["job_nature"] = 4;
+        EXPECT_EQ(statusFor(natureTooHigh), 400);
+
+        nlohmann::json invertedYears = base;
+        invertedYears["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-years-inverted");
+        invertedYears["experience_years_min"] = 5;
+        invertedYears["experience_years_max"] = 3;
+        EXPECT_EQ(statusFor(invertedYears), 400);
+
+        nlohmann::json yearsOverflow = base;
+        yearsOverflow["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-years-overflow");
+        yearsOverflow["experience_years_max"] = 32768;
+        EXPECT_EQ(statusFor(yearsOverflow), 400);
+
+        nlohmann::json malformedDeadline = base;
+        malformedDeadline["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-deadline-malformed");
+        malformedDeadline["deadline"] = "2026-10-31T10:30:00";
+        EXPECT_EQ(statusFor(malformedDeadline), 400);
+
+        nlohmann::json impossibleDeadline = base;
+        impossibleDeadline["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-deadline-impossible");
+        impossibleDeadline["deadline"] = "2026-02-29 10:30:00";
+        EXPECT_EQ(statusFor(impossibleDeadline), 400);
+
+        nlohmann::json dateOnlyWithInstant = base;
+        dateOnlyWithInstant["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-date-only-instant");
+        dateOnlyWithInstant["deadline"] = "2026-10-31 10:30:00";
+        dateOnlyWithInstant["deadline_date_only"] = true;
+        EXPECT_EQ(statusFor(dateOnlyWithInstant), 400);
+
+        nlohmann::json flagWithoutDeadline = base;
+        flagWithoutDeadline["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-flag-only");
+        flagWithoutDeadline["deadline_date_only"] = true;
+        EXPECT_EQ(statusFor(flagWithoutDeadline), 400);
+
+        nlohmann::json nonBooleanFlag = base;
+        nonBooleanFlag["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-flag-type");
+        nonBooleanFlag["deadline"] = "2026-10-31 04:00:00";
+        nonBooleanFlag["deadline_date_only"] = "yes";
+        EXPECT_EQ(statusFor(nonBooleanFlag), 400);
+
+        nlohmann::json dateOnlyValid = base;
+        dateOnlyValid["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-date-only-valid");
+        dateOnlyValid["education_required"] = 3;
+        dateOnlyValid["experience_years_min"] = 0;
+        dateOnlyValid["experience_years_max"] = 3;
+        dateOnlyValid["job_nature"] = 1;
+        dateOnlyValid["deadline"] = "2026-10-31 04:00:00";
+        dateOnlyValid["deadline_date_only"] = true;
+        EXPECT_EQ(statusFor(dateOnlyValid), 200);
+
+        nlohmann::json explicitValid = base;
+        explicitValid["source_url"] =
+            jobpilot::test::UniqueJobToken("extra-explicit-valid");
+        explicitValid["deadline"] = "2026-10-31 10:30:00";
+        explicitValid["deadline_date_only"] = false;
+        EXPECT_EQ(statusFor(explicitValid), 200);
+    }
+
+    TEST_F(JobIngestionHttpTest, RoundTripsBothDeadlineKindsThroughApi)
+    {
+        const std::string dateOnlyUrl =
+            jobpilot::test::UniqueJobToken("extra-roundtrip-date");
+        sourceUrls.push_back(dateOnlyUrl);
+
+        nlohmann::json dateOnly =
+            MakeJobJson(dateOnlyUrl, "Roundtrip Date Only");
+        dateOnly["education_required"] = 3;
+        dateOnly["experience_years_min"] = 0;
+        dateOnly["experience_years_max"] = 3;
+        dateOnly["job_nature"] = 1;
+        dateOnly["deadline"] = "2026-10-31 04:00:00";
+        dateOnly["deadline_date_only"] = true;
+
+        const auto created =
+            SendRequest(
+                "POST",
+                "/internal/jobs/import",
+                nlohmann::json{
+                    {"jobs",
+                     nlohmann::json::array({dateOnly})}}
+                    .dump(),
+                internalToken);
+
+        ASSERT_TRUE(created.has_value());
+        ASSERT_TRUE(created->hasJson);
+        ASSERT_EQ(created->statusCode, 200);
+
+        const jobpilot::core::Result stored =
+            pool->Query(
+                "SELECT id, deadline, deadline_date_only, "
+                "education_required, experience_years_min, "
+                "experience_years_max, job_nature "
+                "FROM jobs WHERE source_url = ?",
+                {dateOnlyUrl});
+
+        ASSERT_EQ(stored.rowCount(), 1U);
+
+        // The date-only convention is stored as Beijing noon in UTC.
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 1)),
+            "2026-10-31 04:00:00");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 2)),
+            "1");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 3)),
+            "3");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 4)),
+            "0");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 5)),
+            "3");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 6)),
+            "1");
+
+        const std::uint64_t jobId =
+            static_cast<std::uint64_t>(
+                std::stoull(
+                    jobpilot::test::RequireValue(
+                        stored.value(0, 0))));
+
+        const auto detail =
+            SendRequest(
+                "GET",
+                "/api/v1/jobs/" + std::to_string(jobId),
+                "",
+                "");
+
+        ASSERT_TRUE(detail.has_value());
+        ASSERT_TRUE(detail->hasJson);
+        ASSERT_EQ(detail->statusCode, 200);
+        EXPECT_EQ(
+            detail->jsonBody["data"]["education_required"],
+            3);
+        EXPECT_EQ(
+            detail->jsonBody["data"]["experience_years_min"],
+            0);
+        EXPECT_EQ(
+            detail->jsonBody["data"]["experience_years_max"],
+            3);
+        EXPECT_EQ(detail->jsonBody["data"]["job_nature"], 1);
+
+        // The date-only value renders as a Beijing calendar date, never as the
+        // 12:00 storage convention.
+        EXPECT_EQ(
+            detail->jsonBody["data"]["deadline"],
+            "2026-10-31");
+        EXPECT_EQ(
+            detail->jsonBody["data"]["deadline_date_only"],
+            true);
+
+        const std::string keyword = dateOnlyUrl.substr(
+            dateOnlyUrl.rfind('/') + 1);
+
+        nlohmann::json searchJob =
+            MakeJobJson(dateOnlyUrl, keyword);
+        searchJob["education_required"] = 3;
+        searchJob["deadline"] = "2026-10-31 04:00:00";
+        searchJob["deadline_date_only"] = true;
+
+        const auto updated =
+            SendRequest(
+                "POST",
+                "/internal/jobs/import",
+                nlohmann::json{
+                    {"jobs",
+                     nlohmann::json::array({searchJob})}}
+                    .dump(),
+                internalToken);
+
+        ASSERT_TRUE(updated.has_value());
+        ASSERT_EQ(updated->statusCode, 200);
+
+        const auto search =
+            SendRequest(
+                "GET",
+                "/api/v1/jobs?keyword=" + keyword,
+                "",
+                "");
+
+        ASSERT_TRUE(search.has_value());
+        ASSERT_TRUE(search->hasJson);
+        ASSERT_EQ(search->statusCode, 200);
+        ASSERT_EQ(search->jsonBody["data"]["list"].size(), 1U);
+        EXPECT_EQ(
+            search->jsonBody["data"]["list"][0]["education_required"],
+            3);
+        EXPECT_EQ(
+            search->jsonBody["data"]["list"][0]["deadline"],
+            "2026-10-31");
+        EXPECT_EQ(
+            search->jsonBody["data"]["list"][0]["deadline_date_only"],
+            true);
+
+        // Explicit time is preserved and rendered as Beijing local time.
+        const std::string explicitUrl =
+            jobpilot::test::UniqueJobToken("extra-roundtrip-explicit");
+        sourceUrls.push_back(explicitUrl);
+
+        nlohmann::json explicitJob =
+            MakeJobJson(explicitUrl, "Roundtrip Explicit");
+        explicitJob["deadline"] = "2026-10-31 10:30:00";
+        explicitJob["deadline_date_only"] = false;
+
+        const auto explicitCreated =
+            SendRequest(
+                "POST",
+                "/internal/jobs/import",
+                nlohmann::json{
+                    {"jobs",
+                     nlohmann::json::array({explicitJob})}}
+                    .dump(),
+                internalToken);
+
+        ASSERT_TRUE(explicitCreated.has_value());
+        ASSERT_EQ(explicitCreated->statusCode, 200);
+
+        const jobpilot::core::Result explicitStored =
+            pool->Query(
+                "SELECT id, deadline, deadline_date_only "
+                "FROM jobs WHERE source_url = ?",
+                {explicitUrl});
+
+        ASSERT_EQ(explicitStored.rowCount(), 1U);
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(
+                explicitStored.value(0, 1)),
+            "2026-10-31 10:30:00");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(
+                explicitStored.value(0, 2)),
+            "0");
+
+        const std::uint64_t explicitJobId =
+            static_cast<std::uint64_t>(
+                std::stoull(
+                    jobpilot::test::RequireValue(
+                        explicitStored.value(0, 0))));
+
+        const auto explicitDetail =
+            SendRequest(
+                "GET",
+                "/api/v1/jobs/" + std::to_string(explicitJobId),
+                "",
+                "");
+
+        ASSERT_TRUE(explicitDetail.has_value());
+        ASSERT_TRUE(explicitDetail->hasJson);
+        EXPECT_EQ(
+            explicitDetail->jsonBody["data"]["deadline"],
+            "2026-10-31 18:30:00");
+        EXPECT_EQ(
+            explicitDetail->jsonBody["data"]["deadline_date_only"],
+            false);
+
+        // The manual path is a whole-group overwrite: re-importing without a
+        // deadline clears it, unlike the observation path's COALESCE guard.
+        nlohmann::json cleared = MakeJobJson(dateOnlyUrl, keyword);
+        cleared["education_required"] = 3;
+
+        const auto clearedResult =
+            SendRequest(
+                "POST",
+                "/internal/jobs/import",
+                nlohmann::json{
+                    {"jobs",
+                     nlohmann::json::array({cleared})}}
+                    .dump(),
+                internalToken);
+
+        ASSERT_TRUE(clearedResult.has_value());
+        ASSERT_EQ(clearedResult->statusCode, 200);
+
+        const jobpilot::core::Result clearedStored =
+            pool->Query(
+                "SELECT deadline, deadline_date_only "
+                "FROM jobs WHERE source_url = ?",
+                {dateOnlyUrl});
+
+        ASSERT_EQ(clearedStored.rowCount(), 1U);
+        EXPECT_FALSE(clearedStored.value(0, 0).has_value());
+        EXPECT_FALSE(clearedStored.value(0, 1).has_value());
+    }
+
 } // namespace jobpilot::service

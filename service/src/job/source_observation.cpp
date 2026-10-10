@@ -6,6 +6,8 @@
 #include <set>
 #include <string>
 
+#include "jobpilot/service/job/job_extra_fields.h"
+
 namespace jobpilot::service
 {
     namespace
@@ -216,6 +218,11 @@ namespace jobpilot::service
 
             if (item.publishedAt.has_value() &&
                 !IsValidDbTimestamp(item.publishedAt.value()))
+            {
+                return false;
+            }
+
+            if (!ValidateJobExtraFields(job))
             {
                 return false;
             }

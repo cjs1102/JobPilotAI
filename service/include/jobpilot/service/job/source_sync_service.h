@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
+#include <vector>
 
 #include "jobpilot/service/job/source_sync_dao_interface.h"
 #include "jobpilot/service/result.h"
@@ -8,7 +10,7 @@
 namespace jobpilot::service
 {
     // Response counters of POST /internal/jobs/source-sync
-    // (ExecPlan 0012 section 7).
+    // (ExecPlan 0012 section 7; F14 counters from 0014).
     struct SourceSyncResult
     {
         std::size_t created = 0;
@@ -16,6 +18,8 @@ namespace jobpilot::service
         std::size_t seen = 0;
         std::size_t closed = 0;
         bool complete = false;
+        std::size_t skippedManual = 0;
+        std::vector<std::string> skippedManualUrls;
     };
 
     class SourceSyncService

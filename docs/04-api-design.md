@@ -312,7 +312,13 @@ GET /api/v1/jobs
         "last_seen_at": "2026-10-08 12:00:00",
         "last_verified_at": "2026-10-08 12:00:00",
         "freshness": "fresh",
-        "source_status": "ok"
+        "source_status": "ok",
+        "education_required": 3,
+        "experience_years_min": 0,
+        "experience_years_max": 3,
+        "job_nature": 1,
+        "deadline": "2026-10-31",
+        "deadline_date_only": true
       }
     ],
     "total": 42,
@@ -326,6 +332,20 @@ GET /api/v1/jobs
 - 使用薪资过滤时，未提供薪资区间的岗位不返回。
 - `skill` 为精确技能过滤，匹配 `job_requirements.skill`。
 - 公共搜索结果按 `create_time DESC, id DESC` 稳定排序。
+
+0014 增量字段（Step 4，**只新增响应键，不改既有键**；本阶段不新增请求参数）：
+
+- `education_required`（`1..5`，无值为 `null`）、`experience_years_min/max`
+  （非负整年，无值为 `null`）、`job_nature`（`1校招/2社招/3实习`，无值为 `null`）。
+- `deadline`：**北京本地时间（Asia/Shanghai, UTC+8）**；
+  来源只给日期时输出裸日期 `"YYYY-MM-DD"`，来源给了具体时刻（或类型未知）时输出
+  `"YYYY-MM-DD HH:MM:SS"`；无值为 `null`。
+  同时输出 `deadline_date_only`（`true` = 仅日期 / `false` = 具体时刻 /
+  `null` = 无 `deadline` 或类型未知，见 [`docs/03` §9.1](03-database-design.md)）。
+- **`deadline` 只是展示字段**：本阶段不参与可见性、排名，也不触发任何自动关闭。
+  因此已过 `deadline` 但仍 `status=1` 的岗位**仍然可见**——这是本阶段已知的
+  可见性限制，过期待核实提示/自动关闭属后续阶段。
+- 上述新增键同样出现在 `GET /api/v1/jobs/recommended` 的条目里（5.3）。
 
 0012 Freshness 可见性与字段（Step 6 已生效）：
 
@@ -374,6 +394,8 @@ GET /api/v1/jobs/{id}
 
 - 详情响应与 5.1 一致地包含 0012 freshness 字段（`posted_at`、`first_seen_at`、
   `last_seen_at`、`last_verified_at`、`freshness`、`source_status`）。
+- 详情响应同样包含 5.1 的 0014 增量字段（`education_required`、
+  `experience_years_min/max`、`job_nature`、`deadline`、`deadline_date_only`）。
 
 ### 5.3 个性化岗位推荐
 
@@ -457,6 +479,12 @@ X-Internal-Token: <environment secret>
       "description": "...",
       "source": "import",
       "source_url": "https://example.com/job/1",
+      "education_required": 3,
+      "experience_years_min": 0,
+      "experience_years_max": 3,
+      "job_nature": 1,
+      "deadline": "2026-10-08 04:00:00",
+      "deadline_date_only": true,
       "requirements": [
         { "skill": "C++", "level": 3 },
         { "skill": "Linux", "level": 2 }
@@ -487,6 +515,28 @@ X-Internal-Token: <environment secret>
 - Greenhouse / Lever / Ashby 等 Source Adapter 不使用本接口，统一走 5.5 的
   `/internal/jobs/source-sync`；任何适配器都不允许直接写业务数据库。
 
+0014 增量请求键（可选；**人工采集路径用 `source="manual"`**）：
+
+- `education_required`：整数 `1..5`（`1不限/2大专/3本科/4硕士/5博士`）。
+- `experience_years_min` / `experience_years_max`：非负整数（`SMALLINT` 上限
+  `32767`），两者同时存在时必须 `min <= max`。
+- `job_nature`：整数 `1..3`（`1校招/2社招/3实习`）。
+- `deadline`：`"YYYY-MM-DD HH:MM:SS"`，**UTC 瞬时**；
+  `deadline_date_only`：布尔，`true` 表示来源只给了日期。
+  来源只给日期时，调用方按 [`docs/03` §9.1](03-database-design.md) 存该日期的
+  北京本地正午（`04:00:00` UTC）；`deadline_date_only=true` 时 `deadline` 的
+  UTC 时间部分必须是 `04:00:00`。来源给了具体时刻则保留真实瞬时、
+  `deadline_date_only=false`（或不传，缺省等价于 `false`）。
+  省略 `deadline` 时 `deadline_date_only` 也必须省略/为 `null`。
+- 非法值（枚举越界、负年限、`min > max`、非法 `deadline`、`deadline_date_only`
+  与 `deadline` 不一致）一律返回 `400`（`code=10001`），
+  **不静默丢弃、不钳制、不截断**；未提供或无法确定的键一律省略（不写 `1` 兜底）。
+- 人工路径**整组覆盖**：再次导入同一 `source_url` 时新字段按本次请求写入
+  （未提供即为 `NULL`），沿用 5.4 既有的整组替换语义。
+- 人工采集的记录在冲突中**胜出**：同一 `source_url` 已被来源观测过时，
+  人工导入照常覆盖该行（含把 `source` 改为 `manual`），
+  此后 5.5 的来源观测不得再覆盖它（F14，见 5.5）。
+
 ### 5.5 岗位来源同步（Source Sync，0012）
 
 该接口不属于公共 `/api/v1/*` API，仅供可信 Source Adapter 上报一次来源观测：
@@ -508,7 +558,9 @@ X-Internal-Token: <environment secret>
 }
 ```
 
-- `source` 必填，来源类型（如 `greenhouse` / `lever` / `ashby`）。
+- `source` 必填，来源类型标识，必须落在 C++ allowlist
+  `IsSupportedObservationSource` 内（当前 `greenhouse` / `lever` / `ashby`；
+  0014 的 China 来源标识按计划 Step 3 在实测登记后加入，本阶段不预先扩大）。
 - `source_scope` 必填，board / scope 标识，用于隔离不同 board 的缺失判定。
 - `complete=true` 表示适配器能证明本次已观测该 scope 的完整岗位集合。
 - `observed_at` 必填，本次观测时间。
@@ -522,7 +574,9 @@ X-Internal-Token: <environment secret>
   "updated": 2,
   "seen": 12,
   "closed": 0,
-  "complete": true
+  "complete": true,
+  "skipped_manual": 1,
+  "skipped_manual_urls": ["https://example.com/job/1"]
 }
 ```
 
@@ -545,6 +599,25 @@ X-Internal-Token: <environment secret>
 - `source_url` 仍是唯一幂等键，本接口不改变 `uk_source_url`。
 - `INTERNAL_API_TOKEN` 仅从环境变量读取；当前无 Gateway，该 token 只是应用层保护。
 - 错误响应继续使用统一 `{code,message,data}` 格式。
+
+0014 增量（F13 deadline 语义 + F14 人工记录胜出）：
+
+- 观测的每个 job 对象与 5.4 同一结构，因此同样接受 `education_required`、
+  `experience_years_min/max`、`job_nature`、`deadline`、`deadline_date_only`；
+  `deadline` 的格式与时区权威约定见 [`docs/03` §9.1](03-database-design.md)
+  （UTC 存储、Beijing 语义、date-only 用北京正午存储约定），非法值返回 `400`。
+- 观测路径对本次未提供的源侧新字段使用 `COALESCE(VALUES(x), x)` 保护：
+  本次观测没有带 `deadline` 时**不得抹掉**该行已观测到的 `deadline` 与
+  `deadline_date_only`；人工路径（5.4）相反，是整组覆盖。
+- **F14 人工记录胜出**：若某个观测 job 的 `source_url` 命中一行
+  `source='manual'` 的记录，服务端**跳过**该观测（不更新任何列、不改 `source`、
+  不动 freshness/`closed_at`/`missing_count`、不替换其 `job_requirements`），
+  并在响应里记为 `skipped_manual` 计数 + `skipped_manual_urls` 明细
+  （同时写一条服务端日志）。该行因此**不会**进入本次观测的
+  `(source, source_scope)` 缺失判定，也不会被
+  `CloseUnseenForScope` 关闭。反向方向不变：人工导入（5.4）可以覆盖观测行，
+  这是「人工胜出」的另一半。
+- `deadline` 不参与生命周期：过期与否都不触发关闭（见 5.1 的可见性限制）。
 
 实现说明：适配器代码位于 `source_adapters/`（Greenhouse / Lever / Ashby，
 fixture 驱动，可选 live smoke）；配置、运行方式与归一化规则见

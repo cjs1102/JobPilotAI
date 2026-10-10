@@ -33,6 +33,45 @@ namespace jobpilot::service
             return static_cast<std::uint64_t>(
                 value.value());
         }
+
+        // TINYINT/SMALLINT columns (0014) travel as signed integers so the
+        // SqlParam variant stays minimal; validation bounds them first.
+        jobpilot::core::SqlParam OptionalSmallUnsignedParam(
+            const std::optional<std::uint32_t> &value)
+        {
+            if (!value.has_value())
+            {
+                return nullptr;
+            }
+
+            return static_cast<std::int64_t>(
+                value.value());
+        }
+
+        jobpilot::core::SqlParam OptionalBoolParam(
+            const std::optional<bool> &value)
+        {
+            if (!value.has_value())
+            {
+                return nullptr;
+            }
+
+            return static_cast<std::int64_t>(
+                value.value() ? 1 : 0);
+        }
+
+        // The date-kind flag is meaningful only next to a deadline; without a
+        // deadline the stored value must stay NULL ("kind unknown").
+        jobpilot::core::SqlParam OptionalDeadlineKindParam(
+            const JobImportData &job)
+        {
+            if (!job.deadline.has_value())
+            {
+                return nullptr;
+            }
+
+            return OptionalBoolParam(job.deadlineDateOnly);
+        }
     } // namespace
 
     JobUpsertResult JobIngestionDao::UpsertJob(
@@ -43,8 +82,11 @@ namespace jobpilot::service
             transaction.Execute(
                 "INSERT INTO jobs "
                 "(company, title, location, salary_min, salary_max, "
-                "salary_currency, description, source, source_url, status) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1) "
+                "salary_currency, description, source, source_url, status, "
+                "education_required, experience_years_min, "
+                "experience_years_max, job_nature, deadline, "
+                "deadline_date_only) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?) "
                 "ON DUPLICATE KEY UPDATE "
                 "id = LAST_INSERT_ID(id), "
                 "company = VALUES(company), "
@@ -56,6 +98,12 @@ namespace jobpilot::service
                 "description = VALUES(description), "
                 "source = VALUES(source), "
                 "source_url = VALUES(source_url), "
+                "education_required = VALUES(education_required), "
+                "experience_years_min = VALUES(experience_years_min), "
+                "experience_years_max = VALUES(experience_years_max), "
+                "job_nature = VALUES(job_nature), "
+                "deadline = VALUES(deadline), "
+                "deadline_date_only = VALUES(deadline_date_only), "
                 "status = 1",
                 {job.company,
                  job.title,
@@ -65,7 +113,13 @@ namespace jobpilot::service
                  job.salaryCurrency,
                  OptionalStringParam(job.description),
                  job.source,
-                 job.sourceUrl});
+                 job.sourceUrl,
+                 OptionalSmallUnsignedParam(job.educationRequired),
+                 OptionalSmallUnsignedParam(job.experienceYearsMin),
+                 OptionalSmallUnsignedParam(job.experienceYearsMax),
+                 OptionalSmallUnsignedParam(job.jobNature),
+                 OptionalStringParam(job.deadline),
+                 OptionalDeadlineKindParam(job)});
 
         if (result.lastInsertId == 0)
         {

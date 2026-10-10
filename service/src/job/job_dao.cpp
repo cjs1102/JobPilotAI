@@ -241,7 +241,7 @@ namespace jobpilot::service
         JobSummary MakeJobSummary(
             const jobpilot::core::Result::Row &row)
         {
-            if (row.size() != 16)
+            if (row.size() != 22)
             {
                 throw std::runtime_error(
                     "job query returned an unexpected column count");
@@ -309,13 +309,59 @@ namespace jobpilot::service
 
             const bool closed = row[14].has_value();
 
+            if (row[15].has_value())
+            {
+                summary.educationRequired =
+                    ParseUint32(
+                        row[15],
+                        "jobs.education_required");
+            }
+
+            if (row[16].has_value())
+            {
+                summary.experienceYearsMin =
+                    ParseUint32(
+                        row[16],
+                        "jobs.experience_years_min");
+            }
+
+            if (row[17].has_value())
+            {
+                summary.experienceYearsMax =
+                    ParseUint32(
+                        row[17],
+                        "jobs.experience_years_max");
+            }
+
+            if (row[18].has_value())
+            {
+                summary.jobNature =
+                    ParseUint32(
+                        row[18],
+                        "jobs.job_nature");
+            }
+
+            if (row[19].has_value())
+            {
+                summary.deadline = row[19].value();
+            }
+
+            if (row[20].has_value())
+            {
+                // NULL keeps the kind unknown (docs/03 section 9.1).
+                summary.deadlineDateOnly =
+                    ParseInt32(
+                        row[20],
+                        "jobs.deadline_date_only") != 0;
+            }
+
             std::optional<std::int64_t> ageSeconds;
 
-            if (row[15].has_value())
+            if (row[21].has_value())
             {
                 ageSeconds =
                     ParseInt64(
-                        row[15],
+                        row[21],
                         "jobs.last_seen_age_seconds");
             }
 
@@ -354,6 +400,9 @@ namespace jobpilot::service
                 "j.source, j.create_time, j.update_time, "
                 "j.published_at, j.last_seen_at, j.last_verified_at, "
                 "j.source_status, j.closed_at, "
+                "j.education_required, j.experience_years_min, "
+                "j.experience_years_max, j.job_nature, j.deadline, "
+                "j.deadline_date_only, "
                 "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()) "
                 "FROM jobs j" +
                     sqlFilter.sql +
@@ -418,6 +467,9 @@ namespace jobpilot::service
                 "j.source, j.create_time, j.update_time, "
                 "j.published_at, j.last_seen_at, j.last_verified_at, "
                 "j.source_status, j.closed_at, "
+                "j.education_required, j.experience_years_min, "
+                "j.experience_years_max, j.job_nature, j.deadline, "
+                "j.deadline_date_only, "
                 "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()) "
                 "FROM jobs j" +
                     sqlFilter.sql +
@@ -558,6 +610,9 @@ namespace jobpilot::service
                 "source, create_time, update_time, "
                 "published_at, last_seen_at, last_verified_at, "
                 "source_status, closed_at, "
+                "education_required, experience_years_min, "
+                "experience_years_max, job_nature, deadline, "
+                "deadline_date_only, "
                 "TIMESTAMPDIFF(SECOND, last_seen_at, NOW()), "
                 "description, source_url, status "
                 "FROM jobs "
@@ -572,7 +627,7 @@ namespace jobpilot::service
 
         const auto &row = result.row(0);
 
-        if (row.size() != 19)
+        if (row.size() != 25)
         {
             throw std::runtime_error(
                 "job detail query returned an unexpected column count");
@@ -583,20 +638,20 @@ namespace jobpilot::service
             MakeJobSummary(
                 jobpilot::core::Result::Row(
                     row.begin(),
-                    row.begin() + 16));
+                    row.begin() + 22));
 
-        if (row[16].has_value())
+        if (row[22].has_value())
         {
-            detail.description = row[16].value();
+            detail.description = row[22].value();
         }
 
-        if (row[17].has_value())
+        if (row[23].has_value())
         {
-            detail.sourceUrl = row[17].value();
+            detail.sourceUrl = row[23].value();
         }
 
         detail.status =
-            ParseInt32(row[18], "jobs.status");
+            ParseInt32(row[24], "jobs.status");
 
         return detail;
     }

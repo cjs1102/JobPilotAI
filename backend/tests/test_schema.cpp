@@ -387,6 +387,99 @@ namespace
         EXPECT_EQ(cleanup.affectedRows, 1U);
     }
 
+    TEST_F(SchemaTest, Creates0014JobColumnsAndNoDeferredIndex)
+    {
+        const std::map<std::string, ColumnContract> columns =
+            LoadJobColumns(pool, database);
+
+        for (const char *name :
+             {"education_required",
+              "experience_years_min",
+              "experience_years_max",
+              "job_nature",
+              "deadline",
+              "deadline_date_only"})
+        {
+            const auto found = columns.find(name);
+
+            ASSERT_NE(found, columns.end()) << name;
+            EXPECT_EQ(found->second.nullable, "YES") << name;
+            EXPECT_TRUE(found->second.defaultValue.empty()) << name;
+        }
+
+        // 0014 adds no index: idx_job_nature_education is deferred, and the
+        // existing keys must be untouched.
+        const jobpilot::core::Result result =
+            pool.Query(
+                "SELECT DISTINCT index_name "
+                "FROM information_schema.statistics "
+                "WHERE table_schema = ? AND table_name = 'jobs'",
+                {database});
+
+        std::set<std::string> names;
+
+        for (std::size_t row = 0;
+             row < result.rowCount();
+             ++row)
+        {
+            names.insert(
+                RequireValue(result.value(row, 0)));
+        }
+
+        EXPECT_EQ(
+            names.find("idx_job_nature_education"),
+            names.end());
+        EXPECT_NE(names.find("uk_source_url"), names.end());
+        EXPECT_NE(
+            names.find("idx_source_scope_status"),
+            names.end());
+    }
+
+    TEST_F(SchemaTest, LegacyJobRowReadsWithNull0014Fields)
+    {
+        const std::string url =
+            "https://schema-test.invalid/jobs/0014-null-defaults";
+
+        pool.Execute(
+            "DELETE FROM jobs WHERE source_url = ?",
+            {url});
+
+        pool.Execute(
+            "INSERT INTO jobs (company, title, source, source_url) "
+            "VALUES (?, ?, ?, ?)",
+            {
+                std::string("schema-test"),
+                std::string("0014 defaults"),
+                std::string("manual"),
+                url,
+            });
+
+        const jobpilot::core::Result result =
+            pool.Query(
+                "SELECT education_required, experience_years_min, "
+                "experience_years_max, job_nature, deadline, "
+                "deadline_date_only "
+                "FROM jobs WHERE source_url = ?",
+                {url});
+
+        ASSERT_EQ(result.rowCount(), 1U);
+
+        for (std::size_t column = 0; column < 6; ++column)
+        {
+            // Pre-0014 rows get NULL, including the deadline kind: the kind is
+            // undetermined and must not be fabricated (docs/03 section 9.1).
+            EXPECT_FALSE(result.value(0, column).has_value())
+                << "column " << column;
+        }
+
+        const jobpilot::core::ExecutionResult cleanup =
+            pool.Execute(
+                "DELETE FROM jobs WHERE source_url = ?",
+                {url});
+
+        EXPECT_EQ(cleanup.affectedRows, 1U);
+    }
+
     TEST_F(SchemaTest, CreatesAiTaskLeaseColumnsAndIndex)
     {
         const jobpilot::core::Result columns =

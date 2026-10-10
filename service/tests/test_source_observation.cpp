@@ -8,10 +8,27 @@
 
 #include <gtest/gtest.h>
 
+#include "jobpilot/service/job/job_quality.h"
+
 namespace jobpilot::service
 {
     namespace
     {
+        bool HasFinding(
+            const JobQualityReport &report,
+            const std::string &code)
+        {
+            for (const JobQualityFinding &finding : report.findings)
+            {
+                if (finding.code == code)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         SourceObservationJob MakeJob(
             const std::string &source,
             const std::string &sourceUrl)
@@ -283,9 +300,22 @@ namespace jobpilot::service
 
     TEST(SourceObservationValidation, RejectsInvalidJobFields)
     {
+        // 0015A option B: a missing employer is a FIXABLE quality problem, so
+        // the structural validator accepts it and the quality gate queues it
+        // as needs_review / company_missing (never a reject).
         SourceObservation noCompany = MakeObservation();
         noCompany.jobs[0].job.company.clear();
-        EXPECT_FALSE(ValidateSourceObservation(noCompany));
+        EXPECT_TRUE(ValidateSourceObservation(noCompany));
+
+        const JobQualityReport companyMissing =
+            EvaluateJobQuality(
+                noCompany.jobs[0].job,
+                PlatformNameRegistry{});
+
+        EXPECT_FALSE(companyMissing.rejected);
+        EXPECT_EQ(companyMissing.reviewStatus, 1);
+        EXPECT_TRUE(
+            HasFinding(companyMissing, "company_missing"));
 
         SourceObservation noTitle = MakeObservation();
         noTitle.jobs[0].job.title.clear();

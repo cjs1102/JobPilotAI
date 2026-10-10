@@ -693,6 +693,11 @@ Stop and report to the Lead (do not widen scope) if:
   e.g. `jobpilot_review_scratch` loaded from `database/schema/*.sql`), assert the connected
   schema via `SELECT DATABASE()`, skip explicitly when the variable is absent, and fail loudly
   if the dev database is targeted.
+- **Scratch-DB credentials (0015A, 2026-10-10):** the `jobpilot` MySQL account has **no grant**
+  on `jobpilot_review_scratch`, so the isolated run needs either an explicit
+  `GRANT ALL ON jobpilot_review_scratch.* TO 'jobpilot'@'%'` or the documented container-root
+  invocation (`MYSQL_USER=root` + the root password); do not assume the default test
+  credentials can reach the scratch schema.
 
 ## 15. Closed Decisions (owner, 2026-10-10)
 

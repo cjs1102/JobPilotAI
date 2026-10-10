@@ -405,8 +405,8 @@ namespace jobpilot::service
                 "2026-10-01 10:00:00");
         extraJobIds.push_back(manualId);
 
-        // One rejected item (company_missing) + one valid item that collides
-        // with the manual row.
+        // One rejected item (source_url_unusable) + one valid item that
+        // collides with the manual row.
         SourceObservation observation = MakeObservation();
         observation.jobs.clear();
 

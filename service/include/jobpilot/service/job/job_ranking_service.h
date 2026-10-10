@@ -40,6 +40,15 @@ namespace jobpilot::service
             std::size_t page,
             std::size_t pageSize);
 
+        // 0015 B4: deterministic explanation for an already-paged list of rows
+        // (the public list keeps its own ordering/total; only the match keys are
+        // added). Never excludes and never re-orders. An absent/partial profile
+        // is allowed: the missing side becomes an advisory reason, not a 400.
+        ServiceResult<std::vector<RankedJob>> ExplainJobs(
+            std::uint64_t userId,
+            const JobSearchFilter &filter,
+            const std::vector<JobSummary> &jobs);
+
     private:
         IJobRankingDao &jobRankingDao_;
         IUserProfileReader &profileReader_;

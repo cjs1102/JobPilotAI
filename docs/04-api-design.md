@@ -392,10 +392,13 @@ GET /api/v1/jobs
 
 **0015 阶段 B 增量契约（B0，全部可选、默认关闭）**
 
-**落地状态（避免文档与代码分歧）**：截至本单元，已落地的是**解释输入与投影**（B1）以及
-`/recommended` 响应上的 `reasons[]` / `deal_breakers[]` / `deadline_urgency`；`GET /api/v1/jobs`
-的 `with_match` / `strict` 查询参数接线属 **B4**，**尚未落地**，因此该端点当前不识别这两个参数
-（传了也按缺省处理）。B4 落地后本表即为最终契约。
+**落地状态（避免文档与代码分歧）**：`with_match=true` **已落地**（`GET /api/v1/jobs` 每行追加
+下表的匹配键；缺省时载荷与今天**逐字节一致**，并有测试断言）；`with_match=true` **需要会话**
+（解释要用画像/技能，与 `/recommended` 同规则，无 token → `401`）。`strict=true` **尚未落地**：
+它在分页前排除 deal-breaker 行，而这需要**按列表排序**的候选窗口——现有 ranking DAO 窗口固定
+`create_time DESC, id DESC` 且忽略 `sort=`，因此今天传 `strict=true` 会**显式 `400`**（绝不静默
+忽略）；语义确定后（新增按 `sort` 排序的窗口查询，或明确 `strict` 仅支持默认排序）再落地。
+`/recommended` 上的 `reasons[]` / `deal_breakers[]` / `deadline_urgency` 已落地（B1）。
 
 | 参数 | 默认 | 语义 |
 |---|---|---|

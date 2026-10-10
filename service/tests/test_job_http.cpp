@@ -683,6 +683,146 @@ namespace jobpilot::service
             newerId);
     }
 
+    TEST_F(JobHttpTest, WithMatchAddsExplanationWithoutChangingTheBasePayload)
+    {
+        const std::string query =
+            "/api/v1/jobs?keyword=" + searchToken +
+            "&page=1&page_size=10";
+
+        const std::optional<HttpResponseData> baseline =
+            SendRequest(query);
+
+        ASSERT_TRUE(baseline.has_value());
+        ASSERT_TRUE(baseline->hasJson);
+        EXPECT_EQ(baseline->statusCode, 200);
+
+        // `with_match=true` needs the caller's profile/skills -> 401 without a
+        // session (same rule as /recommended).
+        const std::optional<HttpResponseData> unauthenticated =
+            SendRequest(query + "&with_match=true");
+
+        ASSERT_TRUE(unauthenticated.has_value());
+        ASSERT_TRUE(unauthenticated->hasJson);
+        EXPECT_EQ(unauthenticated->statusCode, 401);
+
+        const std::optional<HttpResponseData> enriched =
+            SendRequest(
+                query + "&with_match=true",
+                "Bearer " + token);
+
+        ASSERT_TRUE(enriched.has_value());
+        ASSERT_TRUE(enriched->hasJson);
+        EXPECT_EQ(enriched->statusCode, 200);
+
+        // total/page/page_size parity for this combination.
+        EXPECT_EQ(
+            enriched->jsonBody["data"]["total"],
+            baseline->jsonBody["data"]["total"]);
+        EXPECT_EQ(
+            enriched->jsonBody["data"]["page"],
+            baseline->jsonBody["data"]["page"]);
+        EXPECT_EQ(
+            enriched->jsonBody["data"]["page_size"],
+            baseline->jsonBody["data"]["page_size"]);
+
+        const auto &baseList =
+            baseline->jsonBody["data"]["list"];
+        const auto &richList =
+            enriched->jsonBody["data"]["list"];
+
+        ASSERT_EQ(richList.size(), baseList.size());
+
+        const std::vector<std::string> additiveKeys = {
+            "score",
+            "score_version",
+            "matched_skills",
+            "missing_skills",
+            "reasons",
+            "deal_breakers",
+            "deadline_urgency"};
+
+        for (std::size_t index = 0;
+             index < baseList.size();
+             ++index)
+        {
+            // Ordering is unchanged: the same ids in the same positions.
+            EXPECT_EQ(
+                richList[index]["id"],
+                baseList[index]["id"]);
+
+            nlohmann::json stripped = richList[index];
+
+            for (const std::string &key : additiveKeys)
+            {
+                ASSERT_TRUE(stripped.contains(key))
+                    << key << " missing on item " << index;
+                stripped.erase(key);
+            }
+
+            // `with_match` absent stays byte-identical: removing only the new
+            // keys reproduces the baseline item exactly.
+            EXPECT_EQ(stripped, baseList[index]);
+
+            // The added keys are well-formed.
+            EXPECT_EQ(
+                richList[index]["score_version"],
+                "rule_v1");
+            EXPECT_TRUE(
+                richList[index]["score"].is_number());
+
+            const std::string urgency =
+                richList[index]["deadline_urgency"]
+                    .get<std::string>();
+
+            EXPECT_TRUE(
+                urgency == "expired" ||
+                urgency == "urgent" ||
+                urgency == "soon" ||
+                urgency == "normal" ||
+                urgency == "unknown");
+
+            for (const auto &reason :
+                 richList[index]["reasons"])
+            {
+                EXPECT_TRUE(reason.contains("code"));
+                EXPECT_TRUE(reason.contains("text"));
+                EXPECT_TRUE(reason.contains("evidence"));
+            }
+
+            EXPECT_TRUE(
+                richList[index]["deal_breakers"].is_array());
+        }
+
+        // `with_match` absent is byte-identical to today's payload: the baseline
+        // carries none of the additive keys.
+        for (const auto &item : baseList)
+        {
+            for (const std::string &key : additiveKeys)
+            {
+                EXPECT_FALSE(item.contains(key)) << key;
+            }
+        }
+
+        // `strict` is not honoured yet (B3): rejected loudly, never silently
+        // ignored.
+        const std::optional<HttpResponseData> strict =
+            SendRequest(
+                query + "&with_match=true&strict=true",
+                "Bearer " + token);
+
+        ASSERT_TRUE(strict.has_value());
+        ASSERT_TRUE(strict->hasJson);
+        EXPECT_EQ(strict->statusCode, 400);
+
+        // A non-boolean flag value is a 400 like every other parameter.
+        const std::optional<HttpResponseData> badFlag =
+            SendRequest(query + "&with_match=yes");
+
+        ASSERT_TRUE(badFlag.has_value());
+        ASSERT_TRUE(badFlag->hasJson);
+        EXPECT_EQ(badFlag->statusCode, 400);
+    }
+
     TEST_F(JobHttpTest, ReturnsDeterministicRecommendations)
     {
         const std::optional<HttpResponseData> unauthenticated =

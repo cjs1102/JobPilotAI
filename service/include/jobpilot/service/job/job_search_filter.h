@@ -47,6 +47,14 @@ namespace jobpilot::service
         // switch is configuration-driven at the controller boundary and never
         // changes data.
         bool includeNeedsReview = false;
+
+        // 0015 B4 (additive, default off). `withMatch` asks the public list to
+        // carry the deterministic explanation per row (score / score_version /
+        // matched_skills / missing_skills / reasons / deal_breakers /
+        // deadline_urgency); absent, the payload is byte-identical to today.
+        // `strict` is the opt-in exclusion of deal-breaker rows (B3).
+        bool withMatch = false;
+        bool strict = false;
     };
 
     bool NormalizeJobSearchFilter(

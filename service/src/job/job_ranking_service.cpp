@@ -243,4 +243,121 @@ namespace jobpilot::service
         }
     }
 
+    ServiceResult<std::vector<RankedJob>>
+    JobRankingService::ExplainJobs(
+        std::uint64_t userId,
+        const JobSearchFilter &filter,
+        const std::vector<JobSummary> &jobs)
+    {
+        if (userId == 0)
+        {
+            return ServiceResult<std::vector<RankedJob>>{
+                ErrorCode::kUnauthorized,
+                {}};
+        }
+
+        JobSearchFilter normalized;
+
+        if (!NormalizeJobSearchFilter(
+                filter,
+                &normalized))
+        {
+            return ServiceResult<std::vector<RankedJob>>{
+                ErrorCode::kInvalidParam,
+                {}};
+        }
+
+        try
+        {
+            const std::optional<UserProfile> profile =
+                profileReader_.FindProfile(userId);
+            const std::vector<UserSkill> skills =
+                profileReader_.ListSkills(userId);
+
+            std::vector<std::uint64_t> jobIds;
+            jobIds.reserve(jobs.size());
+
+            for (const JobSummary &job : jobs)
+            {
+                jobIds.push_back(job.id);
+            }
+
+            const std::vector<JobRequirementsRecord>
+                requirementRecords =
+                    jobRankingDao_.ListRequirementsForJobs(jobIds);
+
+            std::unordered_map<
+                std::uint64_t,
+                std::vector<JobRequirement>>
+                requirementsByJob;
+
+            for (const JobRequirementsRecord &record :
+                 requirementRecords)
+            {
+                requirementsByJob.emplace(
+                    record.jobId,
+                    record.requirements);
+            }
+
+            const auto now =
+                std::chrono::system_clock::now();
+
+            std::vector<RankedJob> explained;
+            explained.reserve(jobs.size());
+
+            for (const JobSummary &job : jobs)
+            {
+                const auto requirements =
+                    requirementsByJob.find(job.id);
+                const std::vector<JobRequirement> empty;
+                const std::vector<JobRequirement> &jobRequirements =
+                    requirements != requirementsByJob.end()
+                        ? requirements->second
+                        : empty;
+
+                explained.push_back(
+                    ScoreJob(
+                        job,
+                        jobRequirements,
+                        profile,
+                        skills,
+                        normalized,
+                        now));
+
+                RankedJob &scored = explained.back();
+                scored.reasons =
+                    ProjectMatchReasons(
+                        job,
+                        profile,
+                        scored.matchedSkills,
+                        scored.missingSkills,
+                        now);
+                scored.dealBreakers =
+                    EvaluateMatchDealBreakers(
+                        job,
+                        profile,
+                        now);
+                scored.deadlineUrgency =
+                    ClassifyDeadlineUrgency(
+                        job.deadline,
+                        job.deadlineDateOnly,
+                        now);
+            }
+
+            return ServiceResult<std::vector<RankedJob>>{
+                ErrorCode::kSuccess,
+                std::move(explained)};
+        }
+        catch (const std::exception &error)
+        {
+            jobpilot::core::Logger::Get()->error(
+                "job explanation failed: {}",
+                error.what());
+
+            return ServiceResult<std::vector<RankedJob>>{
+                ErrorCode::kDatabaseError,
+                {}};
+        }
+    }
+
 } // namespace jobpilot::service

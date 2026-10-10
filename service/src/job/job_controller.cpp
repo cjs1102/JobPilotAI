@@ -273,6 +273,8 @@ namespace jobpilot::service
             bool hasDeadlineAfter = false;
             bool hasOpenOnly = false;
             bool hasSort = false;
+            bool hasWithMatch = false;
+            bool hasStrict = false;
 
             std::size_t position = queryPosition + 1;
 
@@ -431,6 +433,32 @@ namespace jobpilot::service
 
                         hasOpenOnly = true;
                         query->filter.openOnly =
+                            (value == "true");
+                    }
+                    else if (key == "with_match")
+                    {
+                        if (hasWithMatch ||
+                            (value != "true" &&
+                             value != "false"))
+                        {
+                            return false;
+                        }
+
+                        hasWithMatch = true;
+                        query->filter.withMatch =
+                            (value == "true");
+                    }
+                    else if (key == "strict")
+                    {
+                        if (hasStrict ||
+                            (value != "true" &&
+                             value != "false"))
+                        {
+                            return false;
+                        }
+
+                        hasStrict = true;
+                        query->filter.strict =
                             (value == "true");
                     }
                     else if (key == "sort")
@@ -788,6 +816,37 @@ namespace jobpilot::service
             return;
         }
 
+        // 0015 B3: `strict` turns the deal-breakers into an exclusion. Excluding
+        // before pagination needs the search-ordered candidate window (the
+        // ranking DAO window ignores `sort=`), which is not wired yet, so the
+        // parameter is rejected loudly instead of being silently ignored.
+        if (query.filter.strict)
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInvalidParam,
+                nullptr);
+            return;
+        }
+
+        std::optional<std::uint64_t> matchUserId;
+
+        if (query.filter.withMatch)
+        {
+            // The explanation needs the caller's profile/skills, so
+            // `with_match=true` requires a session (same rule as /recommended).
+            matchUserId = AuthenticateRequest(
+                request,
+                &response,
+                rankingService_);
+
+            if (!matchUserId.has_value())
+            {
+                return;
+            }
+        }
+
         const ServiceResult<JobPage> result =
             service_.SearchJobs(
                 query.filter,
@@ -804,13 +863,81 @@ namespace jobpilot::service
             return;
         }
 
+        std::vector<RankedJob> explained;
+
+        if (query.filter.withMatch &&
+            !result.value.list.empty())
+        {
+            const ServiceResult<std::vector<RankedJob>>
+                explanations =
+                    rankingService_->ExplainJobs(
+                        matchUserId.value(),
+                        query.filter,
+                        result.value.list);
+
+            if (explanations.code != ErrorCode::kSuccess)
+            {
+                WriteResponse(
+                    &response,
+                    request.KeepAlive(),
+                    explanations.code,
+                    nullptr);
+                return;
+            }
+
+            explained = explanations.value;
+        }
+
         Json list = Json::array();
 
-        for (const JobSummary &job :
-             result.value.list)
+        for (std::size_t index = 0;
+             index < result.value.list.size();
+             ++index)
         {
-            list.push_back(
-                SummaryToJson(job));
+            Json item =
+                SummaryToJson(result.value.list[index]);
+
+            if (query.filter.withMatch &&
+                index < explained.size())
+            {
+                const RankedJob &ranked = explained[index];
+
+                Json reasons = Json::array();
+
+                for (const MatchReason &reason : ranked.reasons)
+                {
+                    reasons.push_back(
+                        Json{
+                            {"code", reason.code},
+                            {"text", reason.text},
+                            {"evidence", reason.evidence}});
+                }
+
+                Json dealBreakers = Json::array();
+
+                for (const MatchDealBreaker &breaker :
+                     ranked.dealBreakers)
+                {
+                    dealBreakers.push_back(
+                        Json{
+                            {"code", breaker.code},
+                            {"text", breaker.text}});
+                }
+
+                item["score"] = ranked.score;
+                item["score_version"] = ranked.scoreVersion;
+                item["matched_skills"] =
+                    ranked.matchedSkills;
+                item["missing_skills"] =
+                    ranked.missingSkills;
+                item["reasons"] = std::move(reasons);
+                item["deal_breakers"] =
+                    std::move(dealBreakers);
+                item["deadline_urgency"] =
+                    ToString(ranked.deadlineUrgency);
+            }
+
+            list.push_back(std::move(item));
         }
 
         WriteResponse(

@@ -47,6 +47,8 @@ namespace jobpilot::service
             case ErrorCode::kInternalError:
             case ErrorCode::kDatabaseError:
                 return 500;
+            default:
+                return 500;
             }
 
             return 500;

@@ -296,13 +296,19 @@ behaviour, that is a stop condition (§13), not a licence to change it.
   committed sample dataset derived from `docs/examples/job-import.json`
   (`docs/examples/job-import.json:1-11`, whose URLs are `example.invalid`, so the
   demo stays offline).
-- **P4 CI.** One workflow with two jobs: a build+unit job (no services) and a
-  DB-backed job using `mysql:8.0` + `redis:7` service containers with an isolated
-  database name and dedicated credentials, both running the same bootstrap path
-  as C1 and no AI key. The workflow's command list is replayed locally in the
-  same order before it is committed, because the first real run happens on GitHub
-  after the push; TSan is fixed but stays out of the required matrix
-  (decision 8).
+- **P4 CI.** Three jobs: `build` provisions the pinned graph, configures and
+  compiles the whole tree on a clean runner; `integration` runs the **full**
+  CTest suite plus both Python suites against `mysql:8.0` + `redis:7` service
+  containers with an isolated CI database (`jobpilot_ci`) and dedicated
+  credentials; `image` builds the committed Dockerfile and runs the demo gate
+  against it, which is where CE-5 gets its evidence. The first draft split the
+  suite by the `external` label; replaying that locally proved the filter wrong
+  (309 tests, only 17 labelled `external`/`integration`, 59 with no label, and 52
+  database-backed cases fail without a database), so the compile-only /
+  whole-suite split replaced it and the finding is recorded in §12. The
+  workflow's command list is replayed locally in the same order before it is
+  committed, because the first real run happens on GitHub after the push; TSan is
+  fixed but stays out of the required matrix (decision 8).
 - **P5 hygiene.** Add an English "Quick start" to `README.md` above the existing
   Chinese content rather than rewriting it; move the internal acceptance
   paragraphs to `docs/ai/project-state.md`; add a short orientation note for
@@ -409,7 +415,7 @@ gate is fixed and only the affected levels are re-run.
 | **P1** | Build and run contract (C1, C2): `conan.lock`, pinned settings, `tools/dev/bootstrap.sh`, the TSan target-order fix, multi-stage `Dockerfile`, compose service behind a profile, `resume_storage` attached to the service's storage root, `.env` handling, `/health`; worker documented as optional | P0 | CE-1 and CE-2 pass; CE-5 passes for a locally cached base and stays open for the committed `ubuntu:24.04` base until the P4 CI run (environment-limited, §8.1); `cmake --preset tsan` configures; bootstrap is idempotent; both entries configure and build; `docker compose config` shows the volume attached and the default stack still starts infra only; `/health` returns 200 against the compose MySQL/Redis; an uploaded resume's bytes survive a container recreation inside `resume_storage`; the isolated stack tears down cleanly |
 | **P2** | Database bootstrap + upgrade documentation, demo database isolation | P1 | a fresh isolated database reaches the expected 13 tables from committed files; the upgrade path is documented and applied once to a copy; the dev database is verified untouched |
 | **P3** | Demo gate (C3): `tools/dev/` gate script + extended `docs/examples/job-import.json` + assertions | P1, P2 | CE-3 passes end to end with no AI key and no outbound network; the negative control exits non-zero; raw output archived |
-| **P4** | CI workflow: build job + DB-backed job with an isolated CI database and dedicated credentials, no AI key, TSan out of the required matrix | P1, P3 | CE-4 passes (workflow command list replayed locally); the workflow file validates; the owner confirms the first GitHub run afterwards |
+| **P4** | CI workflow: a clean-build job, a whole-suite job with MySQL/Redis service containers and an isolated CI database with dedicated credentials, and an image job that builds the committed Dockerfile and runs the gate; no AI key, TSan out of the required matrix | P1, P3 | CE-4 passes (the workflow's command list replayed locally, whole suite green against the CI-shaped database); the workflow file validates; the owner confirms the first real GitHub run afterwards, which is also where CE-5 closes |
 | **P5** | Open-source hygiene: README quickstart (en) + internal state moved out, `AGENTS.md`/`docs/ai` orientation note + secret/private-detail check, `THIRD_PARTY_NOTICES.md`, `docs/07`/`docs/08` dated corrections, `docs/quality:12-16` correction, reading-order index | P3 | L0 + link check clean; an outsider can follow README to a running demo without reading any agent document; no secret or local-only detail in the public docs |
 | **P6** | Docs sync + the stage's single L4 + archive | P1-P5 | full L4 green on a frozen commit; README/AGENTS/project-state/this plan consistent; plans archived under `docs/exec-plans/completed/` |
 
@@ -480,6 +486,13 @@ the same isolation invariant §7.2 already imposes on every demo run.
 6. **Build-entry brittleness**: the presets hard-wire generated toolchain paths;
    P1 must keep both entries working rather than fixing one and breaking the
    other.
+7. **The test suite's labels do not mark database dependence.** Measured on the
+   release preset: 309 tests, 17 labelled `external`/`integration`, 59 with no
+   label at all, and 52 cases across nine suites fail when run without a
+   database. A label-based split of CI would therefore run database-backed tests
+   with no database; the first CI draft did exactly that and the local replay
+   caught it, which is why CI compiles in one job and runs the whole suite in the
+   database job.
 
 ## 13. Stop Conditions
 
@@ -552,7 +565,21 @@ Stop and report to the owner (do not widen scope) if:
       No AI key and no outbound network were used, and the developer's database
       was 4/4/0/0 before and after. The run found and fixed the `main.cpp` wiring
       defect recorded in §17.
-- [ ] P4 CI workflow (CE-4; first GitHub run confirmed by the owner)
+- [x] P4 CI workflow — **done 2026-10-10**. `.github/workflows/ci.yml` has three
+      jobs: `build` (pinned bootstrap + configure + compile on a clean runner),
+      `integration` (MySQL 8.0 + Redis 7 service containers, `jobpilot_ci` with
+      its own credentials, schema loaded from the committed files, an explicit
+      grant for the schema test, the **whole** CTest suite and both Python
+      suites), and `image` (builds the committed Dockerfile and runs the demo
+      gate against it — CE-5's only possible home). Evidence, replayed locally in
+      order against an isolated MySQL/Redis pair using the workflow's own values:
+      bootstrap/configure/build rc=0; schema from 7 files → 13 tables; grant
+      applied; `100% tests passed, 0 tests failed out of 309` (41.26 s);
+      `source_adapters` `Ran 446 tests` + `OK`, `ai_worker` `Ran 190 tests` +
+      `OK`. The first draft's `-LE external` split was abandoned after this replay
+      showed the labels do not mark database dependence (§12.7). The `image` job
+      is **not** replayable here (Docker Hub unreachable, §8.1), so CE-5 and the
+      first real CI run are the owner's to confirm after the push.
 - [ ] P5 Open-source hygiene (quickstart, orientation note + secret check, notices, dated corrections, index)
 - [ ] P6 Docs sync + the stage's single L4 + archive
 

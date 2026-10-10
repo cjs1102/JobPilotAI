@@ -615,6 +615,7 @@ X-Internal-Token: <environment secret>
       "job_nature": 1,
       "deadline": "2026-10-08 04:00:00",
       "deadline_date_only": true,
+      "published_at": "2026-09-20 00:00:00",
       "requirements": [
         { "skill": "C++", "level": 3 },
         { "skill": "Linux", "level": 2 }
@@ -623,6 +624,11 @@ X-Internal-Token: <environment secret>
   ]
 }
 ```
+
+`published_at` 为 0017A 新增的**可选**字段：UTC 文本 `YYYY-MM-DD HH:MM:SS`，与
+`POST /internal/jobs/source-sync` 的 `published_at` 同形（没有 kind 标志）。它写入
+`jobs.published_at`，公开详情的 `posted_at` 即来自该列；请求省略该字段时不改写已有值
+（upsert 用 `COALESCE(VALUES(published_at), published_at)`，绝不隐式清空）。
 
 响应：
 

@@ -454,7 +454,11 @@ namespace jobpilot::service
                 !GetOptionalBool(
                     value,
                     "deadline_date_only",
-                    &job.deadlineDateOnly))
+                    &job.deadlineDateOnly) ||
+                !GetOptionalString(
+                    value,
+                    "published_at",
+                    &job.publishedAt))
             {
                 return false;
             }

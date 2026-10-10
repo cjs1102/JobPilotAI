@@ -88,12 +88,17 @@ namespace jobpilot::service
         std::uint64_t jobId = 0;
 
         {
+            JobImportData createdJob = MakeJob("Created Job");
+            // 0017A: the manual import path now carries the optional publication
+            // instant into jobs.published_at.
+            createdJob.publishedAt = "2026-09-20 00:00:00";
+
             auto transaction =
                 pool->BeginTransaction();
             const JobUpsertResult result =
                 ingestionDao->UpsertJob(
                     transaction,
-                    MakeJob("Created Job"));
+                    createdJob);
 
             EXPECT_EQ(
                 result.status,
@@ -109,6 +114,9 @@ namespace jobpilot::service
         ASSERT_TRUE(job.has_value());
         EXPECT_EQ(job->summary.company, "Import Company");
         EXPECT_EQ(job->summary.title, "Created Job");
+        EXPECT_EQ(
+            job->summary.publishedAt,
+            std::optional<std::string>("2026-09-20 00:00:00"));
     }
 
     TEST_F(JobIngestionDaoTest, UpdatesExistingJobByIdempotentSourceUrl)
@@ -116,12 +124,16 @@ namespace jobpilot::service
         std::uint64_t jobId = 0;
 
         {
+            JobImportData createdJob = MakeJob("Before Update");
+            // 0017A: stored on insert; the next upsert omits it on purpose.
+            createdJob.publishedAt = "2026-09-20 00:00:00";
+
             auto transaction =
                 pool->BeginTransaction();
             const JobUpsertResult created =
                 ingestionDao->UpsertJob(
                     transaction,
-                    MakeJob("Before Update"));
+                    createdJob);
 
             ASSERT_EQ(
                 created.status,
@@ -147,6 +159,38 @@ namespace jobpilot::service
                 updated.status,
                 JobUpsertStatus::kUpdated);
             EXPECT_EQ(updated.jobId, jobId);
+            transaction.Commit();
+        }
+
+        {
+            // 0017A: publishedAt was omitted by the update above, so COALESCE
+            // must have preserved the value written by the insert.
+            const std::optional<JobDetail> preserved =
+                readDao->FindActiveJobById(jobId);
+
+            ASSERT_TRUE(preserved.has_value());
+            EXPECT_EQ(
+                preserved->summary.publishedAt,
+                std::optional<std::string>("2026-09-20 00:00:00"));
+
+            // ... and a payload that does carry it overwrites the stored value.
+            JobImportData republished =
+                MakeJob("After Update");
+            republished.company = "Updated Company";
+            republished.location = "Shanghai";
+            republished.publishedAt = "2026-10-01 12:30:00";
+
+            auto transaction =
+                pool->BeginTransaction();
+            const JobUpsertResult result =
+                ingestionDao->UpsertJob(
+                    transaction,
+                    republished);
+
+            EXPECT_EQ(
+                result.status,
+                JobUpsertStatus::kUpdated);
+            EXPECT_EQ(result.jobId, jobId);
             transaction.Commit();
         }
 
@@ -186,6 +230,9 @@ namespace jobpilot::service
         EXPECT_EQ(
             job->summary.location,
             std::optional<std::string>("Shanghai"));
+        EXPECT_EQ(
+            job->summary.publishedAt,
+            std::optional<std::string>("2026-10-01 12:30:00"));
     }
 
     TEST_F(JobIngestionDaoTest, ReplacesRequirementsAsSet)

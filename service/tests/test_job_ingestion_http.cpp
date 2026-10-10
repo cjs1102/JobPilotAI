@@ -912,6 +912,9 @@ namespace jobpilot::service
         dateOnly["job_nature"] = 1;
         dateOnly["deadline"] = "2026-10-31 04:00:00";
         dateOnly["deadline_date_only"] = true;
+        // 0017A: the optional publication instant travels through the import
+        // payload and comes back as the public posted_at.
+        dateOnly["published_at"] = "2026-09-20 00:00:00";
 
         const auto created =
             SendRequest(
@@ -931,7 +934,7 @@ namespace jobpilot::service
             pool->Query(
                 "SELECT id, deadline, deadline_date_only, "
                 "education_required, experience_years_min, "
-                "experience_years_max, job_nature "
+                "experience_years_max, job_nature, published_at "
                 "FROM jobs WHERE source_url = ?",
                 {dateOnlyUrl});
 
@@ -956,6 +959,10 @@ namespace jobpilot::service
         EXPECT_EQ(
             jobpilot::test::RequireValue(stored.value(0, 6)),
             "1");
+        // 0017A: the publication instant reached the row.
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 7)),
+            "2026-09-20 00:00:00");
 
         const std::uint64_t jobId =
             static_cast<std::uint64_t>(
@@ -992,6 +999,10 @@ namespace jobpilot::service
         EXPECT_EQ(
             detail->jsonBody["data"]["deadline_date_only"],
             true);
+        // 0017A: the public detail exposes the stored instant as posted_at.
+        EXPECT_EQ(
+            detail->jsonBody["data"]["posted_at"],
+            "2026-09-20 00:00:00");
 
         const std::string keyword = dateOnlyUrl.substr(
             dateOnlyUrl.rfind('/') + 1);

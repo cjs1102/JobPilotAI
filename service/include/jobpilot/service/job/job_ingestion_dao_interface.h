@@ -31,6 +31,12 @@ namespace jobpilot::service
         std::optional<std::uint32_t> jobNature;
         std::optional<std::string> deadline;
         std::optional<bool> deadlineDateOnly;
+
+        // 0017A. Optional publication instant in the same UTC
+        // "YYYY-MM-DD HH:MM:SS" text the source-sync path stores. A later upsert
+        // that omits it preserves the stored value (COALESCE); it is never
+        // cleared implicitly.
+        std::optional<std::string> publishedAt;
     };
 
     struct JobRequirementImportData

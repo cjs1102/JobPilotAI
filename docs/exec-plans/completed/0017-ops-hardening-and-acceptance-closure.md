@@ -416,15 +416,17 @@ b2a55be  run 38060121842  ci    clean build 3m13s + full test suite 1m25s       
          run 38060121858  image  container image and the end-to-end gate 2m51s
 b1d1b89  run 38061519836  ci    clean build 3m56s + full test suite 1m49s                    = 5m45s
          run 38061519743  image  container image and the end-to-end gate 2m49s
+2055e05  run 38064348674  ci    clean build 4m16s + full test suite 1m24s                    = 5m40s
+         run 38064348650  image  container image and the end-to-end gate 2m45s
 ```
 
 结论：**integration job 从基线的 5m21s 降到 1m16s–1m49s**——不再装 Conan、不再 configure
 和编译，只下载产物、装 schema、跑 309 个 CTest 用例和两个 Python 套件，每次推送省下约
 3.5–4 分钟 Actions 分钟；`clean build` 仍是真正的干净编译（2m44s–4m18s，波动来自 runner 与
-Conan 缓存冷热），`image` job 已移入自己的 workflow 并按路径/分支过滤。四次运行的
-`ci` + `image` 合计 7m00s–8m34s，基线同类推送是 11m26s（三者并行，run 墙钟 5m24s）。
-**新增的 `Coverage map guard` 步骤在四次运行中全部通过**，即 0017-B 的映射在 runner 上也被
-强制执行。
+Conan 缓存冷热），`image` job 已移入自己的 workflow 并按路径/分支过滤。五次运行（含收口文档
+提交 `2055e05`）的 `ci` + `image` 合计 7m00s–8m34s，基线同类推送是 11m26s（三者并行，run
+墙钟 5m24s）。**新增的 `Coverage map guard` 步骤在五次运行中全部通过**，即 0017-B 的映射在
+runner 上也被强制执行。
 
 ## 11. 已知问题与后续
 
@@ -437,7 +439,7 @@ Conan 缓存冷热），`image` job 已移入自己的 workflow 并按路径/分
   **追加（2026-10-10，owner 授权清理）：** 该遗留库已在逐表精确核对为 0 行（13/13 张表）后
   `DROP DATABASE jobpilot_ci`，开发库与 `jobpilot_review_scratch` 复核不变（`jobpilot.jobs`
   仍 4 行）。
-- **[0017-C 发现，真实缺陷，仅记录]** `publish-capture` 发出的 `published_at` 会被手工导入
+- **[0017-C 发现，真实缺陷；已由 0017A 修复]** `publish-capture` 发出的 `published_at` 会被手工导入
   端点**静默丢弃**：`source_adapters/jobpilot_sources/capture/publisher.py:220-224` 会把
   capture 的发布日期归一化后放进 payload（并把它当作可发布字段，失败时还有 note），但
   `POST /internal/jobs/import` 的契约（`docs/04-api-design.md:599-625`）与解析器
@@ -447,8 +449,10 @@ Conan 缓存冷热），`image` job 已移入自己的 workflow 并按路径/分
   `GET /api/v1/jobs/{id}` 的 `posted_at` 为 null（见 §10 P3 记录）。影响：人工采集岗位
   的发布日期不可读；`docs/04:488` 的"发布 N 天内"过滤要求 `published_at IS NOT NULL`
   （`service/src/job/job_dao.cpp:217-218`），因此人工记录在该过滤下会被排除——具体过滤名
-  与端到端影响**未在本阶段测量**。修法二选一（属生产代码，本阶段不做）：(a) 把
-  `published_at` 纳入手工导入契约 + 解析 + DAO；(b) 让 publisher 明确 note 并停止发送。
+  与端到端影响**未在本阶段测量**。~~修法二选一（属生产代码，本阶段不做）~~ **0017A 已采用
+  (a) 并完成**（`completed/0017A-manual-import-published-at.md`：把 `published_at` 纳入手工
+  导入契约 + 解析 + DAO，`COALESCE` 保留语义；见 `docs/04` §5.2 与 0017A 的测试证据）。
+  备选 (b)（让 publisher 明确 note 并停止发送）未被采用。
 - **仅 owner 可做**（本阶段只归档，不执行）：把仓库转为 public；填 About/描述/话题；
   轮换此前用过的 PAT。**CI 确认已完成**：owner 提供了只读 fine-grained token，
   `tools/dev/ci-status.sh` 取回的四次运行的结论与逐 job 耗时见 §10.3。

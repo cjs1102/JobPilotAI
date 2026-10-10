@@ -350,15 +350,11 @@ def check(label, ok, actual):
         raise SystemExit(f"{label}: got {actual!r}")
     print(f"  {label}: {actual!r}")
 
-# The manual import contract (docs/04 section 5.2;
-# service/src/job/internal_job_import_controller.cpp:391-477) does not accept
-# `published_at`, although publish-capture sends it
-# (source_adapters/jobpilot_sources/capture/publisher.py:220-224) and the
-# endpoint silently ignores unknown keys: the value never reaches MySQL and the
-# public `posted_at` stays null. ExecPlan 0017 section 11 records this as a
-# finding; the scaffold reports it instead of asserting a round-trip the
-# contract cannot deliver.
-NOT_IN_IMPORT_CONTRACT = {"published_at": "posted_at"}
+# 0017A: the manual import contract now carries the optional `published_at`
+# (docs/04 section 5.2), so it must round-trip into the public detail exactly
+# like every other documented field. The only difference is the public name:
+# `posted_at` is the column's read-back name.
+PUBLIC_FIELD_ALIASES = {"published_at": "posted_at"}
 
 check("source == manual", detail.get("source") == "manual", detail.get("source"))
 check("source_url round-trips", detail.get("source_url") == payload.get("source_url"),
@@ -368,8 +364,6 @@ for key in ("title", "company", "location", "description", "education_required",
             "salary_currency", "published_at"):
     if key not in payload:
         continue
-    if key in NOT_IN_IMPORT_CONTRACT:
-        continue
     if key == "deadline" and payload.get("deadline_date_only"):
         # F13: a date-only deadline is stored as the Beijing date at 04:00:00 and
         # rendered back as the date, so the payload value is not what the public
@@ -378,12 +372,11 @@ for key in ("title", "company", "location", "description", "education_required",
         check("deadline renders as the Beijing date", detail.get(key) == expected,
               f"{detail.get(key)!r} == {expected!r}")
         continue
-    check(f"{key} round-trips", detail.get(key) == payload[key],
-          f"{detail.get(key)!r} == {payload[key]!r}")
-for key, public_key in NOT_IN_IMPORT_CONTRACT.items():
-    if key in payload:
-        print(f"  INFO {key} was sent but the manual import contract does not accept it; "
-              f"public {public_key}={detail.get(public_key)!r} (ExecPlan 0017 section 11)")
+    public_key = PUBLIC_FIELD_ALIASES.get(key, key)
+    if public_key not in detail:
+        raise SystemExit(f"{key}: the public detail does not expose {public_key}")
+    check(f"{key} round-trips", detail.get(public_key) == payload[key],
+          f"{detail.get(public_key)!r} == {payload[key]!r}")
 check("manual import leaves freshness unobserved", detail.get("last_seen_at") is None,
       detail.get("last_seen_at"))
 check("manual import leaves freshness null", detail.get("freshness") is None,

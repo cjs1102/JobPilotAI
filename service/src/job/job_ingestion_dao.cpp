@@ -126,8 +126,8 @@ namespace jobpilot::service
                 "salary_currency, description, source, source_url, status, "
                 "education_required, experience_years_min, "
                 "experience_years_max, job_nature, deadline, "
-                "deadline_date_only) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?) "
+                "deadline_date_only, published_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?) "
                 "ON DUPLICATE KEY UPDATE "
                 "id = LAST_INSERT_ID(id), "
                 "company = VALUES(company), "
@@ -145,6 +145,9 @@ namespace jobpilot::service
                 "job_nature = VALUES(job_nature), "
                 "deadline = VALUES(deadline), "
                 "deadline_date_only = VALUES(deadline_date_only), "
+                // 0017A: a payload that omits published_at must not clear an
+                // already stored value (same rule as source_sync_dao.cpp:154).
+                "published_at = COALESCE(VALUES(published_at), published_at), "
                 "status = 1",
                 {job.company,
                  job.title,
@@ -160,7 +163,8 @@ namespace jobpilot::service
                  OptionalSmallUnsignedParam(job.experienceYearsMax),
                  OptionalSmallUnsignedParam(job.jobNature),
                  OptionalStringParam(job.deadline),
-                 OptionalDeadlineKindParam(job)});
+                 OptionalDeadlineKindParam(job),
+                 OptionalStringParam(job.publishedAt)});
 
         if (result.lastInsertId == 0)
         {

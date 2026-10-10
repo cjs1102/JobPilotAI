@@ -527,7 +527,16 @@ Stop and report to the owner (do not widen scope) if:
       for the committed `ubuntu:24.04` base** (Docker Hub unreachable here, §8.1)
       and is the P4 CI job's to close; the scratch-base run is recorded as
       exactly that.
-- [ ] P2 Database bootstrap + upgrade documentation + demo isolation
+- [x] P2 Database bootstrap and upgrade documentation — **done 2026-10-10**.
+      `database/schema/README.md` now carries the file→table map, the two
+      from-scratch paths, the numbered additive-`ALTER` upgrade table with the
+      duplicate-column caveat, the verification queries and the isolation rule;
+      `docs/03` §6 points at it instead of claiming every script is idempotent.
+      Evidence: an isolated MySQL instance built from the committed scripts holds
+      exactly the 13 documented tables; the §10.3 block applies cleanly to a copy
+      whose three columns were dropped (all three nullable, default NULL) and
+      reports `ERROR 1060 Duplicate column name` when re-run, which is what the
+      documents promise; the developer's database was 4/4/0/0 before and after.
 - [ ] P3 Demo gate script + extended sample dataset (CE-3, negative control)
 - [ ] P4 CI workflow (CE-4; first GitHub run confirmed by the owner)
 - [ ] P5 Open-source hygiene (quickstart, orientation note + secret check, notices, dated corrections, index)

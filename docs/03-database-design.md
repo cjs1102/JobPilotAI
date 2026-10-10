@@ -261,7 +261,10 @@ CREATE TABLE notifications (
 
 - `database/schema/` 挂载到容器 `docker-entrypoint-initdb.d`，首次启动自动建表
 - 种子数据尚未纳入当前 P0 schema；后续引入时必须保持幂等
-- 所有脚本幂等可重复执行
+- 建表脚本均为 `CREATE TABLE IF NOT EXISTS`，可重复执行；**既有库加列走 §7.3 起的
+  编号 ALTER 增量块，不幂等——重复执行会报 duplicate column，属预期行为**
+- 从零建库（容器化/手工两条路径）、既有库升级步骤、表数量校验与数据隔离规则见
+  [`database/schema/README.md`](../database/schema/README.md)
 
 ## 7. 0012 Additive Freshness Migration Contract（增量契约）
 

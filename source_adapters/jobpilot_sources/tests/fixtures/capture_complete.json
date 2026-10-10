@@ -1,0 +1,22 @@
+{
+  "capture_version": 1,
+  "captured_at": "2026-10-09T12:15:00.000Z",
+  "page_url": "https://jobs.example-cn.invalid/campus/1001?utm_source=bookmark",
+  "page_title": "C++ 后端开发工程师 - 示例科技",
+  "page_host": "jobs.example-cn.invalid",
+  "job": {
+    "title": "C++ 后端开发工程师",
+    "company": "示例科技有限公司",
+    "source_url": "https://jobs.example-cn.invalid/campus/1001?utm_source=bookmark",
+    "location": "深圳市-南山区",
+    "salary": "15-25K·14薪",
+    "education": "本科及以上",
+    "job_nature": "校招",
+    "experience": "应届生",
+    "deadline": "截止时间：2026-10-31",
+    "published_at": "2026-09-20 08:00:00",
+    "description": "负责后端服务开发，熟悉 Linux 与 MySQL。",
+    "skills": ["C++", "Linux", "MySQL"]
+  },
+  "warnings": ["description is an excerpt of the visible page text"]
+}

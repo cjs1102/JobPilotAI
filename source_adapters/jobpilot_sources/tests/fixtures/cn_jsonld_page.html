@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>示例公司校园招聘</title>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "JobPosting",
+        "title": "算法工程师（校招）",
+        "url": "https://jobs.example-cn.invalid/campus/2001",
+        "identifier": {"value": "CN-2001"},
+        "datePosted": "2026-09-21T09:00:00+08:00",
+        "validThrough": "2026-10-31",
+        "description": "<p>负责推荐算法</p>",
+        "hiringOrganization": {"name": "示例科技有限公司"},
+        "jobLocation": {"address": {"addressLocality": "杭州市", "addressRegion": "浙江省"}}
+      },
+      {
+        "@type": "JobPosting",
+        "title": "前端开发工程师",
+        "url": "https://jobs.example-cn.invalid/campus/2002",
+        "datePosted": "2026-09-22T10:30:00+08:00",
+        "validThrough": "2026-11-20T18:00:00+08:00",
+        "hiringOrganization": {"name": "示例科技有限公司"},
+        "jobLocation": {"address": {"addressLocality": "成都市"}}
+      }
+    ]
+  }
+  </script>
+  <script type="application/ld+json">{ this is not valid json }</script>
+</head>
+<body>
+  <a href="/campus/2003">测试工程师</a>
+  <a href="javascript:void(0)">无效链接</a>
+</body>
+</html>

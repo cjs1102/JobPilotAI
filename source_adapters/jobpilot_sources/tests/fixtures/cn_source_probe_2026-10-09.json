@@ -1,0 +1,146 @@
+{
+  "probe_version": 1,
+  "probe_date": "2026-10-09",
+  "probe_host": "project dev host (private LAN)",
+  "user_agent": "jobpilot-source-adapters/0.1 (+https://github.com/jobpilotai; public job board reader)",
+  "method": "robots.txt per host -> public navigable pages/bundles only -> the site's own declared list endpoints; no path guessing, no login, no CAPTCHA, no TLS bypass",
+  "budget": {
+    "iguopin_requests": 12,
+    "tsinghua_requests": 16,
+    "note": "read-only GET (plus 3 unsigned POST probes on iguopin), well under the planned per-source budget"
+  },
+  "candidates": [
+    {
+      "id": "S2-iguopin",
+      "host": "www.iguopin.com",
+      "robots": {
+        "url": "https://www.iguopin.com/robots.txt",
+        "status": 200,
+        "body": "User-agent: *\\nDisallow:\\n",
+        "verdict_all_paths": "allowed",
+        "crawl_delay": null
+      },
+      "login_free": true,
+      "public_surface": [
+        {
+          "url": "https://www.iguopin.com/",
+          "status": 200,
+          "content_type": "text/html",
+          "bytes": 1363,
+          "shape": "single-page-app shell, no server-rendered job rows",
+          "login_markers": false
+        },
+        {
+          "url": "https://www.iguopin.com/static/js/main.a5c1e78d.js",
+          "status": 200,
+          "content_type": "javascript",
+          "bytes": 3331541,
+          "shape": "public bundle; source of the API surface below"
+        }
+      ],
+      "list_contract_found_in_bundle": {
+        "list": {
+          "url": "/api/jobs/v3/list",
+          "method": "post",
+          "evidence": "s=function(e){return(0,o.ZP)({url:\"/api/jobs/v3/list\",method:\"post\",data:e})}"
+        },
+        "detail": {
+          "url": "/api/jobs/v3/info",
+          "method": "get",
+          "evidence": "c=function(e){return(0,o.ZP)({url:\"/api/jobs/v3/info\",params:e})}"
+        },
+        "pagination_params_seen_nearby": ["page", "page_size"],
+        "client_side_signature": {
+          "applies_to_prefixes": [
+            "/api/jobs/subscribe/v1/list",
+            "/api/activity",
+            "/personal/activity",
+            "/api/jobs/v3",
+            "personal/company"
+          ],
+          "condition": "(isLocalEnv || env === PRODUCTION) -> true in production",
+          "headers": ["Sign", "T", "Nonce"],
+          "algorithm_evidence": "o=[Math.floor(Date.now()/1e3), Math.random().toString(36).slice(2,10), METHOD.toUpperCase(), url, \"pc\"].join(\"|\"); n=Math.floor(o/m); {t:\"\"+r, sign:g(p.MB, n, r, o), nonce:i}",
+          "secret_reference": "g(p.MB, ...) with the transform bundled in the public JS",
+          "assessment": "anti-automation request signing; reproducing it would mean reimplementing the site's risk-control mechanism from a bundled secret"
+        }
+      },
+      "unsigned_probe_results": [
+        {
+          "url": "https://www.iguopin.com/api/jobs/v3/list",
+          "method": "POST",
+          "payloads": [
+            {"page": 1, "page_size": 5},
+            {"page": 1, "pageSize": 5},
+            {"page_index": 1, "page_size": 5}
+          ],
+          "status": 405,
+          "body": "nginx 405 Not Allowed"
+        },
+        {"url": "https://www.iguopin.com/api/jobs/v3/list", "method": "GET", "status": 200, "body": "SPA shell (1363 bytes), not data"},
+        {"url": "https://www.iguopin.com/api/jobs/v3/info", "method": "GET", "status": 200, "body": "SPA shell (1363 bytes), not data"},
+        {"url": "https://www.iguopin.com/sitemap.xml", "method": "GET", "status": 200, "body": "SPA shell (1363 bytes) -> no sitemap published"},
+        {"url": "https://www.iguopin.com/sitemap_index.xml", "method": "GET", "status": 200, "body": "SPA shell (1363 bytes) -> no sitemap published"}
+      ],
+      "verdict": "OUT for automated collection: the job list is only reachable through a client-signature-gated POST API (risk control). Not bypassed. Manual capture remains the channel.",
+      "would_be_needed_to_revisit": "written permission / a documented public data API, or a server-rendered public list that appears without the signature"
+    },
+    {
+      "id": "S3-tsinghua-career",
+      "host": "career.tsinghua.edu.cn",
+      "robots": {
+        "url": "https://career.tsinghua.edu.cn/robots.txt",
+        "status": 404,
+        "verdict_all_paths": "allowed",
+        "note": "404 means no rules published (RFC 9309 2.3.1.3)"
+      },
+      "login_free": true,
+      "public_surface": [
+        {
+          "url": "https://career.tsinghua.edu.cn/",
+          "status": 200,
+          "content_type": "text/html",
+          "bytes": 38242,
+          "shape": "server-rendered CMS landing page; no job rows",
+          "login_markers": false
+        }
+      ],
+      "columns_published_on_the_main_host": {
+        "notice_and_news_only": [
+          "/tzgg.htm",
+          "/xwrd.htm",
+          "/gjzz.htm",
+          "/gatxs.htm",
+          "/jyrl.htm",
+          "/js/tzgg.htm"
+        ],
+        "assessment": "announcements/events and one 置顶 article (/info/1033/3543.htm); there is no server-rendered job-posting list on this host"
+      },
+      "job_list_is_on_another_host": {
+        "anchor_text": "招聘信息",
+        "url": "http://career.cic.tsinghua.edu.cn/xsglxt/f/jyxt/anony/xxfb",
+        "path_implies": "anonymous (no-login) view of the school job system"
+      },
+      "fallback_host_probe": {
+        "host": "career.cic.tsinghua.edu.cn",
+        "robots_url_https": "https://career.cic.tsinghua.edu.cn/robots.txt",
+        "robots_url_http": "http://career.cic.tsinghua.edu.cn/robots.txt",
+        "status": 503,
+        "attempts": 4,
+        "schemes": ["https", "http"],
+        "span_minutes": 12,
+        "policy": "RFC 9309: 5xx means robots.txt is unavailable -> complete disallow (fail closed)",
+        "verdict_for_list_path": "disallowed",
+        "list_path_read": false
+      },
+      "verdict": "No verified list contract: the only public job list lives on a host whose robots.txt is 503-unavailable, so it must not be read. The main host publishes announcements, not job postings.",
+      "would_be_needed_to_revisit": "re-probe career.cic.tsinghua.edu.cn/robots.txt later; if it returns 200/404 the anonymous list can be verified and an adapter built"
+    }
+  ],
+  "other_candidates_unchanged": {
+    "note": "see source_adapters/README.md 来源登记表; no new probe was run for these in this step",
+    "out": ["www.zhiye.com (TLS certificate verify failed)", "O1 login-walled platforms", "O2 WeChat/APP referrals"],
+    "unverified": ["job.nju.edu.cn (SPA)", "www.nowcoder.com (login markers, /search disallowed)", "job.pku.edu.cn / career.zju.edu.cn (DNS)"]
+  },
+  "outcome": "no compliant, reusable list contract verified within budget => Step 5 adapter and the four-place allowlist registration were NOT started (ExecPlan 0014 section 12 stop condition 2 degradation path)"
+}

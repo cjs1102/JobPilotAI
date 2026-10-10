@@ -1,0 +1,339 @@
+"""Parse and validate a capture artifact produced by the bookmarklet.
+
+The artifact is **untrusted input**: it came from a web page via the clipboard
+and the user may have edited it by hand. Everything is checked here, before any
+normalization and before any network call, with a diagnosable message for every
+rejection. Nothing is silently dropped, clamped or truncated.
+
+Shape (``capture_version`` 1, produced by ``capture/bookmarklet.js``)::
+
+    {
+      "capture_version": 1,
+      "captured_at": "2026-10-09T20:15:00.000Z",
+      "page_url": "https://example.com/job/1",
+      "page_title": "...",
+      "page_host": "example.com",
+      "job": {
+        "title": "...", "company": "...", "source_url": "...",
+        "location": "...", "salary": "15-25K", "description": "...",
+        "education": "本科", "job_nature": "校招", "experience": "3-5年",
+        "deadline": "2026-10-31", "published_at": "...", "skills": ["..."]
+      },
+      "warnings": ["..."]
+    }
+
+A bare ``job`` object (no wrapper) is also accepted, and unknown keys are
+ignored so a newer bookmarklet stays readable. ``skills`` are carried for the
+audit trail but are **not** published: the source gives skill names without a
+level, and writing a level would fabricate a requirement.
+"""
+
+from __future__ import annotations
+
+import urllib.parse
+from dataclasses import dataclass, field
+from typing import Any, Mapping, Sequence
+
+MAX_CAPTURE_VERSION = 1
+#: The manual import endpoint accepts 1..100 jobs per request, and one capture
+#: file is published as one request so the outcome is unambiguous.
+MAX_CAPTURES_PER_RUN = 100
+
+#: Column byte limits from docs/03 section 3, mirroring the server validation.
+MAX_COMPANY_BYTES = 128
+MAX_TITLE_BYTES = 128
+MAX_LOCATION_BYTES = 64
+MAX_SOURCE_URL_BYTES = 255
+MAX_DESCRIPTION_BYTES = 65535
+
+_OPTIONAL_TEXT_FIELDS = (
+    "location",
+    "salary",
+    "description",
+    "education",
+    "job_nature",
+    "experience",
+    "deadline",
+    "published_at",
+)
+
+
+class CaptureError(Exception):
+    """The capture artifact is unusable; the message says why."""
+
+
+@dataclass(frozen=True)
+class CapturedJob:
+    """One validated capture: raw source strings, not yet normalized."""
+
+    source_url: str
+    title: str
+    company: str
+    location: str | None = None
+    salary: str | None = None
+    description: str | None = None
+    education: str | None = None
+    job_nature: str | None = None
+    experience: str | None = None
+    deadline: str | None = None
+    published_at: str | None = None
+    skills: tuple[str, ...] = ()
+    page_url: str | None = None
+    page_title: str | None = None
+    captured_at: str | None = None
+    warnings: tuple[str, ...] = field(default_factory=tuple)
+
+
+def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise CaptureError(f"{label} must be a JSON object")
+
+    return value
+
+
+def _text(
+    document: Mapping[str, Any],
+    key: str,
+    *,
+    label: str,
+    required: bool = False,
+) -> str | None:
+    value = document.get(key)
+
+    if value is None:
+        if required:
+            raise CaptureError(f"{label} is required but missing")
+
+        return None
+
+    if not isinstance(value, str):
+        raise CaptureError(
+            f"{label} must be a string, got {type(value).__name__}"
+        )
+
+    cleaned = value.strip()
+
+    if not cleaned:
+        if required:
+            raise CaptureError(f"{label} must not be empty")
+
+        return None
+
+    return cleaned
+
+
+def _bounded(value: str, max_bytes: int, label: str) -> str:
+    size = len(value.encode("utf-8"))
+
+    if size > max_bytes:
+        raise CaptureError(
+            f"{label} is {size} bytes, over the {max_bytes} byte limit; "
+            "shorten it before publishing (it is never truncated for you)"
+        )
+
+    return value
+
+
+def _absolute_http_url(value: str, label: str) -> str:
+    parts = urllib.parse.urlsplit(value)
+
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        raise CaptureError(
+            f"{label} must be an absolute http(s) URL, got {value!r}"
+        )
+
+    return value
+
+
+def _string_list(
+    document: Mapping[str, Any],
+    key: str,
+    *,
+    label: str,
+) -> tuple[str, ...]:
+    value = document.get(key)
+
+    if value is None:
+        return ()
+
+    if isinstance(value, str):
+        # A single value is accepted for hand-written artifacts.
+        return (value,) if value.strip() else ()
+
+    if not isinstance(value, Sequence):
+        raise CaptureError(f"{label} must be a list of strings")
+
+    entries: list[str] = []
+
+    for index, entry in enumerate(value):
+        if not isinstance(entry, str):
+            raise CaptureError(
+                f"{label}[{index}] must be a string, got "
+                f"{type(entry).__name__}"
+            )
+
+        if entry.strip():
+            entries.append(entry.strip())
+
+    return tuple(entries)
+
+
+def parse_artifact(document: Any) -> CapturedJob:
+    """Validate one capture artifact and return a :class:`CapturedJob`."""
+
+    root = _require_mapping(document, "capture artifact")
+
+    version = root.get("capture_version")
+
+    if version is not None:
+        if isinstance(version, bool) or not isinstance(version, int):
+            raise CaptureError(
+                "capture_version must be an integer, got "
+                f"{type(version).__name__}"
+            )
+
+        if version != MAX_CAPTURE_VERSION:
+            raise CaptureError(
+                f"unsupported capture_version {version}; this publisher "
+                f"understands {MAX_CAPTURE_VERSION}"
+            )
+
+    job_document = root.get("job")
+
+    if job_document is None:
+        # A bare job object (the wrapper omitted) is accepted.
+        job_document = root
+    else:
+        job_document = _require_mapping(job_document, "capture artifact.job")
+
+    page_url = _text(root, "page_url", label="page_url")
+
+    if page_url is not None:
+        page_url = _absolute_http_url(page_url, "page_url")
+
+    source_url = _text(
+        job_document, "source_url", label="job.source_url"
+    )
+
+    if source_url is None:
+        source_url = page_url
+
+    if source_url is None:
+        raise CaptureError(
+            "job.source_url (or page_url) is required: it is the platform's "
+            "idempotency key"
+        )
+
+    source_url = _absolute_http_url(source_url, "job.source_url")
+    source_url = _bounded(source_url, MAX_SOURCE_URL_BYTES, "job.source_url")
+
+    title = _text(
+        job_document, "title", label="job.title", required=True
+    )
+    company = _text(
+        job_document, "company", label="job.company", required=True
+    )
+
+    assert title is not None and company is not None  # required=True above
+
+    title = _bounded(title, MAX_TITLE_BYTES, "job.title")
+    company = _bounded(company, MAX_COMPANY_BYTES, "job.company")
+
+    optional: dict[str, str | None] = {}
+
+    for key in _OPTIONAL_TEXT_FIELDS:
+        value = _text(job_document, key, label=f"job.{key}")
+
+        if key == "location" and value is not None:
+            value = _bounded(value, MAX_LOCATION_BYTES, "job.location")
+
+        if key == "description" and value is not None:
+            value = _bounded(
+                value, MAX_DESCRIPTION_BYTES, "job.description"
+            )
+
+        optional[key] = value
+
+    return CapturedJob(
+        source_url=source_url,
+        title=title,
+        company=company,
+        location=optional["location"],
+        salary=optional["salary"],
+        description=optional["description"],
+        education=optional["education"],
+        job_nature=optional["job_nature"],
+        experience=optional["experience"],
+        deadline=optional["deadline"],
+        published_at=optional["published_at"],
+        skills=_string_list(job_document, "skills", label="job.skills"),
+        page_url=page_url,
+        page_title=_text(root, "page_title", label="page_title"),
+        captured_at=_text(root, "captured_at", label="captured_at"),
+        warnings=_string_list(root, "warnings", label="warnings"),
+    )
+
+
+def parse_captures(document: Any) -> list[CapturedJob]:
+    """Validate one artifact, a list of artifacts, or ``{"captures": [...]}``."""
+
+    entries: Any = document
+
+    if isinstance(document, Mapping):
+        if "captures" in document:
+            entries = document["captures"]
+        elif "jobs" in document and "job" not in document:
+            entries = document["jobs"]
+
+    if isinstance(entries, Mapping):
+        entries = [entries]
+
+    if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
+        raise CaptureError(
+            "capture file must be a JSON object, a list of objects, "
+            "or {\"captures\": [...]}"
+        )
+
+    if not entries:
+        raise CaptureError("capture file contains no captures to publish")
+
+    if len(entries) > MAX_CAPTURES_PER_RUN:
+        raise CaptureError(
+            f"capture file contains {len(entries)} captures, over the "
+            f"{MAX_CAPTURES_PER_RUN} per run limit (the manual import endpoint "
+            "accepts at most 100 jobs per request); split the file"
+        )
+
+    captures: list[CapturedJob] = []
+    seen: dict[str, int] = {}
+
+    for index, entry in enumerate(entries):
+        try:
+            capture = parse_artifact(entry)
+        except CaptureError as error:
+            raise CaptureError(f"capture[{index}]: {error}") from error
+
+        folded = capture.source_url.casefold()
+
+        if folded in seen:
+            raise CaptureError(
+                f"capture[{index}] repeats source_url {capture.source_url!r} "
+                f"(already used by capture[{seen[folded]}]); source_url is the "
+                "idempotency key, so duplicates are rejected instead of being "
+                "silently merged"
+            )
+
+        seen[folded] = index
+        captures.append(capture)
+
+    return captures
+
+
+__all__ = [
+    "MAX_CAPTURE_VERSION",
+    "MAX_CAPTURES_PER_RUN",
+    "CaptureError",
+    "CapturedJob",
+    "parse_artifact",
+    "parse_captures",
+]

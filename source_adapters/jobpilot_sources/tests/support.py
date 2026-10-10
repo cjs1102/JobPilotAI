@@ -24,6 +24,14 @@ def api_response(document: Mapping[str, Any], status: int = 200) -> tuple[int, b
     return status, json.dumps(document).encode("utf-8")
 
 
+def text_fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+def bytes_fixture(name: str) -> bytes:
+    return (FIXTURES / name).read_bytes()
+
+
 class RecordingTransport:
     """Transport stub that serves canned responses and records every call.
 
@@ -75,6 +83,88 @@ class RecordingTransport:
             for request in self.requests
             if request["method"] == "POST"
         ]
+
+
+class RichRecordingTransport:
+    """Rich transport stub returning status, headers and body.
+
+    Mirrors :class:`jobpilot_sources.fetch.TransportResponse` without importing
+    it, so the fetch tests exercise the real adaptation path.
+    """
+
+    def __init__(
+        self,
+        responses: Mapping[str, Any] | None = None,
+        default: Any = None,
+    ) -> None:
+        self.responses = dict(responses or {})
+        self.default = default
+        self.requests: list[dict[str, Any]] = []
+
+    def __call__(
+        self,
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: float,
+    ) -> Any:
+        self.requests.append(
+            {
+                "method": method,
+                "url": url,
+                "body": body,
+                "headers": dict(headers),
+                "timeout": timeout,
+            }
+        )
+
+        for fragment, response in self.responses.items():
+            if fragment in url:
+                return self._coerce(response, url)
+
+        if self.default is not None:
+            return self._coerce(self.default, url)
+
+        raise AssertionError(f"unexpected request to {url}")
+
+    @staticmethod
+    def _coerce(response: Any, url: str) -> Any:
+        from jobpilot_sources.fetch import TransportResponse
+
+        if isinstance(response, TransportResponse):
+            return response
+
+        if isinstance(response, tuple) and len(response) == 3:
+            status, headers, payload = response
+            return TransportResponse(
+                status=status,
+                headers=dict(headers),
+                body=payload,
+                url=url,
+            )
+
+        status, payload = response
+        return TransportResponse(
+            status=status,
+            headers={},
+            body=payload,
+            url=url,
+        )
+
+
+def public_resolver(*_args: Any, **_kwargs: Any) -> list[tuple[Any, ...]]:
+    """Resolver stub for tests: every host resolves to a public address."""
+
+    return [
+        (
+            2,
+            1,
+            6,
+            "",
+            ("93.184.216.34", 443),
+        )
+    ]
 
 
 def write_config(directory: Path, document: Mapping[str, Any]) -> Path:

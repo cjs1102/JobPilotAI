@@ -1,0 +1,19 @@
+# robots.txt fixture used by the offline robots tests and by the Step 2 source
+# register (source_adapters/README.md). Shape mirrors a real public job board:
+# a wildcard group, a named group that is more specific for our agent token, a
+# per-path Disallow and a Crawl-delay.
+User-agent: *
+Disallow: /admin/
+Disallow: /search
+Allow: /search/public
+Crawl-delay: 1
+
+User-agent: jobpilot-source-adapters
+Disallow: /admin/
+Disallow: /jobs/*/apply
+Allow: /jobs/
+Allow: /campus-recruitment/
+Crawl-delay: 2
+
+User-agent: some-other-bot
+Disallow: /

@@ -1,0 +1,45 @@
+{
+  "total": 3,
+  "data": [
+    {
+      "jobId": "CN-1001",
+      "title": "C++ 后端开发工程师",
+      "companyName": "示例科技有限公司",
+      "jobUrl": "https://jobs.example-cn.invalid/campus/1001",
+      "city": "深圳市",
+      "district": "南山区",
+      "salary": "15-25K·14薪",
+      "education": "本科及以上",
+      "jobNature": "校招",
+      "experience": "应届生",
+      "publishTime": "2026-09-20 08:00:00",
+      "deadline": "截止时间：2026-10-31",
+      "description": "<p>负责后端服务开发</p><ul><li>熟悉 Linux</li></ul>"
+    },
+    {
+      "jobId": "CN-1002",
+      "title": "运维实习生",
+      "companyName": "示例科技有限公司",
+      "jobUrl": "https://jobs.example-cn.invalid/campus/1002",
+      "city": "北京市",
+      "salary": "300元/天",
+      "jobType": "实习",
+      "validThrough": "2026-10-31T18:30:00+08:00",
+      "experience": "经验不限"
+    },
+    {
+      "jobId": "CN-1003",
+      "title": "数据分析师",
+      "companyName": "示例科技有限公司",
+      "jobUrl": "https://jobs.example-cn.invalid/campus/1003",
+      "city": "上海市",
+      "district": "浦东新区",
+      "salary": "面议",
+      "education": "硕士",
+      "jobNature": "社招",
+      "experience": "3-5年",
+      "publishTime": "2026-09-18",
+      "deadline": "2026-11-15 23:59:59"
+    }
+  ]
+}

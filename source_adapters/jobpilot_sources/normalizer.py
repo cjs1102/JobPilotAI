@@ -12,6 +12,13 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
+from .normalize_cn import MAX_EXPERIENCE_YEARS
+from .timestamps import (
+    NormalizedTimestamp,
+    is_date_only_stored,
+    is_valid_utc_timestamp,
+)
+
 DB_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 _SCRIPT_RE = re.compile(r"(?is)<(script|style)[^>]*>.*?</\1>")
@@ -164,11 +171,25 @@ def build_job(
     salary_currency: Any = None,
     description: Any = None,
     requirements: Iterable[dict[str, Any]] | None = None,
+    education_required: Any = None,
+    experience_years_min: Any = None,
+    experience_years_max: Any = None,
+    job_nature: Any = None,
+    deadline: Any = None,
+    deadline_date_only: Any = None,
 ) -> dict[str, Any]:
     """Build the source-sync job object, omitting every unknown field.
 
     ``company``, ``title``, ``source`` and ``source_url`` are mandatory for the
     platform contract; the remaining keys are only emitted when known.
+
+    The 0014 keys mirror the C++ validation domain (``docs/03`` section 9.2), so
+    a payload produced here can never be rejected for a value this function
+    emitted: enums stay inside ``1..5``/``1..3``, experience years are
+    non-negative integers ``<= 32767`` with ``min <= max``, and ``deadline`` is a
+    stored UTC timestamp whose ``deadline_date_only`` kind is always definite
+    (F13). A contradictory ``deadline``/``deadline_date_only`` pair is dropped
+    entirely instead of being sent as a fabricated instant.
     """
 
     job: dict[str, Any] = {
@@ -200,4 +221,84 @@ def build_job(
     if maximum is not None:
         job["salary_max"] = maximum
 
+    education = as_unsigned_int(education_required)
+
+    if education is not None and 1 <= education <= 5:
+        job["education_required"] = education
+
+    nature = as_unsigned_int(job_nature)
+
+    if nature is not None and 1 <= nature <= 3:
+        job["job_nature"] = nature
+
+    years_min = as_unsigned_int(experience_years_min)
+    years_max = as_unsigned_int(experience_years_max)
+
+    if years_min is not None and years_min > MAX_EXPERIENCE_YEARS:
+        years_min = None
+
+    if years_max is not None and years_max > MAX_EXPERIENCE_YEARS:
+        years_max = None
+
+    if (
+        years_min is not None
+        and years_max is not None
+        and years_max < years_min
+    ):
+        # An inverted pair is unusable; sending it would only be rejected.
+        years_min = None
+        years_max = None
+
+    if years_min is not None:
+        job["experience_years_min"] = years_min
+
+    if years_max is not None:
+        job["experience_years_max"] = years_max
+
+    stored_deadline, stored_kind = deadline_pair(
+        deadline,
+        deadline_date_only,
+    )
+
+    if stored_deadline is not None and stored_kind is not None:
+        job["deadline"] = stored_deadline
+        job["deadline_date_only"] = stored_kind
+
     return job
+
+
+def deadline_pair(
+    deadline: Any,
+    deadline_date_only: Any = None,
+) -> tuple[str | None, bool | None]:
+    """Normalize a ``(utc, date_only)`` pair, or ``(None, None)`` when unusable.
+
+    Accepts a :class:`~jobpilot_sources.timestamps.NormalizedTimestamp`, a
+    ``(utc, date_only)`` pair, or a stored UTC string plus a flag. The wire
+    protocol always carries a definite kind next to a present deadline, so an
+    omitted flag means "explicit instant"; a date-only flag whose value does not
+    carry the Beijing-noon convention is contradictory and drops the pair.
+    """
+
+    value: Any = deadline
+    kind: Any = deadline_date_only
+
+    if isinstance(deadline, NormalizedTimestamp):
+        value = deadline.utc
+        kind = deadline.date_only
+    elif isinstance(deadline, (tuple, list)) and len(deadline) == 2:
+        value, kind = deadline
+
+    if not isinstance(value, str) or not is_valid_utc_timestamp(value):
+        return None, None
+
+    if kind is None:
+        kind = False
+
+    if not isinstance(kind, bool):
+        return None, None
+
+    if kind and not is_date_only_stored(value):
+        return None, None
+
+    return value, kind

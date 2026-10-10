@@ -1,0 +1,21 @@
+{
+  "capture_version": 1,
+  "captures": [
+    {
+      "page_url": "https://jobs.example-cn.invalid/campus/4001",
+      "job": {
+        "title": "重复岗位 A",
+        "company": "示例科技",
+        "source_url": "https://jobs.example-cn.invalid/campus/4001"
+      }
+    },
+    {
+      "page_url": "https://jobs.example-cn.invalid/campus/4001#apply",
+      "job": {
+        "title": "重复岗位 B",
+        "company": "示例科技",
+        "source_url": "https://jobs.example-cn.invalid/campus/4001#apply"
+      }
+    }
+  ]
+}

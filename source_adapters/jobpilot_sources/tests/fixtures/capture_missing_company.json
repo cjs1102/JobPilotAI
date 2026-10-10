@@ -1,0 +1,8 @@
+{
+  "capture_version": 1,
+  "page_url": "https://jobs.example-cn.invalid/campus/3003",
+  "job": {
+    "title": "缺公司名的岗位",
+    "description": "company is missing on purpose"
+  }
+}

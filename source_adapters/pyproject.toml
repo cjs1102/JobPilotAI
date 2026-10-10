@@ -1,7 +1,7 @@
 [project]
 name = "jobpilot-sources"
 version = "0.1.0"
-description = "JobPilotAI ATS source adapters (Greenhouse / Lever / Ashby)"
+description = "JobPilotAI source adapters (Greenhouse / Lever / Ashby, China framework, manual capture)"
 requires-python = ">=3.10"
 # Standard library for HTTP/JSON; PyYAML parses the manual source config.
 # No web framework and no database driver (ExecPlan 0012 section 4).
@@ -15,4 +15,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["jobpilot_sources", "jobpilot_sources.providers"]
+packages = [
+    "jobpilot_sources",
+    "jobpilot_sources.providers",
+    "jobpilot_sources.capture",
+]
+
+# The bookmarklet is shipped as data so the installed package can print it
+# (ExecPlan 0014 Step 6). Keeping it a real .js file means one source of truth
+# that is also executable by the test suite.
+[tool.setuptools.package-data]
+"jobpilot_sources.capture" = ["*.js"]

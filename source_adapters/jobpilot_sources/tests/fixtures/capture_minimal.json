@@ -1,0 +1,15 @@
+{
+  "capture_version": 1,
+  "captured_at": "2026-10-09T12:20:00.000Z",
+  "page_url": "https://app.example-ats.invalid/social/2002",
+  "page_title": "运维工程师",
+  "job": {
+    "title": "运维工程师",
+    "company": "示例运维有限公司",
+    "description": "负责线上稳定性"
+  },
+  "warnings": [
+    "no JSON-LD JobPosting found on the page; only the visible page was used",
+    "salary not found on the page"
+  ]
+}

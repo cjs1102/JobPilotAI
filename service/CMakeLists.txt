@@ -462,8 +462,6 @@ if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         test_resume_dao
         test_resume_service
         test_resume_http
-        test_tailor_rule
-        test_resume_artifact_dao
         test_job_dao
         test_job_ingestion_dao
         test_job_ingestion_service
@@ -559,6 +557,19 @@ gtest_discover_tests(
     PROPERTIES
         LABELS "resume;external;integration"
 )
+
+# These two targets are defined after the main CROSSCOMPILING_EMULATOR block
+# above, so they get the TSan launcher here instead: naming a target before
+# add_executable makes every TSan configure fail. Keep the two blocks in sync.
+if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set_target_properties(
+        test_tailor_rule
+        test_resume_artifact_dao
+        PROPERTIES
+            CROSSCOMPILING_EMULATOR
+                "setarch;${CMAKE_SYSTEM_PROCESSOR};-R"
+    )
+endif()
 
 gtest_discover_tests(
     test_job_dao

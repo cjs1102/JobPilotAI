@@ -220,11 +220,15 @@ Documentation state
 ### 5.1 Clean-machine build contract (C1)
 
 From a fresh clone, with only documented prerequisites installed, these commands
-must succeed in order and produce `build/presets/release/service/jobpilot_service`:
+must succeed in order and produce the service binary — `build/presets/release/service/jobpilot_service`
+when the root entry is used, `service/build/presets/release/jobpilot_service` when
+the `service/` entry is used:
 
 ```bash
-# prerequisites: cmake>=3.22, a C++17 compiler, pkg-config, libmysqlclient-dev, python3-pip, conan>=2
-tools/dev/bootstrap.sh          # runs conan install with the committed profile/lock
+# prerequisites: cmake>=3.22, a C++17 compiler, pkg-config, libmysqlclient-dev,
+# python3 + pip (for Conan 2). tools/dev/bootstrap.sh checks each one and names
+# whatever is missing.
+tools/dev/bootstrap.sh          # conan install, pinned by service/conan.lock
 cmake --preset release          # root entry: backend + service
 cmake --build --preset release -j"$(nproc)"
 ```
@@ -266,8 +270,10 @@ behaviour, that is a stop condition (§13), not a licence to change it.
 
 - **P1 build and run contract.** Keep Conan 2 and the existing exact pins; add a
   committed `conan.lock` generated from `service/conanfile.txt`, pin
-  `compiler.cppstd=17` and `build_type=Release` explicitly in the bootstrap step
-  (matching what the current generated toolchain already resolves to), and add
+  `compiler.cppstd=gnu17` and `build_type=Release` explicitly in the bootstrap
+  step (the setting the verified toolchain and the lock were resolved with —
+  `service/build/conan_toolchain.cmake` sets `CMAKE_CXX_EXTENSIONS ON`, and the
+  project's own C++17 requirement is enforced by `CMAKE_CXX_STANDARD 17`), and add
   `tools/dev/bootstrap.sh`, which resolves the Conan binary (it lives outside
   `PATH` for non-interactive shells on this host) and runs `conan install` with
   `--output-folder` at the path both entries' presets expect. On the same unit,

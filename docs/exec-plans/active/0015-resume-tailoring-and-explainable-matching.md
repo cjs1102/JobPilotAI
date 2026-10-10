@@ -711,7 +711,7 @@ Stop and report to the Lead (do not widen scope) if:
         single `GET` with the existing Bearer token (never a mutating verb, never the database).
   - [x] C3: documented in `docs/04` §8 + `tools/job_report/README.md`; deterministic fixture tests
         in `tools/job_report/tests/test_render_report.py` (11 tests, all green).
-- [ ] Phase D: decisions 1/3 (D0) → contract (D1) → `tailor_rule_v1` (D2) →
+- [x] Phase D: decisions 1/3 (D0) → contract (D1) → `tailor_rule_v1` (D2) →
       artifact persistence (D3) → fact gate (D4) → confirmation boundary (D5) →
       worker (D6, conditional) → docs + single L4 (D7)
   - [x] D0 (owner decisions recorded): decision 1 = **RESUME ONLY** — no cover letters in this
@@ -756,7 +756,23 @@ Stop and report to the Lead (do not widen scope) if:
         surface / AI key / worker handler is wired in this stage. `generator='rule_v1'` +
         `source_version='tailor_rule_v1'` remain the ONLY generator; any future wording pass is
         already bounded by the D4 fact gate (wording may only be ADDED, never invented).
-  - [ ] D7: docs sync (README/AGENTS/project-state) + the stage's single L4.
+  - [x] D7 (docs sync + the stage's single L4): docs synced (this section, README, AGENTS,
+        project-state). L4 at HEAD `26e2069` (production code frozen at `576f436`, tree clean):
+        `debug rc=0`, `asan rc=0`, `ubsan rc=0`, `release rc=0`, `root-release rc=0`. Post-fix
+        CTest: debug `100% tests passed, 0 tests failed out of 309` (118.25 s, rc=0), asan
+        `100% tests passed, 0 tests failed out of 309` (131.29 s, rc=0), ubsan
+        `100% tests passed, 0 tests failed out of 309` (76.48 s, rc=0); sanitizer diagnostics 0
+        (AddressSanitizer / LeakSanitizer / `runtime error:` / UndefinedBehaviorSanitizer).
+        Python: `source_adapters` `Ran 446 tests` + `OK`, `ai_worker` `Ran 190 tests` + `OK`.
+        Backfill isolation: dev `REVIEW_DB_ISOLATION connected=jobpilot scratch_env=<unset>` +
+        `[  SKIPPED ]` (rc=0); scratch `REVIEW_DB_ISOLATION connected=jobpilot_review_scratch
+        scratch_env=jobpilot_review_scratch` + `[  PASSED  ] 7 tests` (rc=0).
+        **Honest note**: the first full-matrix run at `576f436` failed debug + asan (309 tests,
+        1 failed: `MatchExplanationTest.ClassifiesDeadlineUrgencyWithDateOnlyHandling` compared
+        `const char *` with `EXPECT_EQ`, so it passed only where the literal was pooled — a
+        Phase B test-only defect): fixed in test-only commit `26e2069`, and the three CTest
+        phases re-ran green with production code unchanged. Raw logs: `build/l4-0015/`
+        (gitignored).
 
 ## 15. Smallest First Implementable Unit
 

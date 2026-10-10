@@ -12,8 +12,9 @@
 > are complete and archived; the **0015A** job-list/intake hardening is closed.
 > **0015 resume tailoring and explainable matching is the active stage**: Phases
 > A-C are complete and Phase D is implemented through the D5 routes, which passed
-> their L2 verification (commit `ae85868`; D6 deferred by owner decision), with
-> the stage's single L4 pending (`## Active Plan (0015)`). 0014's Step 5 is
+> their L2 verification (commit `ae85868`; D6 deferred by owner decision), and the
+> stage's single L4 passed at HEAD `26e2069` (`## Active Plan (0015)`, raw lines in
+> `## Verified Snapshot`). 0014's Step 5 is
 > environment-limited and carried forward (see the Completed Plan section and
 > `## Next Entry` items 6/7). 0016 open-source packaging follows 0015.
 
@@ -98,7 +99,7 @@ Key decisions:
 [`active/0015-resume-tailoring-and-explainable-matching.md`](../exec-plans/active/0015-resume-tailoring-and-explainable-matching.md)
 — Phases A-C complete, Phase D implemented through D5 (D6 deferred by owner
 decision, plan §17); D5 passed its L2 verification (commit `ae85868`) and the
-stage's single L4 is pending.
+stage's single L4 passed at HEAD `26e2069` (production code frozen at `576f436`).
 
 Delivered:
 
@@ -130,8 +131,14 @@ Delivered:
   `test_resume_dao` 2/2, `test_resume_service` 6/6, `test_ai_task_service` 13/13);
   `tools/checks/no_submission_path.py` rc=0; `git diff --check` rc=0.
 
-The stage's single L4 has not run yet; no stage-level test totals exist (the D5
-figures above are L2 scope only).
+The stage's single L4 passed at HEAD `26e2069` (production code frozen at
+`576f436`, tree clean): builds `debug` / `asan` / `ubsan` / `release` /
+`root-release` all rc=0; CTest `100% tests passed, 0 tests failed out of 309` in
+Debug, ASan and UBSan (rc=0, sanitizer diagnostics 0); Python `source_adapters`
+`Ran 446 tests` + `OK` and `ai_worker` `Ran 190 tests` + `OK`; backfill isolation
+dev `[  SKIPPED ]` / scratch `[  PASSED  ] 7 tests`. The first full-matrix run at
+`576f436` caught one test-only defect, fixed in `26e2069` with production code
+unchanged (raw lines below).
 
 ## Completed Plan (0015A)
 
@@ -331,8 +338,20 @@ HTTP request
   `source_adapters` **446** and `ai_worker` **190**; the review-backfill
   isolation ran with the dev database explicitly SKIPped and the scratch database
   7/7.
-- 0015 stage L4: **not run yet** — the stage is active and its single L4 runs at
-  close, so no stage-level test totals exist in this snapshot.
+- 0015 stage L4 (HEAD `26e2069`; production code frozen at `576f436`, tree clean;
+  run after the test-only fix): builds `debug rc=0`, `asan rc=0`, `ubsan rc=0`,
+  `release rc=0`, `root-release rc=0`; CTest **`100% tests passed, 0 tests failed
+  out of 309`** in Debug (118.25 s), ASan (131.29 s) and UBSan (76.48 s), all rc=0,
+  sanitizer diagnostics 0 (`AddressSanitizer` / `LeakSanitizer` / `runtime error:`
+  / `UndefinedBehaviorSanitizer`); Python `source_adapters` `Ran 446 tests` + `OK`
+  and `ai_worker` `Ran 190 tests` + `OK`; backfill isolation dev
+  `REVIEW_DB_ISOLATION connected=jobpilot scratch_env=<unset>` + `[  SKIPPED ]`
+  (rc=0) and scratch `REVIEW_DB_ISOLATION connected=jobpilot_review_scratch
+  scratch_env=jobpilot_review_scratch` + `[  PASSED  ] 7 tests` (rc=0). The first
+  full-matrix run at `576f436` failed debug + asan on one **test-only** defect
+  (`MatchExplanationTest.ClassifiesDeadlineUrgencyWithDateOnlyHandling` compared
+  `const char *` with `EXPECT_EQ`); fixed in test-only commit `26e2069` and the
+  three CTest phases re-ran green. Raw logs (gitignored): `build/l4-0015/`.
 - Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
   all published with `complete=false` only where the 200-job limit required it.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test
@@ -386,10 +405,12 @@ Performance baseline:
 7. **0014 carry-forward — the real-browser bookmarklet acceptance is still
    UNVERIFIED.** The plan's §19.5 holds the redacted-evidence template; this is
    owned by the product owner and is not a stage blocker.
-8. **0015 is active.** Phases A-C are complete and Phase D is implemented through
-   D5, whose L2 verification passed (commit `ae85868`); only D7 — this docs sync
-   plus the stage's single L4 — remains. The plan's D7 checkbox stays open until
-   the L4 evidence is recorded.
+8. **0015 is implementation-complete.** Phases A-C are complete; Phase D is
+   implemented through D5 (L2-verified at `ae85868`, D6 deferred) and the stage's
+   single L4 is green at `26e2069` (`## Verified Snapshot`); the docs sync that
+   records it is committed with this snapshot. Open: the stage-close decision
+   (archiving this plan under `completed/`, together with item 9) and then
+   **0016** open-source packaging.
 9. **0015A is closed but its plan file still sits under `active/`** with its own
    status header and §13 checkboxes unupdated; updating them and archiving the
    file is the Lead's call (plan §5.5 assigns that file to the Lead).

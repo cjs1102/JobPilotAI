@@ -485,8 +485,14 @@ Performance baseline:
    complete through packaging and **no plan is active**. Genuinely open:
    0014's Step 5 (item 6), the bookmarklet's `publish-capture`/read-back
    acceptance (item 7), 0015's D6 deferral (0015 plan §17), and 0016's CI `image`
-   job — unconfirmed until the owner sees the first GitHub run. The Lead commits
-   and pushes this archival change.
+   job — unconfirmed until the owner sees the first GitHub run. That workflow
+   itself is verified as far as it can be from here: `actionlint` 1.7.7 reports
+   **0 issues** (schema, expressions and shell rules), while no Actions run can be
+   observed because this repository is **private** and the credential available on
+   the development host has no Actions scope. The repository being private is also
+   the one thing that keeps the packaging work from being "open source" in
+   practice: making it public (and confirming the first CI run) is the owner's
+   call. The Lead commits and pushes this archival change.
 9. **Resolved — both plans are archived under `completed/`.** 0015A's §13 step
    boxes remain unticked on purpose (never maintained during the stage); its
    status header now records the closure evidence, and Step 5's real-database

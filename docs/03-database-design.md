@@ -511,8 +511,10 @@ CREATE TABLE job_review_items(...)              -- 异常与复核审计（reaso
 - **0015A 质量状态（quality status）**：`jobs.review_status ∈ {0,1,2}`（0 clean /
   1 needs_review / 2 quarantined），`NOT NULL DEFAULT 0`，既有行升级后一律为 `0`
   （**不批量标记、不回填**，历史数据按 `docs/04` 的内部 dry-run 流程分类）。
-  公共搜索/推荐只返回 `review_status = 0`；`needs_review`/`quarantined` 仅能通过
-  受保护的内部端点访问。`job_review_items` 逐条记录 `reason_code`（稳定机器码）、
+  公共读取（列表、推荐、按 id 详情及其 `requirements`、AI 匹配任务创建、简历定制与
+  创建申请时的岗位校验）只使用 `review_status = 0`；`needs_review`/`quarantined` 仅能
+  通过受保护的内部端点访问（审核队列、审核决定，以及 AI worker 的任务输入）。
+  `job_review_items` 逐条记录 `reason_code`（稳定机器码）、
   `reason_text`、`outcome` 与 `resolution`；`review_status` 不参与 `uk_source_url`
   幂等键。
 - **`job_review_items.outcome` 词表与列宽**：列为 `VARCHAR(24)`，规范词表

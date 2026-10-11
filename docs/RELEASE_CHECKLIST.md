@@ -151,9 +151,15 @@ deliberate deviations from the draft wording: **`job-automation` was dropped**,
 because the project has no submission path at all
 (`tools/checks/no_submission_path.py` enforces that), so a topic implying
 auto-applying would misdescribe it; and no AI-model-service claim appears,
-because the provider layer is optional and BYOK. **Applying About/Topics is an
-owner action** — GitHub Topics are public even while the repository is private,
-so the copy lives here instead of being pushed.
+because the provider layer is optional and BYOK. **Applying this is a one-minute owner action**, because the available
+credential cannot do it: `PATCH /repos/cjs1102/JobPilotAI` answers
+`403 Resource not accessible by personal access token` (fine-grained tokens need
+repository *administration* write to change metadata; the read-only token used
+here deliberately does not have it). In the GitHub UI: repository → the gear icon
+next to **About** → paste the description, add the topics, leave the homepage
+empty, **Save changes**. Do not change the repository visibility in that dialog.
+GitHub Topics are public even while a repository is private, which is why the
+copy lives here rather than being pushed by an agent.
 
 ## 6. Owner-only actions that make the release real
 
@@ -174,12 +180,14 @@ Every command below is reproducible from a full clone.
 
 | Check | Command | Result |
 |---|---|---|
-| Current tree: secrets, private addresses, developer paths | `python3 tools/checks/release_preflight.py` (items 3 and 8) | `PASS secrets`, `PASS local-paths` over 420 tracked files |
-| History: credential shapes, PEM headers, ever-added secret-named files | `tools/checks/history_secret_scan.sh` | `history scan: 149 commits, 0 credential-shape finding(s)` + `HISTORY_SCAN_CLEAN` (exit 0). Only `.env.example` was ever added under a secret-looking name. |
+| Current tree: secrets, private addresses, developer paths | `python3 tools/checks/release_preflight.py` (items 3 and 8) | `PASS secrets`, `PASS local-paths` over **423** tracked files (refreshed 2026-10-11 after the review-gate change) |
+| History: credential shapes, PEM headers, ever-added secret-named files | `tools/checks/history_secret_scan.sh` | `history scan: 156 commits, 0 credential-shape finding(s)` + `HISTORY_SCAN_CLEAN` (exit 0), refreshed 2026-10-11. Files ever added under a secret-looking name: `.env.example` and `tools/checks/history_secret_scan.sh` itself (the scanner's own name matches the pattern; harmless, listed so the next reader is not surprised). |
 | History scanner controls | synthetic throwaway repositories (`/tmp/hs-pos`, `/tmp/hs-neg`) | positive control (a synthetic invalid PEM private-key header — the RSA form — plus a fake `ghp_…` value) → 2 findings, exit 1; negative control (prose about a PRIVATE KEY and a `-----BEGIN PUBLIC KEY-----` header) → 0 findings, exit 0 |
-| History: private addresses and home paths | `tools/checks/history_secret_scan.sh` (info counters) | `absolute home path x6`, `rfc1918 address x14`, values deliberately not printed; two RFC1918 addresses inside the development host's own `192.168.150.x` network (gateway, host), masked here and in the tree — 0016 P5 and `b2a55be` redacted the tree, history stays by policy — plus the intentional SSRF fixtures |
+| History: private addresses and home paths | `tools/checks/history_secret_scan.sh` (info counters) | `absolute home path x7`, `rfc1918 address x14`, values deliberately not printed; two RFC1918 addresses inside the development host's own `192.168.150.x` network (gateway, host), masked here and in the tree — 0016 P5 and `b2a55be` redacted the tree, history stays by policy — plus the intentional SSRF fixtures |
 | Licence | `LICENSE`, `THIRD_PARTY_NOTICES.md` | MIT, holder `JobPilotAI` (no personal name); every Conan dependency's licence was verified from the pinned package's own licence file |
 | Fixture data | manual read of `docs/examples/*`, `source_adapters/**/fixtures/*` | synthetic only (`example.invalid`, `示例科技`); no customer, resume or employee data |
+| CI artifacts (they become downloadable with the repository) | full download + `sha256` check + content scan of `release-build` (run `38128059424`) | **complete**: 1,175 members, integrity matched the API digest, no credential/PEM/AWS/Slack/OpenAI shape, no personal email, no RFC1918 address, no environment dump, no CI placeholder password, no developer home path; only runner-local paths (210 text + 105 binary files) — report `/tmp/jobpilot-release/artifact-audit.txt`. The whitelist was then trimmed (`d9fc0bb`) so object files, archives, dep/Make metadata, the CMake cache and `compile_commands.json` are no longer shipped |
+| CI logs (they become public with the repository) | downloaded the `full test suite` job log of run `38128059424` and scanned it masked | 1,279 lines: 0 token shapes, 0 PEM headers, 0 AWS keys, 0 personal emails, 0 environment dumps; the ephemeral job-scoped `ci-root-password` literal appears (explained and hardened in `e23f98e`) |
 
 ### Risks to accept or resolve before the repository becomes public
 
@@ -209,16 +217,19 @@ Every command below is reproducible from a full clone.
    placeholders in scripts and docs, and the ephemeral `ci-root-password` inside
    `.github/workflows/ci.yml`. All placeholders/ephemeral and documented; listed
    so the next scan is not surprising.
-6. **Contract mismatch around `needs_review` visibility** (found on
-   2026-10-11): `docs/04:461-462` says only clean rows are public and that
-   `needs_review`/`quarantined` rows are reachable **only** through the protected
-   internal endpoints, but `GET /api/v1/jobs/{id}` returns 200 for a
-   `needs_review` row (it is `JobDao::FindActiveJobById`, which filters
-   `status = 1` only). List/search hide it correctly. The content is a public
-   posting, so this is not a confidentiality blocker, but the code and the
-   contract disagree. **Owner decision:** gate the detail lookup as well (touches
-   three call sites and the `JOB_PUBLIC_INCLUDE_NEEDS_REVIEW` rollback switch) or
-   amend the contract to say only the discovery surfaces are gated.
+6. ~~**Contract mismatch around `needs_review` visibility**~~ — **fixed
+   2026-10-11** (`7ba62c8`, code first, contract unchanged). Every public read now
+   shares one rule: the job list, the recommended list, the by-id detail (with
+   the requirements it carries), AI match creation, resume tailoring and the
+   job-existence check behind `POST /api/v1/applications` treat a queued row
+   exactly like a missing one (404 / `kJobNotFound` / code 40001), so the API
+   cannot confirm that a hidden row exists. The review queue, the review
+   decisions and the AI worker's task input read the row regardless of its review
+   state, so reviewing and processing still work. `JobDao` now exposes
+   `FindPublicJobById` / `FindReviewableJobById` / `PublicJobExists` instead of a
+   single ambiguous "find an active job" lookup. Evidence: 66 targeted tests,
+   100% passed, and the real capture acceptance on the review path (11 legs,
+   `CAPTURE_ACCEPTANCE_OK`, by-id detail now 404).
 
 ## 8. Evidence record
 
@@ -271,6 +282,21 @@ footer text
 Raw logs stay outside the repository (`build/0017a/acceptance-real-capture2.log`,
 `build/0017a/section-19.5-real.txt`, both gitignored scratch), and the capture JSON
 was never copied into the repository.
+
+### 2026-10-11 — release-candidate close-out (second pass)
+
+Collected after the first evidence block. Same rule: raw logs stay outside the
+repository, and every number below comes from a command that was actually run.
+
+| Item | Result | Evidence |
+|---|---|---|
+| `needs_review` reachable by direct id | **fixed** — a queued row is 404 on the public detail, rejected by `POST /api/v1/applications`, hidden from list/search, and still readable by the review queue and the AI worker | `7ba62c8`; 66 targeted tests 100% passed (0 failed, 1 skipped by design); real capture acceptance 11 legs / `CAPTURE_ACCEPTANCE_OK` with `a queued row is not readable by direct id (HTTP 404)` |
+| Release-build artifact, full audit | **complete** — `release-build` from run `38128059424` (`040bd47`), 28,796,225 bytes, downloaded in full and `sha256` matched the API digest `c732fce0…146d`; 1 zip member, 1,175 tar members, 89,112,929 bytes, 282 text + 745 binary files scanned | report `/tmp/jobpilot-release/artifact-audit.txt`. Findings: **0** credential shapes, **0** PEM headers, **0** AWS/Slack/OpenAI keys, **0** personal email addresses, **0** RFC1918 addresses, **0** environment dumps, **0** occurrences of the CI placeholder password, **0** developer home paths. Only runner-local path strings appear (210 text + 105 binary files) |
+| Artifact composition / whitelist | 123 `.o`, 3 `.a`, 305 `.make`, 181 `.d`, `CMakeCache.txt`, `compile_commands.json` and 61 `compiler_depend.ts` were being shipped although only the test binaries, `CTestTestfile.cmake` and the discovered `*_tests.cmake` files are needed at test time. Excluded now; the trimmed archive (21.0 MB vs 27.5 MB uncompressed-tar size) was re-extracted over the release tree in place and the suite ran from it: **309/309 passed in 96.5 s** | `d9fc0bb`; the runner's integration job re-verifies the round trip |
+| CI service credentials (`ci-root-password` in the log) | **explained and hardened** — it is the root password of the job's own `mysql` service container, set from a workflow literal, scoped to the ephemeral job, destroyed with it, and absent from the artifact (scanned). Both service passwords are now overridable by `CI_MYSQL_ROOT_PASSWORD` / `CI_APP_DB_PASSWORD` with the documented literals as defaults, the three root steps use `MYSQL_PWD` instead of `--password=`, and the health check reads the container's own env; verified locally against `mysql:8.0` with the same options string (`exit 1` while initialising, then `exit 0`, `health=healthy`) | `e23f98e` |
+| Commit identity for future commits | repository-local `user.name=cjs1102`, `user.email=180498659+cjs1102@users.noreply.github.com` (verified GitHub account id); the global config is untouched. **History still contains the previous personal address in its commit objects — fixing the configuration does not change that** | `git config --local --get user.email` |
+| Local credential exposure | the shell history contained **one** line with a literal token value; it was redacted in place (mode preserved, 0 literal values remain). No credential-helper entry, `~/.git-credentials`, `~/.netrc`, `/tmp/gh.*` or environment token exists; `origin` uses SSH | counted, never printed |
+| Repository metadata (About/Topics) | **cannot be applied with the available credential**: `PATCH /repos/cjs1102/JobPilotAI` → HTTP 403 "Resource not accessible by personal access token" (fine-grained tokens need repository administration write for metadata). The verified copy is in section 5; applying it is a one-minute owner action | attempted 2026-10-11 |
 
 ```text
 Release: <version or "public switch">     Date: ____-__-__

@@ -64,20 +64,39 @@ sentence. Paths are in the build host's Conan cache (`~/.conan2/p/…/p/licenses
 | PyYAML | floor `>=6.0`, **no lock file** (6.0.1 installed here) | MIT | package metadata `License: MIT`; declared in `source_adapters/pyproject.toml` and `ai_worker/pyproject.toml` |
 | vendored `third_party/libbcrypt` | **no upstream revision recorded** | CC0 / public-domain dedication, Openwall `crypt_blowfish` with a permissive fallback | `PROVENANCE.md` + the licence headers inside `bcrypt.c` and `crypt_blowfish.c` |
 
-**Open, and deliberately not concluded here: the MySQL C client.** The committed
-`Dockerfile` builds on `ubuntu:24.04` with `libmysqlclient-dev` and its runtime
-stage installs `libmysqlclient21`; `readelf -d` on the host-built binary shows
-`NEEDED libmysqlclient.so.21`, i.e. Oracle MySQL 8.0.46
+**MySQL C client: evaluated, with the smaller-risk option identified (2026-10-11).**
+The committed `Dockerfile` builds on `ubuntu:24.04` with `libmysqlclient-dev` and
+its runtime stage installs `libmysqlclient21`; `readelf -d` on the host-built
+binary shows `NEEDED libmysqlclient.so.21`, i.e. Oracle MySQL 8.0.46
 (`libmysqlclient21 8.0.46-0ubuntu0.24.04.4`). `/usr/share/doc/libmysqlclient21/copyright`
 states GPLv2 **plus the Oracle FOSS License Exception** (`License: GPL-2+` for the
 library files; the exception is quoted at its lines 6-25). Whether the *combined
 work* — the `service/jobpilot_service` binary and the image — can be distributed
 under MIT because of that exception is a legal judgement the maintainer has to
-make; this repository records the facts and the conditions instead of asserting
-compliance. Asymmetry worth knowing: the local scratch verification image
-(`build/Dockerfile.verify`, used only because Docker Hub is unreachable from the
-development host) installs `libmariadb3` and links `libmariadb.so.3` (LGPL-2.1),
-so it says **nothing** about the shipped image.
+make; this repository records facts and conditions instead of asserting
+compliance.
+
+The alternative that removes that question is MariaDB Connector/C, whose **client
+library is LGPL-2.1-or-later** — a library licence an MIT application links
+against dynamically:
+
+| Fact | Evidence |
+|---|---|
+| Ubuntu 24.04 ships the packages | `libmariadb3` `1:10.11.13-0ubuntu0.24.04.1` and `libmariadb-dev-compat` `1:10.11.13-0ubuntu0.24.04.1` (source package `mariadb`) |
+| The client library, not the server, is what is linked — and it is LGPL | the package's own copyright file: `Files: libmariadb/*` → `License: LGPL-2+` (read from the installed `libmariadb3 1:10.11.18-0+deb12u1`); the GPL-2 stanzas in the same file cover the *server* files |
+| No source change is needed | in an evaluation image with `libmariadb-dev` + `libmariadb-dev-compat`, CMake reported `Found mysqlclient, version 3.3.19` (MariaDB Connector/C) and built the whole release preset — the service binary **and every test binary** |
+| Linking is dynamic, as LGPL-2.1 expects | `ldd` inside that image: `libmariadb.so.3 => /lib/x86_64-linux-gnu/libmariadb.so.3` |
+| The real paths already ran on it against MySQL 8.0 | the Debian-based verification images (`jobpilot-backend:0017a`, `:reviewgate`) contain **only** `libmariadb3` and passed the real-capture acceptance (11 legs, `CAPTURE_ACCEPTANCE_OK`) and the demo gate (9 legs, `DEMO_GATE_OK`) against compose MySQL 8.0 |
+
+**Status of the switch (honest):** the licence facts, the Ubuntu package set, the
+unchanged-build evidence and the dynamic-link evidence are complete. The *full*
+C++ suite with MariaDB-linked test binaries was still being produced when this
+block was written (see the second evidence block in section 8 for its result), so
+the committed `Dockerfile` still ships the Oracle client. The three-line change is
+ready: `libmysqlclient-dev` → `libmariadb-dev` + `libmariadb-dev-compat` in the
+builder, `libmysqlclient21` → `libmariadb3` in the runtime stage, and the two CI
+package lines. It is applied only together with that compatibility result, and the
+runner re-verifies the `ubuntu:24.04` shape end to end through the image job.
 
 ## 3. README and documentation for outsiders
 
@@ -296,6 +315,8 @@ repository, and every number below comes from a command that was actually run.
 | CI service credentials (`ci-root-password` in the log) | **explained and hardened** — it is the root password of the job's own `mysql` service container, set from a workflow literal, scoped to the ephemeral job, destroyed with it, and absent from the artifact (scanned). Both service passwords are now overridable by `CI_MYSQL_ROOT_PASSWORD` / `CI_APP_DB_PASSWORD` with the documented literals as defaults, the three root steps use `MYSQL_PWD` instead of `--password=`, and the health check reads the container's own env; verified locally against `mysql:8.0` with the same options string (`exit 1` while initialising, then `exit 0`, `health=healthy`) | `e23f98e` |
 | Commit identity for future commits | repository-local `user.name=cjs1102`, `user.email=180498659+cjs1102@users.noreply.github.com` (verified GitHub account id); the global config is untouched. **History still contains the previous personal address in its commit objects — fixing the configuration does not change that** | `git config --local --get user.email` |
 | Local credential exposure | the shell history contained **one** line with a literal token value; it was redacted in place (mode preserved, 0 literal values remain). No credential-helper entry, `~/.git-credentials`, `~/.netrc`, `/tmp/gh.*` or environment token exists; `origin` uses SSH | counted, never printed |
+| MySQL client evaluation | MariaDB Connector/C evaluated as the LGPL alternative: the Ubuntu 24.04 package set is verified, the installed package's own copyright file assigns `Files: libmariadb/*` to `License: LGPL-2+`, the project builds unchanged against it (`Found mysqlclient, version 3.3.19`), the binary carries `NEEDED libmariadb.so.3`, and both real-path suites are already green on images that contain only `libmariadb3`. The full suite with MariaDB-linked test binaries was still building when this row was written, so the committed `Dockerfile` still ships the Oracle client and the three-line switch stays unapplied | section 2's table; evaluation image `jobpilot-mariadb:verify` |
+| Debug / ASan / UBSan matrix | **not completed in this pass, recorded as a gap**: the ASan tree was rebuilt to 47 % and then stopped so the single-core-bound MariaDB evaluation could finish on a 4-core host (three heavy jobs at once had already stretched everything 2-3x). The release matrix for the pushed commit does run in CI - 312 cases + coverage guard + both Python suites, green on `1ec48e1` - but no sanitizer matrix has been run since the review-gate change | re-run `build/l4-0017/run.sh` (or the three ctest presets) before the public switch; do not treat this row as a pass |
 | Repository metadata (About/Topics) | **cannot be applied with the available credential**: `PATCH /repos/cjs1102/JobPilotAI` → HTTP 403 "Resource not accessible by personal access token" (fine-grained tokens need repository administration write for metadata). The verified copy is in section 5; applying it is a one-minute owner action | attempted 2026-10-11 |
 
 ```text

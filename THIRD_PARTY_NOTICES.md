@@ -33,15 +33,31 @@ build bootstraps, so none of them is vendored into this repository.
 | GoogleTest | <https://github.com/google/googletest> | BSD-3-Clause (verified in the pinned package's `licenses/`) |
 | hiredis | <https://github.com/redis/hiredis> | BSD-3-Clause (verified in the pinned package's `licenses/COPYING`) |
 
-One dependency is not from Conan: the MySQL client library, provided by the
-distribution (`libmysqlclient-dev` to build, `libmysqlclient21` at run time).
-**Its licence is GPLv2 with Oracle's "FOSS License Exception"** — the Debian
-package ships that text in `/usr/share/doc/libmysqlclient21/copyright`. That is
-the one term in this file of a different kind, so it is named explicitly here:
-the `service/` binary and any image built from `Dockerfile` link that library and
-are therefore a combined work with it, which is a distribution decision the
-maintainer has to make (the release checklist's publish-safety review lists the
-options). The repository's own source stays MIT.
+One dependency is not from Conan: the MySQL **client** library, provided by the
+distribution. The committed `Dockerfile` builds on `ubuntu:24.04` with
+`libmysqlclient-dev` and installs `libmysqlclient21` at run time, i.e. Oracle's
+client (MySQL 8.0.46 where this was checked). **Its licence is GPLv2 with Oracle's
+"FOSS License Exception"** — the distribution package ships that text in
+`/usr/share/doc/libmysqlclient21/copyright` (`License: GPL-2+` for the library
+files; the exception is quoted in its first 25 lines). That is the one term in
+this file of a different kind, so it is named explicitly: the `service/` binary
+and any image built from `Dockerfile` link it and are a combined work with it,
+which is a distribution decision the maintainer has to make.
+
+**The evaluated alternative is MariaDB Connector/C** (`libmariadb-dev` +
+`libmariadb-dev-compat` to build, `libmariadb3` at run time), whose *client
+library* is **LGPL-2.1-or-later**: the package's own copyright file assigns
+`Files: libmariadb/*` to `License: LGPL-2+`, while the GPL-2 stanzas in that same
+file cover the MariaDB *server* files. The project needs no source change for it —
+CMake resolves the same `mysqlclient` pkg-config name to MariaDB Connector/C
+3.3.19 through the compat package, the binary then carries
+`NEEDED libmariadb.so.3` (dynamic linking, which is the relink condition LGPL-2.1
+asks for), and the Debian-based verification images that contain only
+`libmariadb3` have already passed the real-capture acceptance and the demo gate
+against MySQL 8.0. Switching the committed `Dockerfile` and the CI package lines
+is prepared and recorded in `docs/RELEASE_CHECKLIST.md` §2; a dependency change is
+applied only together with the compatibility evidence recorded there, and none of
+this is a legal conclusion — the maintainer decides.
 
 ## Python dependencies
 

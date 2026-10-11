@@ -104,24 +104,27 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          # Ephemeral, job-scoped credentials (the container is destroyed with
-          # the run and nothing here reaches the artifact). The literals are
-          # documented defaults so a fresh clone runs; setting the matching
-          # repository secret replaces them, and GitHub then masks the value in
-          # the logs. `MYSQL_PWD` keeps the value out of the process arguments.
-          MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD != '' && secrets.CI_MYSQL_ROOT_PASSWORD || 'ci-root-password' }}
+          # Ephemeral, job-scoped credentials: this container and the runner are
+          # destroyed with the run, the values reach no artifact (the artifact
+          # audit scanned every member for them) and they grant nothing outside
+          # the job. They stay literals here on purpose - a service definition is
+          # evaluated before any step, and an optional-secret expression in this
+          # block left the container unhealthy on the runner (run 38132106588 sat
+          # in "Initialize containers" for minutes). The step-level hygiene in
+          # this job does not depend on them: the three root commands read the
+          # password from MYSQL_PWD instead of the command line.
+          MYSQL_ROOT_PASSWORD: ci-root-password
           MYSQL_DATABASE: jobpilot_ci
           MYSQL_USER: jobpilot_ci
-          MYSQL_PASSWORD: ${{ secrets.CI_APP_DB_PASSWORD != '' && secrets.CI_APP_DB_PASSWORD || 'jobpilot_ci_password' }}
+          MYSQL_PASSWORD: jobpilot_ci_password
         ports:
           - 3306:3306
-        # The health check runs inside the container, where MYSQL_USER and
-        # MYSQL_PASSWORD are already set from the values above. `secrets` is not
-        # an allowed context in `options`, and a `#` line inside this folded
-        # scalar would be literal text (docker would read it as the image name),
-        # so the comment lives here and the scalar holds only docker arguments.
+        # Exactly the command that has been green on the runner since 0016. A
+        # `#` line inside this folded scalar would be literal text (docker would
+        # read it as the image name and fail with "invalid reference format"),
+        # so the comment lives above the key.
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD --silent"
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ujobpilot_ci -pjobpilot_ci_password --silent"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -143,10 +146,11 @@ jobs:
       MYSQL_PORT: "3306"
       MYSQL_DATABASE: jobpilot_ci
       MYSQL_USER: jobpilot_ci
-      MYSQL_PASSWORD: ${{ secrets.CI_APP_DB_PASSWORD != '' && secrets.CI_APP_DB_PASSWORD || 'jobpilot_ci_password' }}
+      MYSQL_PASSWORD: jobpilot_ci_password
       # Used by the three root steps below through the `env` context, so the
-      # password never appears in a command line.
-      MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD != '' && secrets.CI_MYSQL_ROOT_PASSWORD || 'ci-root-password' }}
+      # password never appears in a command line (argv is visible in the process
+      # table and in docker's own error output).
+      MYSQL_ROOT_PASSWORD: ci-root-password
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: "6379"
       # The review backfill test only runs when this names the same scratch

@@ -115,10 +115,12 @@ jobs:
           MYSQL_PASSWORD: ${{ secrets.CI_APP_DB_PASSWORD != '' && secrets.CI_APP_DB_PASSWORD || 'jobpilot_ci_password' }}
         ports:
           - 3306:3306
+        # The health check runs inside the container, where MYSQL_USER and
+        # MYSQL_PASSWORD are already set from the values above. `secrets` is not
+        # an allowed context in `options`, and a `#` line inside this folded
+        # scalar would be literal text (docker would read it as the image name),
+        # so the comment lives here and the scalar holds only docker arguments.
         options: >-
-          # The health check runs inside the container, where the values above
-          # (secret or default) are already in the environment; `secrets` is not
-          # an allowed context in `options`, so the container supplies its own.
           --health-cmd "mysqladmin ping -h 127.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD --silent"
           --health-interval 5s
           --health-timeout 5s

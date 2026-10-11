@@ -191,6 +191,35 @@ echo "POST /internal/jobs/import -> $IMPORT_CODE (created=$CREATED updated=$UPDA
 [ "$REVIEW" = 0 ] || fail "$REVIEW imported job(s) landed in needs_review, so the public search cannot see them"
 pass "import: $TOTAL job(s) through the manual import path, all clean"
 
+# ------------------------------------------------------------------- review --
+# 0015A. The review surface must be reachable on the shipped binary: the C++
+# tests construct the controller themselves, so a controller the entry point
+# forgot to wire answers 404 here and nowhere else. `backfill?mode=dry_run` is
+# read-only by contract (docs/04 section 5.4.2), so probing it writes nothing.
+say "review surface"
+QUEUE_CODE="$(curl -sS -o /tmp/demo-gate-review-queue.json -w '%{http_code}' \
+    "$API/internal/jobs/review-queue?status=needs_review&page=1&page_size=5" \
+    -H "X-Internal-Token: $INTERNAL_TOKEN")"
+[ "$QUEUE_CODE" = 200 ] || { cat /tmp/demo-gate-review-queue.json; fail "the internal review queue answered HTTP $QUEUE_CODE"; }
+BACKFILL_CODE="$(curl -sS -o /tmp/demo-gate-review-backfill.json -w '%{http_code}' -X POST \
+    "$API/internal/jobs/review/backfill?mode=dry_run" \
+    -H 'Content-Type: application/json' \
+    -H "X-Internal-Token: $INTERNAL_TOKEN" \
+    -d '{}')"
+[ "$BACKFILL_CODE" = 200 ] || { cat /tmp/demo-gate-review-backfill.json; fail "review backfill dry_run answered HTTP $BACKFILL_CODE"; }
+python3 - <<'PY'
+import json
+queue = json.load(open("/tmp/demo-gate-review-queue.json"))
+assert isinstance(queue.get("items"), list) and isinstance(queue.get("total"), int), queue
+backfill = json.load(open("/tmp/demo-gate-review-backfill.json"))
+assert backfill.get("mode") == "dry_run", backfill
+assert isinstance(backfill.get("scanned"), int), backfill
+print("GET  /internal/jobs/review-queue -> 200 (total=%s)" % queue["total"])
+print("POST /internal/jobs/review/backfill?mode=dry_run -> 200 (scanned=%s would_flag=%s)"
+      % (backfill.get("scanned"), backfill.get("would_flag")))
+PY
+pass "review: the internal review queue and the read-only backfill probe are wired on the shipped binary"
+
 # ------------------------------------------------------------------- search --
 say "search"
 SEARCH_KEYWORD="C%2B%2B"

@@ -15,7 +15,7 @@
 #
 # Usage:
 #   tools/dev/capture-acceptance.sh --capture <capture.json> \
-#     [--keep-evidence <file>] [--image <image>]
+#     [--keep-evidence <file>] [--image <image>] [--expect-review]
 #
 #   --capture        required; a capture_version 1 artifact (the synthetic
 #                    sample is docs/examples/capture-acceptance-sample.json)
@@ -23,12 +23,25 @@
 #   --image          backend image (default $JOBPILOT_BACKEND_IMAGE or
 #                    jobpilot-backend:local; the development host has
 #                    jobpilot-backend:verify because Docker Hub is unreachable)
+#   --expect-review  require the 0015A pre-flight to route this capture to the
+#                    review queue and verify the REVIEW path instead of the clean
+#                    one. Without the flag the script adapts to whatever the
+#                    pre-flight reports and says which path it took; a capture
+#                    that is routed for review is never forced public.
+#
+# Two paths, one contract. A clean capture is expected to become publicly
+# visible; a `needs_review` capture is expected to stay hidden from the public
+# list/search and to appear in the internal review queue with its finding code.
+# Both paths assert created/updated/total, the row in the database, and the F14
+# rule that a colliding source observation cannot change a manual record.
 #
 # Isolation: this script never reuses a running stack. It owns compose project
 # `jobpilot-capture`, host ports 18081 / 13307 / 16380 and its own volumes, and
 # it refuses to run against the development or demo-gate coordinates. The
 # internal token is generated here, lives only in this process environment, and
 # is never printed nor written to the evidence file.
+#
+# The capture JSON is read where it lies and never copied into the repository.
 #
 # Exit codes: 0 only after every assertion passed (CAPTURE_ACCEPTANCE_OK is the
 # last line), 1 on a failed assertion, 2 on a usage/environment problem.
@@ -47,6 +60,7 @@ INTERNAL_TOKEN="capture-acceptance-$(date +%s)-$$"
 
 CAPTURE=""
 KEEP_EVIDENCE=""
+EXPECT="auto"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 WORK="/tmp/capture-acceptance-${STAMP}"
 EVIDENCE="/tmp/capture-acceptance-${STAMP}.txt"
@@ -64,6 +78,8 @@ while [ $# -gt 0 ]; do
         --capture) [ $# -ge 2 ] || usage_error "--capture needs a value"; CAPTURE="$2"; shift 2 ;;
         --keep-evidence) [ $# -ge 2 ] || usage_error "--keep-evidence needs a value"; KEEP_EVIDENCE="$2"; shift 2 ;;
         --image) [ $# -ge 2 ] || usage_error "--image needs a value"; IMAGE="$2"; shift 2 ;;
+        --expect-review) EXPECT="review"; shift ;;
+        --expect-clean) EXPECT="clean"; shift ;;
         -h|--help) sed -n '2,40p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) usage_error "unknown argument: $1" ;;
     esac
@@ -225,7 +241,9 @@ say "publish (dry run)"
 DRY_RUN_JSON="$WORK/dry-run.json"
 run_publish_capture "$DRY_RUN_JSON" --dry-run --json || fail "publish-capture --dry-run exited non-zero"
 EXPECTED_JSON="$WORK/expected-payload.json"
-DRY_SUMMARY="$(DRY_RUN_JSON="$DRY_RUN_JSON" EXPECTED_JSON="$EXPECTED_JSON" python3 - <<'PY'
+MODE_FILE="$WORK/mode.txt"
+DRY_SUMMARY="$(DRY_RUN_JSON="$DRY_RUN_JSON" EXPECTED_JSON="$EXPECTED_JSON" MODE_FILE="$MODE_FILE" \
+    CI_EXPECT="$EXPECT" python3 - <<'PY'
 import json, os
 with open(os.environ["DRY_RUN_JSON"], encoding="utf-8") as handle:
     document = json.load(handle)
@@ -234,19 +252,46 @@ if document.get("ok") is not True or document.get("dry_run") is not True:
 jobs = document.get("jobs") or []
 if len(jobs) != 1:
     raise SystemExit(f"this scaffold accepts exactly one capture per run, got {len(jobs)}")
+
 counters = document.get("counters") or {}
-if counters.get("rejected") or counters.get("needs_review"):
-    raise SystemExit(f"capture would be rejected or hidden for review: {json.dumps(counters)}")
+clean = counters.get("clean") or 0
+needs_review = counters.get("needs_review") or 0
+rejected = counters.get("rejected") or 0
+if rejected:
+    raise SystemExit(f"the 0015A pre-flight rejects this capture: {json.dumps(counters)}")
+
+mode = "review" if needs_review else "clean"
+expect = os.environ["CI_EXPECT"]
+if expect != "auto" and expect != mode:
+    raise SystemExit(
+        f"the pre-flight reports {mode!r} but --expect-{expect} was requested: {json.dumps(counters)}")
+
 payload = jobs[0]
 if payload.get("source") != "manual":
     raise SystemExit(f"payload source is {payload.get('source')!r}, not 'manual'")
 with open(os.environ["EXPECTED_JSON"], "w", encoding="utf-8") as handle:
     json.dump(payload, handle, ensure_ascii=False, indent=2)
-print("clean=%s payload_fields=%s" % (counters.get("clean"), ",".join(sorted(payload))))
+with open(os.environ["MODE_FILE"], "w", encoding="utf-8") as handle:
+    handle.write(mode)
+
+# Stable finding codes only: no description text reaches the log or the evidence.
+findings = []
+for item in (document.get("items") or []):
+    for finding in (item.get("findings") or []):
+        findings.append("%s/%s:%s" % (
+            finding.get("code"), finding.get("field"), finding.get("outcome")))
+print("mode=%s clean=%s needs_review=%s rejected=%s findings=%s payload_fields=%s" % (
+    mode, clean, needs_review, rejected, ",".join(findings) or "-",
+    ",".join(sorted(payload))))
 PY
-)" || fail "dry run rejected the capture"
+)" || fail "dry run did not pass its gate"
+MODE="$(cat "$MODE_FILE")"
 echo "dry run: $DRY_SUMMARY"
-pass "publish (dry run): capture validates and normalizes to a clean manual payload"
+if [ "$MODE" = "review" ]; then
+    pass "publish (dry run): the 0015A pre-flight routes this capture to the review queue (hidden, never forced public)"
+else
+    pass "publish (dry run): capture validates and normalizes to a clean manual payload"
+fi
 
 # ---------------------------------------------------- publish (real, twice) --
 say "publish"
@@ -291,14 +336,17 @@ say "public search visibility"
 SEARCH_JSON="$WORK/search.json"
 JOB_JSON="$WORK/job.json"
 SEARCH_SUMMARY="$(API="$API" EXPECTED_JSON="$EXPECTED_JSON" SEARCH_JSON="$SEARCH_JSON" \
-    JOB_JSON="$JOB_JSON" python3 - <<'PY'
+    JOB_JSON="$JOB_JSON" CI_MODE="$MODE" python3 - <<'PY'
 import json, os, urllib.parse, urllib.request
 with open(os.environ["EXPECTED_JSON"], encoding="utf-8") as handle:
     payload = json.load(handle)
 api = os.environ["API"]
+mode = os.environ["CI_MODE"]
 title = payload["title"]
 candidates = [title, payload.get("company") or "", title[:12]]
-last = None
+
+probes = []
+matching = []
 for keyword in candidates:
     if not keyword:
         continue
@@ -306,44 +354,161 @@ for keyword in candidates:
     with urllib.request.urlopen(url, timeout=10) as response:
         body = json.load(response)
     rows = body["data"]["list"]
-    matching = [row for row in rows if row.get("title") == title]
-    last = (keyword, len(rows), matching)
-    if matching:
-        break
-if last is None or not last[2]:
-    raise SystemExit(f"the published job is not visible in public search; last={last}")
-keyword, row_count, matching = last
-if len(matching) != 1:
-    raise SystemExit(f"public search returned {len(matching)} rows with the exact title")
-row = matching[0]
-if not isinstance(row.get("id"), int) or row["id"] <= 0:
-    raise SystemExit(f"the search row carries no usable id: {row.get('id')!r}")
+    current = [row for row in rows if row.get("title") == title]
+    probes.append({"keyword_len": len(keyword), "rows": len(rows), "matched": len(current)})
+    if current:
+        matching = current
+        if mode == "clean":
+            break
+
 with open(os.environ["SEARCH_JSON"], "w", encoding="utf-8") as handle:
-    json.dump({"keyword": keyword, "rows": row_count}, handle, ensure_ascii=False)
-with open(os.environ["JOB_JSON"], "w", encoding="utf-8") as handle:
-    json.dump(row, handle, ensure_ascii=False)
-print("keyword_len=%d rows=%d matched=1 id=%d" % (len(keyword), row_count, row["id"]))
+    json.dump({"mode": mode, "probes": probes}, handle, ensure_ascii=False)
+
+total_matched = sum(probe["matched"] for probe in probes)
+
+if mode == "review":
+    # 0015A: a needs_review row must stay hidden from the public list/search.
+    if total_matched != 0:
+        raise SystemExit(f"a needs_review row is visible in public search: {probes}")
+    print("public search probes=%d matched=0 (hidden, as required for needs_review)" % len(probes))
+else:
+    if total_matched != 1:
+        raise SystemExit(f"public search matched {total_matched} rows with the exact title: {probes}")
+    row = matching[0]
+    if not isinstance(row.get("id"), int) or row["id"] <= 0:
+        raise SystemExit(f"the search row carries no usable id: {row.get('id')!r}")
+    with open(os.environ["JOB_JSON"], "w", encoding="utf-8") as handle:
+        json.dump(row, handle, ensure_ascii=False)
+    print("probes=%d rows=%d matched=1 id=%d" % (
+        len(probes), probes[-1]["rows"], row["id"]))
 PY
-)" || fail "the published job is not visible through the public search"
+)" || fail "public search visibility did not match the expected path"
 echo "GET /api/v1/jobs?keyword=<redacted> -> $SEARCH_SUMMARY"
-pass "search: the manual job is visible through the public query interface"
+if [ "$MODE" = "review" ]; then
+    pass "search: the needs_review row is NOT visible through the public query interface"
+else
+    pass "search: the manual job is visible through the public query interface"
+fi
+
+# ------------------------------------------------- review queue (0015A) -----
+if [ "$MODE" = "review" ]; then
+    say "review queue visibility (internal surface)"
+    QUEUE_JSON="$WORK/review-queue.json"
+    QUEUE_SUMMARY="$(API="$API" TOKEN="$INTERNAL_TOKEN" EXPECTED_JSON="$EXPECTED_JSON" \
+        QUEUE_JSON="$QUEUE_JSON" JOB_JSON="$JOB_JSON" python3 - <<'PY'
+import json, os, urllib.request
+with open(os.environ["EXPECTED_JSON"], encoding="utf-8") as handle:
+    payload = json.load(handle)
+url = (f"{os.environ['API']}/internal/jobs/review-queue"
+       "?status=needs_review&page=1&page_size=50")
+request = urllib.request.Request(url, headers={"X-Internal-Token": os.environ["TOKEN"]})
+with urllib.request.urlopen(request, timeout=10) as response:
+    body = json.load(response)
+
+items = body.get("items") or []
+matching = [item for item in items if item.get("source_url") == payload.get("source_url")]
+if len(matching) != 1:
+    raise SystemExit(
+        f"the queued row is not on the review surface (items={len(items)}, matched={len(matching)})")
+item = matching[0]
+if item.get("review_status") != 1:
+    raise SystemExit(f"the queued row has review_status={item.get('review_status')!r}, expected 1")
+if item.get("resolution") not in (None, "open"):
+    raise SystemExit(f"the queued row already carries a resolution: {item.get('resolution')!r}")
+if not item.get("reason_code"):
+    raise SystemExit("the queued row carries no stable reason_code")
+
+# Only the review metadata is kept; no title, company or description text.
+with open(os.environ["QUEUE_JSON"], "w", encoding="utf-8") as handle:
+    json.dump({"total": body.get("total"),
+               "item": {key: item.get(key) for key in (
+                   "job_id", "review_status", "reason_code", "outcome",
+                   "resolution", "source", "created_at")}},
+              handle, ensure_ascii=False)
+with open(os.environ["JOB_JSON"], "w", encoding="utf-8") as handle:
+    json.dump({"id": item.get("job_id")}, handle, ensure_ascii=False)
+print("queue_total=%s job_id=%s review_status=%s reason_code=%s outcome=%s resolution=%s" % (
+    body.get("total"), item.get("job_id"), item.get("review_status"),
+    item.get("reason_code"), item.get("outcome"), item.get("resolution")))
+PY
+)" || fail "the queued row is not visible on the internal review surface"
+    echo "GET /internal/jobs/review-queue?status=needs_review -> $QUEUE_SUMMARY"
+    pass "review queue: the hidden row is queued with its stable finding code (no decision taken)"
+
+    say "database record (isolated stack)"
+    DB_SUMMARY="$(PROJECT="$PROJECT" EXPECTED_JSON="$EXPECTED_JSON" python3 - <<'PY'
+import hashlib, json, os, subprocess
+with open(os.environ["EXPECTED_JSON"], encoding="utf-8") as handle:
+    payload = json.load(handle)
+source_url = payload["source_url"]
+if "'" in source_url or "\\" in source_url:
+    raise SystemExit("refusing to query with a quote-bearing source_url")
+query = ("SELECT COUNT(*), COALESCE(MAX(review_status), -1), COALESCE(MAX(source), ''), "
+         "COALESCE(MAX(description) IS NOT NULL, 0) "
+         f"FROM jobs WHERE source_url = '{source_url}'")
+out = subprocess.run(
+    ["docker", "exec", f"{os.environ['PROJECT']}-mysql",
+     "mysql", "-uroot", "-proot", "-N", "-e", f"USE jobpilot; {query}"],
+    capture_output=True, text=True, check=False)
+if out.returncode != 0:
+    raise SystemExit(f"the isolated MySQL query failed: {out.stderr.strip()[:200]}")
+fields = out.stdout.strip().split("\t")
+if len(fields) != 4:
+    raise SystemExit(f"unexpected query output shape: {out.stdout.strip()[:120]!r}")
+count, review_status, source, has_description = fields
+if count != "1" or review_status != "1" or source != "manual" or has_description != "1":
+    raise SystemExit(
+        f"row check failed: count={count} review_status={review_status} source={source!r} "
+        f"has_description={has_description}")
+digest = hashlib.sha256(source_url.encode()).hexdigest()[:12]
+print(f"rows=1 review_status=1 source=manual description_present=yes "
+      f"source_url_sha256={digest}")
+PY
+)" || fail "the database row does not match the expected review state"
+    echo "isolated MySQL: $DB_SUMMARY"
+    pass "database: exactly one manual row, stored hidden (review_status=1)"
+fi
 
 # ------------------------------------------------------- detail read-back ---
 say "detail read-back"
 DETAIL_BEFORE="$WORK/detail-before.json"
 JOB_ID="$(JOB_JSON="$JOB_JSON" python3 -c 'import json,os;print(json.load(open(os.environ["JOB_JSON"]))["id"])')"
 READBACK="$(API="$API" JOB_ID="$JOB_ID" EXPECTED_JSON="$EXPECTED_JSON" DETAIL_BEFORE="$DETAIL_BEFORE" \
-    python3 - <<'PY'
-import json, os, urllib.request
+    CI_MODE="$MODE" SKIP_FILE="$WORK/detail-status.txt" python3 - <<'PY'
+import json, os, urllib.error, urllib.request
 api = os.environ["API"]
+mode = os.environ["CI_MODE"]
 with open(os.environ["EXPECTED_JSON"], encoding="utf-8") as handle:
     payload = json.load(handle)
 job_id = int(os.environ["JOB_ID"])
-with urllib.request.urlopen(f"{api}/api/v1/jobs/{job_id}", timeout=10) as response:
-    document = json.load(response)
+
+try:
+    with urllib.request.urlopen(f"{api}/api/v1/jobs/{job_id}", timeout=10) as response:
+        status = getattr(response, "status", 200)
+        document = json.load(response)
+except urllib.error.HTTPError as error:
+    status = error.code
+    document = None
+
+with open(os.environ["SKIP_FILE"], "w", encoding="utf-8") as handle:
+    handle.write(str(status))
+
+if status != 200:
+    if mode == "review":
+        # Recorded as an observation: the by-id detail is not part of the public
+        # discovery surface (list/search), so a hidden row may or may not answer
+        # here; nothing is forced visible.
+        print(f"  observation: the by-id detail returned HTTP {status}")
+        raise SystemExit(0)
+    raise SystemExit(f"the public detail returned HTTP {status}")
+
 detail = document["data"]
 with open(os.environ["DETAIL_BEFORE"], "w", encoding="utf-8") as handle:
     json.dump(detail, handle, ensure_ascii=False, sort_keys=True)
+
+if mode == "review":
+    print(f"  observation: a needs_review row still answers by direct id (HTTP {status}); "
+          "it stays out of list/search")
 
 def check(label, ok, actual):
     if not ok:
@@ -385,9 +550,15 @@ print("fields_compared=%d" % (len(payload) + 2))
 PY
 )" || fail "the public detail does not match the published payload"
 printf '%s\n' "$READBACK"
-pass "read-back: the public detail matches the normalized payload, freshness unobserved"
+DETAIL_STATUS="$(cat "$WORK/detail-status.txt" 2>/dev/null || echo unknown)"
+if [ "$MODE" = "review" ] && [ "$DETAIL_STATUS" != "200" ]; then
+    pass "read-back: the stored row matches the payload is not observable by id (HTTP $DETAIL_STATUS); recorded, not forced"
+else
+    pass "read-back: the stored row matches the normalized payload, freshness unobserved"
+fi
 
 # --------------------------------------------------------------------- F14 --
+if [ -f "$DETAIL_BEFORE" ]; then
 say "F14 (a colliding source observation must not win)"
 F14="$(API="$API" JOB_ID="$JOB_ID" EXPECTED_JSON="$EXPECTED_JSON" TOKEN="$INTERNAL_TOKEN" \
     DETAIL_BEFORE="$DETAIL_BEFORE" WORK="$WORK" python3 - <<'PY'
@@ -444,28 +615,117 @@ PY
 )" || fail "the F14 manual-record priority check failed"
 printf '%s\n' "$F14"
 pass "F14: a colliding source observation is skipped and the manual record is unchanged"
+else
+    say "F14 (database comparison; the by-id detail was not readable)"
+    F14="$(PROJECT="$PROJECT" API="$API" TOKEN="$INTERNAL_TOKEN" EXPECTED_JSON="$EXPECTED_JSON" \
+        python3 - <<'PY'
+import hashlib, json, os, subprocess, urllib.request
+with open(os.environ["EXPECTED_JSON"], encoding="utf-8") as handle:
+    payload = json.load(handle)
+source_url = payload["source_url"]
+if "'" in source_url or "\\" in source_url:
+    raise SystemExit("refusing to query with a quote-bearing source_url")
+
+def digest():
+    query = ("SELECT COALESCE(company,''), COALESCE(title,''), COALESCE(description,''), "
+             "COALESCE(review_status,-1), COALESCE(source,'') FROM jobs "
+             f"WHERE source_url = '{source_url}'")
+    out = subprocess.run(
+        ["docker", "exec", f"{os.environ['PROJECT']}-mysql",
+         "mysql", "-uroot", "-proot", "-N", "-e", f"USE jobpilot; {query}"],
+        capture_output=True, text=True, check=False)
+    if out.returncode != 0 or not out.stdout.strip():
+        raise SystemExit(f"the F14 digest query failed: {out.stderr.strip()[:200]}")
+    return hashlib.sha256(out.stdout.strip().encode("utf-8")).hexdigest()
+
+before = digest()
+observation = {
+    "source": "greenhouse",
+    "source_scope": "capture-acceptance-collision",
+    "complete": False,
+    "observed_at": "2026-10-10 12:00:00",
+    "jobs": [{
+        "company": "observed company must not win",
+        "title": "observed title must not win",
+        "source": "greenhouse",
+        "source_url": source_url,
+        "description": "observed description must not win",
+    }],
+}
+request = urllib.request.Request(
+    f"{os.environ['API']}/internal/jobs/source-sync",
+    data=json.dumps(observation).encode("utf-8"),
+    headers={"Content-Type": "application/json", "X-Internal-Token": os.environ["TOKEN"]},
+    method="POST")
+with urllib.request.urlopen(request, timeout=10) as response:
+    sync = json.load(response)
+if sync.get("skipped_manual") != 1:
+    raise SystemExit(f"the observation was not skipped for the manual row: {sync}")
+after = digest()
+if before != after:
+    raise SystemExit("F14 violated: the manual row changed (database digest differs)")
+print("  source-sync skipped_manual=1; the row's database digest is unchanged")
+PY
+)" || fail "the F14 database comparison failed"
+    printf '%s\n' "$F14"
+    pass "F14: a colliding observation is skipped and the hidden manual row is unchanged (database digest)"
+fi
 
 # --------------------------------------------------------------- evidence ---
 say "section 19.5 evidence (sanitized)"
 CAPTURE_DIGEST="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$CAPTURE")"
 CAPTURE_BYTES="$(wc -c < "$CAPTURE" | tr -d ' ')"
-SEARCH_ROWS="$(SEARCH_JSON="$SEARCH_JSON" python3 -c 'import json,os;print(json.load(open(os.environ["SEARCH_JSON"]))["rows"])')"
+SEARCH_ROWS="$(SEARCH_JSON="$SEARCH_JSON" CI_MODE="$MODE" python3 -c '
+import json, os
+data = json.load(open(os.environ["SEARCH_JSON"]))
+probes = data.get("probes") or []
+matched = sum(probe["matched"] for probe in probes)
+if os.environ["CI_MODE"] == "review":
+    print("不可见（matched=0 probes=%d keyword=<redacted>）" % len(probes))
+else:
+    print("可见（matched=%d keyword=<redacted>）" % matched)
+')"
+REVIEW_LINE=""
+if [ "$MODE" = "review" ]; then
+    REVIEW_LINE="$(QUEUE_JSON="$QUEUE_JSON" DETAIL_STATUS_FILE="$WORK/detail-status.txt" python3 -c '
+import json, os
+data = json.load(open(os.environ["QUEUE_JSON"]))
+item = data.get("item") or {}
+status = open(os.environ["DETAIL_STATUS_FILE"]).read().strip()
+print("审核队列: review_status=%s reason_code=%s outcome=%s resolution=%s queue_total=%s；公共列表/搜索不可见；按 id 详情探测 HTTP %s" % (
+    item.get("review_status"), item.get("reason_code"), item.get("outcome"),
+    item.get("resolution"), data.get("total"), status))
+')"
+fi
 PUBLISH_TOTALS="$(PUBLISH1_JSON="$PUBLISH1_JSON" python3 -c 'import json,os;d=json.load(open(os.environ["PUBLISH1_JSON"]));print("created=%s updated=%s total=%s" % (d["created"], d["updated"], d["total"]))')"
 GIT_REV="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
 EVIDENCE_TMP="$WORK/section-19.5.txt"
 {
     printf '# ExecPlan 0014 section 19.5 evidence - generated by tools/dev/capture-acceptance.sh\n'
-    printf '# date: %s   commit: %s   isolated project: %s   image: %s\n' \
-        "$(date -Iseconds)" "$GIT_REV" "$PROJECT" "$IMAGE"
+    printf '# date: %s   commit: %s   isolated project: %s   image: %s   path: %s\n' \
+        "$(date -Iseconds)" "$GIT_REV" "$PROJECT" "$IMAGE" "$MODE"
     printf '站点类别（不写具体平台）: manual capture file（host 已脱敏）   判定日期: %s\n' "$(date +%F)"
     printf '书签点击结果（复制到剪贴板/回退 prompt）: <owner 填写>\n'
     printf '脱敏后的 capture JSON: { "capture_version": 1, "sha256": "%s", "bytes": %s }\n' \
         "$CAPTURE_DIGEST" "$CAPTURE_BYTES"
     printf '经 publish-capture 发布的结果行: %s\n' "$PUBLISH_TOTALS"
-    printf '公共搜索可见性（GET /api/v1/jobs?keyword=…）: 可见（matched=1 rows=%s keyword=<redacted>）\n' "$SEARCH_ROWS"
+    printf '公共搜索可见性（GET /api/v1/jobs?keyword=…）: %s\n' "$SEARCH_ROWS"
+    if [ -n "$REVIEW_LINE" ]; then
+        printf '%s\n' "$REVIEW_LINE"
+        printf '数据质量问题（稳定 finding code；需人工复核后再决定，不绕过审核）: %s\n' \
+            "$(DRY_RUN_JSON="$DRY_RUN_JSON" python3 -c '
+import json, os
+document = json.load(open(os.environ["DRY_RUN_JSON"]))
+codes = sorted({finding.get("code")
+                for item in (document.get("items") or [])
+                for finding in (item.get("findings") or [])
+                if finding.get("code")})
+print(",".join(codes) or "-")
+')"
+    fi
     printf 'robots/登录墙判定: 未绕过登录、未提交表单（人工确认）: <owner 填写>\n'
-    printf '断言: %s 项通过（publish/dry-run/search/read-back/F14）+ 证据完整性检查通过，token 未出现在任何输出中\n' "$legs_passed"
+    printf '断言: %s 项通过（dry-run/publish/search/read-back/F14）+ 证据完整性检查通过，token 未出现在任何输出中\n' "$legs_passed"
 } > "$EVIDENCE_TMP"
 
 # Credential guard: the generated token must not appear in anything we keep.

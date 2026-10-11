@@ -21,7 +21,10 @@
 #include "jobpilot/service/job/job_ranking_service.h"
 #include "jobpilot/service/job/job_service.h"
 #include "jobpilot/service/job/internal_job_import_controller.h"
+#include "jobpilot/service/job/internal_job_review_controller.h"
 #include "jobpilot/service/job/internal_source_sync_controller.h"
+#include "jobpilot/service/job/job_review.h"
+#include "jobpilot/service/job/job_review_dao.h"
 #include "jobpilot/service/job/source_sync_dao.h"
 #include "jobpilot/service/job/source_sync_service.h"
 #include "jobpilot/service/resume/resume_artifact_dao.h"
@@ -211,6 +214,23 @@ int main(int argc, char *argv[])
                 sourceSyncService,
                 config.internalApi.token);
 
+        // 0015A's review surface has to be wired into the shipped entry point
+        // too: the router only registers /internal/jobs/review-queue,
+        // /internal/jobs/review/{id} and /internal/jobs/review/backfill when it
+        // receives this controller, and the C++ tests build it themselves, so an
+        // omission here is invisible to them (the capture acceptance scaffold
+        // found the resulting 404 on the real binary).
+        jobpilot::service::JobReviewDao jobReviewDao(
+            mysqlPool);
+
+        jobpilot::service::JobReviewService jobReviewService(
+            jobReviewDao);
+
+        jobpilot::service::InternalJobReviewController
+            internalJobReviewController(
+                jobReviewService,
+                config.internalApi.token);
+
         jobpilot::service::ApplicationDao applicationDao(
             mysqlPool);
 
@@ -271,7 +291,10 @@ int main(int argc, char *argv[])
             &aiController,
             config.internalApi.token.empty()
                 ? nullptr
-                : &aiInternalController);
+                : &aiInternalController,
+            config.internalApi.token.empty()
+                ? nullptr
+                : &internalJobReviewController);
 
         server.Start();
 

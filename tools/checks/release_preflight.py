@@ -282,7 +282,13 @@ def check_workflows(root: Path) -> tuple[str, list[str]]:
     output = (completed.stdout + completed.stderr).strip()
     if completed.returncode != 0:
         return FAIL, evidence + [f"actionlint rc={completed.returncode}"] + output.splitlines()
-    evidence.append(f"actionlint rc=0 ({(actionlint)})")
+    # Print the version, never the local binary path: evidence must stay portable
+    # and must not leak a developer-machine path into the repository.
+    version = subprocess.run(
+        [actionlint, "--version"], capture_output=True, text=True, check=False
+    ).stdout.strip().splitlines()
+    label = version[0] if version else "actionlint"
+    evidence.append(f"actionlint rc=0 ({label})")
     return PASS, evidence
 
 

@@ -101,6 +101,16 @@ python3 tools/checks/release_preflight.py --allow-dirty   # preparation only
   to curl through a shell-builtin `printf` process substitution, so it never
   appears in argv, on disk or in the output. `--check`, `--limit`, `--sha`,
   `--run` and `--json`; it is a maintainer tool, not part of the release gate.
+  The GitHub **billing** endpoint is not readable with a fine-grained token
+  (HTTP 403), so monthly Actions usage stays an owner task.
+- `history_secret_scan.sh` (2026-10-11) scans the whole Git **history** for
+  credential shapes and PEM private-key headers, and prints only counts, commit
+  ids and paths. It exists because the one-liners pasted into Markdown tables had
+  to escape `|` as `\|`, which in ERE matches a literal pipe — so the documented
+  commands could never match a real key. The history scan and the working-tree
+  scan are two different checks: neither proves the other. Synthetic controls
+  (an invalid PEM header plus a fake token in a throwaway repository) confirm the
+  scanner fails when it should.
 
 ## Open-source MVP Quality Gates
 

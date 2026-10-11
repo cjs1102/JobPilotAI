@@ -64,8 +64,26 @@ jobs:
       # exec these test binaries. `-C build presets/release` keeps the archive
       # rooted at build/, so extracting it under build/ restores the exact path
       # the tests were configured with.
+      #
+      # 2026-10-11 (artifact audit): ship only what the suite needs at run time.
+      # Object files, static libraries, dep/Makefile metadata, the CMake cache and
+      # compile_commands.json are build-time only, are the bulk of the archive and
+      # bake the runner's absolute paths into files nobody reads. Everything ctest
+      # needs stays: the test binaries, `CTestTestfile.cmake` and the discovered
+      # `*_tests.cmake` files (ctest re-runs its GoogleTest discovery at test
+      # time).
       - name: Package the release build tree
-        run: tar -czf release-build.tar.gz -C build presets/release
+        run: |
+          tar -czf release-build.tar.gz -C build \
+            --exclude='*.o' \
+            --exclude='*.a' \
+            --exclude='*.d' \
+            --exclude='*.make' \
+            --exclude='compiler_depend*' \
+            --exclude='*.marks' \
+            --exclude='CMakeCache.txt' \
+            --exclude='compile_commands.json' \
+            presets/release
 
       - name: Upload the release build tree
         uses: actions/upload-artifact@v4

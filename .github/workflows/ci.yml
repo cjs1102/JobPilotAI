@@ -104,14 +104,22 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: ci-root-password
+          # Ephemeral, job-scoped credentials (the container is destroyed with
+          # the run and nothing here reaches the artifact). The literals are
+          # documented defaults so a fresh clone runs; setting the matching
+          # repository secret replaces them, and GitHub then masks the value in
+          # the logs. `MYSQL_PWD` keeps the value out of the process arguments.
+          MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD != '' && secrets.CI_MYSQL_ROOT_PASSWORD || 'ci-root-password' }}
           MYSQL_DATABASE: jobpilot_ci
           MYSQL_USER: jobpilot_ci
-          MYSQL_PASSWORD: jobpilot_ci_password
+          MYSQL_PASSWORD: ${{ secrets.CI_APP_DB_PASSWORD != '' && secrets.CI_APP_DB_PASSWORD || 'jobpilot_ci_password' }}
         ports:
           - 3306:3306
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -ujobpilot_ci -pjobpilot_ci_password --silent"
+          # The health check runs inside the container, where the values above
+          # (secret or default) are already in the environment; `secrets` is not
+          # an allowed context in `options`, so the container supplies its own.
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD --silent"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -133,7 +141,10 @@ jobs:
       MYSQL_PORT: "3306"
       MYSQL_DATABASE: jobpilot_ci
       MYSQL_USER: jobpilot_ci
-      MYSQL_PASSWORD: jobpilot_ci_password
+      MYSQL_PASSWORD: ${{ secrets.CI_APP_DB_PASSWORD != '' && secrets.CI_APP_DB_PASSWORD || 'jobpilot_ci_password' }}
+      # Used by the three root steps below through the `env` context, so the
+      # password never appears in a command line.
+      MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD != '' && secrets.CI_MYSQL_ROOT_PASSWORD || 'ci-root-password' }}
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: "6379"
       # The review backfill test only runs when this names the same scratch
@@ -167,26 +178,31 @@ jobs:
           tar -xzf release-build.tar.gz -C build
 
       - name: Load the schema into the CI database
+        env:
+          MYSQL_PWD: ${{ env.MYSQL_ROOT_PASSWORD }}
         run: |
           for file in database/schema/*.sql; do
-            mysql --host=127.0.0.1 --user=root --password=ci-root-password \
-              --database=jobpilot_ci < "$file"
+            mysql --host=127.0.0.1 --user=root --database=jobpilot_ci < "$file"
           done
 
       # The schema test creates and drops its own databases, so the dedicated
       # user needs more than the single-database grant the service container
       # gives it. Root is used only here, inside the ephemeral job.
       - name: Grant the dedicated CI user what the schema test needs
+        env:
+          MYSQL_PWD: ${{ env.MYSQL_ROOT_PASSWORD }}
         run: |
-          mysql --host=127.0.0.1 --user=root --password=ci-root-password -e "
+          mysql --host=127.0.0.1 --user=root -e "
             GRANT ALL PRIVILEGES ON *.* TO 'jobpilot_ci'@'%';"
 
       # Printed so a failure documents its own environment: the server version,
       # the collation the schema asserts, how many tables the load produced, and
       # which accounts exist.
       - name: Record the database the tests will use
+        env:
+          MYSQL_PWD: ${{ env.MYSQL_ROOT_PASSWORD }}
         run: |
-          mysql --host=127.0.0.1 --user=root --password=ci-root-password -e "
+          mysql --host=127.0.0.1 --user=root -e "
             SELECT VERSION() AS server_version, @@collation_server AS collation_server;
             SELECT COUNT(*) AS tables_in_ci
               FROM information_schema.tables

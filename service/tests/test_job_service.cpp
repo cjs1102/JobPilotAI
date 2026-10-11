@@ -55,23 +55,34 @@ namespace jobpilot::service
                 return total;
             }
 
-            std::optional<JobDetail> FindActiveJobById(
-                std::uint64_t jobId) override
+            std::optional<JobDetail> FindPublicJobById(
+                std::uint64_t jobId,
+                bool includeNeedsReview) override
             {
+                capturedJobId = jobId;
+                capturedIncludeNeedsReview = includeNeedsReview;
+
                 if (throwOnDetail)
                 {
                     throw std::runtime_error(
                         "forced detail failure");
                 }
 
-                capturedJobId = jobId;
                 return detail;
             }
 
-            bool ActiveJobExists(
-                jobpilot::core::ConnectionPool::Transaction &,
-                std::uint64_t) override
+            std::optional<JobDetail> FindReviewableJobById(
+                std::uint64_t jobId) override
             {
+                return detail;
+            }
+
+            bool PublicJobExists(
+                jobpilot::core::ConnectionPool::Transaction &,
+                std::uint64_t,
+                bool includeNeedsReview) override
+            {
+                capturedIncludeNeedsReview = includeNeedsReview;
                 return activeJobExists;
             }
 
@@ -89,6 +100,7 @@ namespace jobpilot::service
             bool throwOnSearch = false;
             bool throwOnCount = false;
             bool throwOnDetail = false;
+            bool capturedIncludeNeedsReview = false;
             bool activeJobExists = true;
 
             std::optional<std::string> capturedKeyword;
@@ -244,7 +256,7 @@ namespace jobpilot::service
         JobService service(dao);
 
         const ServiceResult<JobDetail> found =
-            service.GetJob(42);
+            service.GetJob(42, false);
 
         ASSERT_EQ(found.code, ErrorCode::kSuccess);
         ASSERT_EQ(found.value.requirements.size(), 2U);
@@ -253,10 +265,13 @@ namespace jobpilot::service
             "C++");
         EXPECT_EQ(dao.capturedJobId, 42U);
         EXPECT_EQ(dao.capturedRequirementJobId, 42U);
+        // The service hands the visibility rule to the DAO unchanged; it never
+        // decides on its own that a queued row may be read.
+        EXPECT_FALSE(dao.capturedIncludeNeedsReview);
 
         dao.detail.reset();
         const ServiceResult<JobDetail> missing =
-            service.GetJob(99);
+            service.GetJob(99, false);
 
         EXPECT_EQ(
             missing.code,
@@ -276,7 +291,7 @@ namespace jobpilot::service
         dao.throwOnCount = false;
         dao.throwOnDetail = true;
         EXPECT_EQ(
-            service.GetJob(1).code,
+            service.GetJob(1, false).code,
             ErrorCode::kDatabaseError);
     }
     TEST(JobServiceTest, NormalizesFreshnessFilters)

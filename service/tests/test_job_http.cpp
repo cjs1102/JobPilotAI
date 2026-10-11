@@ -301,6 +301,24 @@ namespace jobpilot::service
                     0,
                     "2026-10-03 10:00:00");
 
+            // 0015A: the same shape as a normal row, but still queued for
+            // review, so the public surface must not expose it.
+            queuedId =
+                jobpilot::test::InsertJob(
+                    pool.get(),
+                    "Queued",
+                    searchToken + " queued",
+                    location,
+                    "Queued description",
+                    jobpilot::test::UniqueJobToken(
+                        "job-http-url"),
+                    1,
+                    "2026-10-04 10:00:00");
+
+            pool->Execute(
+                "UPDATE jobs SET review_status = 1 WHERE id = ?",
+                {static_cast<std::int64_t>(queuedId)});
+
             pool->Execute(
                 "UPDATE jobs SET salary_min = ?, salary_max = ? "
                 "WHERE id = ?",
@@ -455,6 +473,9 @@ namespace jobpilot::service
             jobpilot::test::CleanupJob(
                 pool.get(),
                 inactiveId);
+            jobpilot::test::CleanupJob(
+                pool.get(),
+                queuedId);
             sessions->Remove(token);
             jobpilot::test::CleanupUser(
                 pool.get(),
@@ -485,6 +506,7 @@ namespace jobpilot::service
         std::uint64_t olderId = 0;
         std::uint64_t newerId = 0;
         std::uint64_t inactiveId = 0;
+        std::uint64_t queuedId = 0;
         std::string email;
         std::string token;
         std::uint64_t userId = 0;
@@ -571,6 +593,44 @@ namespace jobpilot::service
         EXPECT_EQ(
             missing->jsonBody["code"],
             40001);
+    }
+
+    // 0015A review gate on the real HTTP surface: a queued row is invisible to
+    // the list and the by-id detail answers exactly like it does for a row that
+    // does not exist, so the endpoint cannot confirm that a hidden job exists.
+    // The internal read still returns it, which is what keeps review working.
+    TEST_F(JobHttpTest, HidesQueuedJobsFromPublicDetailAndList)
+    {
+        const std::optional<HttpResponseData> list =
+            SendRequest(
+                "/api/v1/jobs?keyword=" +
+                searchToken);
+
+        ASSERT_TRUE(list.has_value());
+        ASSERT_TRUE(list->hasJson);
+        EXPECT_EQ(list->statusCode, 200);
+
+        for (const auto &item : list->jsonBody["data"]["list"])
+        {
+            EXPECT_NE(item["id"], queuedId)
+                << "a queued row leaked into the public list";
+        }
+
+        const std::optional<HttpResponseData> detail =
+            SendRequest(
+                "/api/v1/jobs/" +
+                std::to_string(queuedId));
+
+        ASSERT_TRUE(detail.has_value());
+        ASSERT_TRUE(detail->hasJson);
+        EXPECT_EQ(detail->statusCode, 404);
+        EXPECT_EQ(detail->jsonBody["code"], 40001);
+
+        const std::optional<JobDetail> reviewable =
+            jobDao->FindReviewableJobById(queuedId);
+
+        ASSERT_TRUE(reviewable.has_value());
+        EXPECT_EQ(reviewable->summary.title, searchToken + " queued");
     }
 
     TEST_F(JobHttpTest, ReturnsEmptyPageWithRealTotal)

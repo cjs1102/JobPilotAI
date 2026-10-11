@@ -1,10 +1,13 @@
 #include "jobpilot/service/job/job_quality.h"
 
+#include "jobpilot/service/job/job_visibility.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
 #include <map>
+#include <string>
 #include <utility>
 
 namespace jobpilot::service
@@ -1051,6 +1054,26 @@ namespace jobpilot::service
         }
 
         return summary;
+    }
+
+    bool PublicVisibilityIncludesNeedsReview()
+    {
+        // Read on every call, exactly like the list path has done since 0015A,
+        // so the switch and the lists can never disagree about its value.
+        const char *value =
+            std::getenv("JOB_PUBLIC_INCLUDE_NEEDS_REVIEW");
+
+        if (value == nullptr)
+        {
+            return false;
+        }
+
+        const std::string text = value;
+
+        return text == "1" ||
+               text == "true" ||
+               text == "TRUE" ||
+               text == "yes";
     }
 
 } // namespace jobpilot::service

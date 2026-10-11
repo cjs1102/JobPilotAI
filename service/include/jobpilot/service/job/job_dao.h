@@ -41,17 +41,29 @@ namespace jobpilot::service
         std::vector<JobRequirementsRecord> ListRequirementsForJobs(
             const std::vector<std::uint64_t> &jobIds) override;
 
-        std::optional<JobDetail> FindActiveJobById(
+        std::optional<JobDetail> FindPublicJobById(
+            std::uint64_t jobId,
+            bool includeNeedsReview) override;
+
+        std::optional<JobDetail> FindReviewableJobById(
             std::uint64_t jobId) override;
 
-        bool ActiveJobExists(
+        bool PublicJobExists(
             jobpilot::core::ConnectionPool::Transaction &transaction,
-            std::uint64_t jobId) override;
+            std::uint64_t jobId,
+            bool includeNeedsReview) override;
 
         std::vector<JobRequirement> ListRequirements(
             std::uint64_t jobId) override;
 
     private:
+        // Shared implementation behind FindPublicJobById /
+        // FindReviewableJobById. The parameter is the visibility rule the caller
+        // committed to, not a preference.
+        std::optional<JobDetail> QueryJobDetail(
+            std::uint64_t jobId,
+            bool includeNeedsReview);
+
         jobpilot::core::ConnectionPool &pool_;
     };
 

@@ -88,7 +88,8 @@ namespace jobpilot::service
     }
 
     ServiceResult<JobDetail> JobService::GetJob(
-        std::uint64_t jobId)
+        std::uint64_t jobId,
+        bool includeNeedsReview)
     {
         if (jobId == 0)
         {
@@ -99,8 +100,12 @@ namespace jobpilot::service
 
         try
         {
+            // Public semantics: a job still queued for review is reported as
+            // not found, so the detail endpoint cannot confirm that it exists.
             std::optional<JobDetail> detail =
-                jobDao_.FindActiveJobById(jobId);
+                jobDao_.FindPublicJobById(
+                    jobId,
+                    includeNeedsReview);
 
             if (!detail.has_value())
             {

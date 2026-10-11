@@ -495,20 +495,22 @@ with open(os.environ["SKIP_FILE"], "w", encoding="utf-8") as handle:
 
 if status != 200:
     if mode == "review":
-        # Recorded as an observation: the by-id detail is not part of the public
-        # discovery surface (list/search), so a hidden row may or may not answer
-        # here; nothing is forced visible.
-        print(f"  observation: the by-id detail returned HTTP {status}")
+        # 0015A review gate: a row that is still queued is not part of the public
+        # surface, and the by-id detail must not confirm that it exists. Any
+        # non-200 answer is accepted here, but the status stays in the evidence.
+        print(f"  a queued row is not readable by direct id (HTTP {status}), "
+              "exactly like a row that does not exist")
         raise SystemExit(0)
     raise SystemExit(f"the public detail returned HTTP {status}")
+
+if mode == "review":
+    raise SystemExit(
+        "the public detail returned HTTP 200 for a row that is still queued "
+        "for review: the review gate is open on the by-id path")
 
 detail = document["data"]
 with open(os.environ["DETAIL_BEFORE"], "w", encoding="utf-8") as handle:
     json.dump(detail, handle, ensure_ascii=False, sort_keys=True)
-
-if mode == "review":
-    print(f"  observation: a needs_review row still answers by direct id (HTTP {status}); "
-          "it stays out of list/search")
 
 def check(label, ok, actual):
     if not ok:
@@ -552,7 +554,7 @@ PY
 printf '%s\n' "$READBACK"
 DETAIL_STATUS="$(cat "$WORK/detail-status.txt" 2>/dev/null || echo unknown)"
 if [ "$MODE" = "review" ] && [ "$DETAIL_STATUS" != "200" ]; then
-    pass "read-back: the stored row matches the payload is not observable by id (HTTP $DETAIL_STATUS); recorded, not forced"
+    pass "read-back: the queued row is invisible by id (HTTP $DETAIL_STATUS), so the public detail cannot confirm it exists"
 else
     pass "read-back: the stored row matches the normalized payload, freshness unobserved"
 fi
@@ -632,11 +634,15 @@ def digest():
              f"WHERE source_url = '{source_url}'")
     out = subprocess.run(
         ["docker", "exec", f"{os.environ['PROJECT']}-mysql",
-         "mysql", "-uroot", "-proot", "-N", "-e", f"USE jobpilot; {query}"],
-        capture_output=True, text=True, check=False)
+         "mysql", "-uroot", "-proot", "--default-character-set=utf8mb4",
+         "-N", "-e", f"USE jobpilot; {query}"],
+        capture_output=True, check=False)
     if out.returncode != 0 or not out.stdout.strip():
-        raise SystemExit(f"the F14 digest query failed: {out.stderr.strip()[:200]}")
-    return hashlib.sha256(out.stdout.strip().encode("utf-8")).hexdigest()
+        raise SystemExit(f"the F14 digest query failed: {out.stderr.decode('utf-8', 'replace')[:200]}")
+    # Hash the bytes the client returned; the row legitimately contains non-ASCII
+    # text, and both digests are taken the same way, so decoding is unnecessary
+    # and must not be attempted (an earlier version failed on a GBK byte).
+    return hashlib.sha256(out.stdout.strip()).hexdigest()
 
 before = digest()
 observation = {
@@ -692,7 +698,7 @@ import json, os
 data = json.load(open(os.environ["QUEUE_JSON"]))
 item = data.get("item") or {}
 status = open(os.environ["DETAIL_STATUS_FILE"]).read().strip()
-print("审核队列: review_status=%s reason_code=%s outcome=%s resolution=%s queue_total=%s；公共列表/搜索不可见；按 id 详情探测 HTTP %s" % (
+print("审核队列: review_status=%s reason_code=%s outcome=%s resolution=%s queue_total=%s；公共列表/搜索不可见；按 id 详情也不可见（HTTP %s）" % (
     item.get("review_status"), item.get("reason_code"), item.get("outcome"),
     item.get("resolution"), data.get("total"), status))
 ')"

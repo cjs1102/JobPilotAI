@@ -6,6 +6,7 @@
 
 #include "jobpilot/core/logger.h"
 #include "jobpilot/service/resume/tailor_rule.h"
+#include "jobpilot/service/job/job_visibility.h"
 
 namespace jobpilot::service
 {
@@ -89,7 +90,9 @@ namespace jobpilot::service
             if (jobId.has_value())
             {
                 const std::optional<JobDetail> detail =
-                    jobDao_.FindActiveJobById(jobId.value());
+                    jobDao_.FindPublicJobById(
+                        jobId.value(),
+                        PublicVisibilityIncludesNeedsReview());
 
                 if (!detail.has_value())
                 {

@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include "jobpilot/service/job/job_quality.h"
+#include "jobpilot/service/job/job_visibility.h"
 
 namespace
 {
@@ -441,4 +442,32 @@ namespace
         EXPECT_EQ(missing.Size(), 0U);
         EXPECT_FALSE(missingWarning.empty());
     }
+
+    // 0015A: the rollback switch is parsed in exactly one place so the list, the
+    // detail, the application check and every other public read cannot disagree
+    // about its value.
+    TEST(JobQualityTest, PublicVisibilitySwitchParsesTheDocumentedValues)
+    {
+        constexpr const char *kSwitch = "JOB_PUBLIC_INCLUDE_NEEDS_REVIEW";
+
+        ASSERT_EQ(::unsetenv(kSwitch), 0);
+        EXPECT_FALSE(jobpilot::service::PublicVisibilityIncludesNeedsReview());
+
+        for (const char *enabled : {"1", "true", "TRUE", "yes"})
+        {
+            ASSERT_EQ(::setenv(kSwitch, enabled, 1), 0);
+            EXPECT_TRUE(jobpilot::service::PublicVisibilityIncludesNeedsReview())
+                << "expected " << enabled << " to enable the switch";
+        }
+
+        for (const char *disabled : {"0", "false", "no", ""})
+        {
+            ASSERT_EQ(::setenv(kSwitch, disabled, 1), 0);
+            EXPECT_FALSE(jobpilot::service::PublicVisibilityIncludesNeedsReview())
+                << "expected '" << disabled << "' to keep clean-only reads";
+        }
+
+        ASSERT_EQ(::unsetenv(kSwitch), 0);
+    }
+
 } // namespace

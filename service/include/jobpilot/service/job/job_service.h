@@ -30,8 +30,12 @@ namespace jobpilot::service
             std::size_t page,
             std::size_t pageSize);
 
+        // Public detail read. `includeNeedsReview` is the 0015A rollback switch
+        // value (see job_visibility.h); it is threaded in rather than read here
+        // so every public read in one request uses the same decision.
         ServiceResult<JobDetail> GetJob(
-            std::uint64_t jobId);
+            std::uint64_t jobId,
+            bool includeNeedsReview);
 
     private:
         IJobDao &jobDao_;

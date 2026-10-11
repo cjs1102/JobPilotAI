@@ -109,7 +109,7 @@ namespace jobpilot::service
         }
 
         const std::optional<JobDetail> job =
-            readDao->FindActiveJobById(jobId);
+            readDao->FindReviewableJobById(jobId);
 
         ASSERT_TRUE(job.has_value());
         EXPECT_EQ(job->summary.company, "Import Company");
@@ -166,7 +166,7 @@ namespace jobpilot::service
             // 0017A: publishedAt was omitted by the update above, so COALESCE
             // must have preserved the value written by the insert.
             const std::optional<JobDetail> preserved =
-                readDao->FindActiveJobById(jobId);
+                readDao->FindReviewableJobById(jobId);
 
             ASSERT_TRUE(preserved.has_value());
             EXPECT_EQ(
@@ -215,7 +215,7 @@ namespace jobpilot::service
         }
 
         const std::optional<JobDetail> job =
-            readDao->FindActiveJobById(jobId);
+            readDao->FindReviewableJobById(jobId);
         const jobpilot::core::Result count =
             pool->Query(
                 "SELECT COUNT(*) FROM jobs WHERE source_url = ?",
@@ -384,7 +384,7 @@ namespace jobpilot::service
         }
 
         const std::optional<JobDetail> job =
-            readDao->FindActiveJobById(jobId);
+            readDao->FindReviewableJobById(jobId);
 
         ASSERT_TRUE(job.has_value());
         EXPECT_EQ(job->summary.title, "Rollback Before");

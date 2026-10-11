@@ -15,6 +15,7 @@
 #include "jobpilot/service/auth/session_authenticator.h"
 #include "jobpilot/service/job/job_extra_fields.h"
 #include "jobpilot/service/job/job_ranking_service.h"
+#include "jobpilot/service/job/job_visibility.h"
 
 namespace jobpilot::service
 {
@@ -817,22 +818,13 @@ namespace jobpilot::service
         : service_(service),
           rankingService_(rankingService)
     {
-        // 0015A compatibility rollback switch. The predicate is on by default;
-        // the environment variable restores the pre-0015A visibility without
-        // touching stored data (ExecPlan 0015A section 10).
-        const char *value =
-            std::getenv("JOB_PUBLIC_INCLUDE_NEEDS_REVIEW");
-
-        if (value != nullptr)
-        {
-            const std::string text = value;
-
-            includeNeedsReview_ =
-                text == "1" ||
-                text == "true" ||
-                text == "TRUE" ||
-                text == "yes";
-        }
+        // 0015A compatibility rollback switch (JOB_PUBLIC_INCLUDE_NEEDS_REVIEW).
+        // The predicate is on by default; the environment variable restores the
+        // pre-0015A visibility without touching stored data (ExecPlan 0015A
+        // section 10). job_visibility.h owns the parsing so the list, the detail
+        // and the other public reads can never disagree.
+        includeNeedsReview_ =
+            PublicVisibilityIncludesNeedsReview();
     }
 
     void JobController::Search(
@@ -1017,7 +1009,9 @@ namespace jobpilot::service
         }
 
         const ServiceResult<JobDetail> result =
-            service_.GetJob(jobId.value());
+            service_.GetJob(
+                jobId.value(),
+                includeNeedsReview_);
 
         if (result.code != ErrorCode::kSuccess)
         {

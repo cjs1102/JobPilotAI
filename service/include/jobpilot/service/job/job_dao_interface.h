@@ -76,12 +76,27 @@ namespace jobpilot::service
         virtual std::size_t CountJobs(
             const JobSearchFilter &filter) = 0;
 
-        virtual std::optional<JobDetail> FindActiveJobById(
+        // PUBLIC detail semantics: an active job that is publicly visible
+        // (review_status = 0, unless the 0015A rollback switch is on). Returns
+        // nullopt for a queued or quarantined row, exactly as for a row that
+        // does not exist, so a caller cannot learn that a hidden job exists.
+        virtual std::optional<JobDetail> FindPublicJobById(
+            std::uint64_t jobId,
+            bool includeNeedsReview) = 0;
+
+        // INTERNAL semantics for ops and worker paths only: an active job
+        // regardless of its review state. The review queue, the review decision
+        // and the AI worker's task input use this; nothing that serves an
+        // unauthenticated or ordinary user request may.
+        virtual std::optional<JobDetail> FindReviewableJobById(
             std::uint64_t jobId) = 0;
 
-        virtual bool ActiveJobExists(
+        // PUBLIC existence check used when an application is created, with the
+        // same visibility rule as FindPublicJobById.
+        virtual bool PublicJobExists(
             jobpilot::core::ConnectionPool::Transaction &transaction,
-            std::uint64_t jobId) = 0;
+            std::uint64_t jobId,
+            bool includeNeedsReview) = 0;
 
         virtual std::vector<JobRequirement> ListRequirements(
             std::uint64_t jobId) = 0;

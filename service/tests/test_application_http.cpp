@@ -414,6 +414,13 @@ namespace jobpilot::service
                     pool.get(),
                     jobId);
             }
+
+            for (std::uint64_t extraJobId : extraJobIds)
+            {
+                jobpilot::test::CleanupJob(
+                    pool.get(),
+                    extraJobId);
+            }
         }
 
         std::string TrackEmail(
@@ -472,6 +479,7 @@ namespace jobpilot::service
         std::string token;
         std::vector<std::string> tokens;
         std::vector<std::string> emails;
+        std::vector<std::uint64_t> extraJobIds;
     };
 
     TEST_F(ApplicationHttpTest, CreatesListsUpdatesAndStatistics)
@@ -607,6 +615,55 @@ namespace jobpilot::service
         ASSERT_TRUE(jobError->hasJson);
         EXPECT_EQ(jobError->statusCode, 404);
         EXPECT_EQ(jobError->jsonBody["code"], 40001);
+
+        // 0015A: a job that is still queued for review cannot be the target of
+        // an application. The error is the same "job not found" an unknown id
+        // produces, so the endpoint never confirms that a hidden job exists.
+        const std::uint64_t queuedJobId =
+            jobpilot::test::InsertJob(
+                pool.get(),
+                "Queued Co",
+                "Queued Application Job",
+                "Shenzhen",
+                "description",
+                jobpilot::test::UniqueJobToken(
+                    "application-http-queued"),
+                1,
+                "2026-10-01 10:00:00");
+
+        extraJobIds.push_back(queuedJobId);
+
+        pool->Execute(
+            "UPDATE jobs SET review_status = 1 WHERE id = ?",
+            {static_cast<std::int64_t>(queuedJobId)});
+
+        const nlohmann::json queuedJob{
+            {"job_id", queuedJobId},
+            {"resume_version_id", resumeVersionId}};
+
+        const std::optional<HttpResponseData> queuedError =
+            SendRequest(
+                "POST",
+                "/api/v1/applications",
+                queuedJob.dump(),
+                authorization);
+
+        ASSERT_TRUE(queuedError.has_value());
+        ASSERT_TRUE(queuedError->hasJson);
+        EXPECT_EQ(queuedError->statusCode, 404);
+        EXPECT_EQ(queuedError->jsonBody["code"], 40001);
+
+        // Nothing was written for the queued job.
+        const jobpilot::core::Result leaked =
+            pool->Query(
+                "SELECT id FROM applications WHERE job_id = ?",
+                {queuedJobId});
+
+        EXPECT_EQ(leaked.rowCount(), 0U);
+
+        // The rollback switch is what makes it visible again: with
+        // JOB_PUBLIC_INCLUDE_NEEDS_REVIEW=1 the same request is accepted. That is
+        // asserted in the service-level test, which can inject the flag.
 
         const nlohmann::json missingResume{
             {"job_id", jobId},

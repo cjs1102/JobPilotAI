@@ -348,12 +348,8 @@ namespace jobpilot::service
                 return 0;
             }
 
-            std::optional<JobDetail> FindActiveJobById(
-                std::uint64_t jobId) override
+            std::optional<JobDetail> Lookup()
             {
-                ++detailCalls;
-                capturedJobId = jobId;
-
                 if (throwOnDetail)
                 {
                     throw std::runtime_error(
@@ -363,10 +359,30 @@ namespace jobpilot::service
                 return detail;
             }
 
-            bool ActiveJobExists(
-                jobpilot::core::ConnectionPool::Transaction &,
-                std::uint64_t) override
+            std::optional<JobDetail> FindPublicJobById(
+                std::uint64_t jobId,
+                bool includeNeedsReview) override
             {
+                ++detailCalls;
+                capturedJobId = jobId;
+                capturedIncludeNeedsReview = includeNeedsReview;
+                return Lookup();
+            }
+
+            std::optional<JobDetail> FindReviewableJobById(
+                std::uint64_t jobId) override
+            {
+                ++detailCalls;
+                capturedJobId = jobId;
+                return Lookup();
+            }
+
+            bool PublicJobExists(
+                jobpilot::core::ConnectionPool::Transaction &,
+                std::uint64_t,
+                bool includeNeedsReview) override
+            {
+                capturedIncludeNeedsReview = includeNeedsReview;
                 return true;
             }
 
@@ -385,6 +401,7 @@ namespace jobpilot::service
             std::uint64_t capturedJobId = 0;
             std::uint64_t capturedRequirementJobId = 0;
             bool throwOnDetail = false;
+            bool capturedIncludeNeedsReview = false;
         };
 
         class FakeResumeDao final : public IResumeDao

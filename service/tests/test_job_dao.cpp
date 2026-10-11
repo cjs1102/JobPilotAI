@@ -191,7 +191,7 @@ namespace jobpilot::service
         EXPECT_EQ(rows.front().sourceUrl.value(), url);
 
         const std::optional<JobDetail> detail =
-            dao->FindActiveJobById(id);
+            dao->FindReviewableJobById(id);
 
         ASSERT_TRUE(detail.has_value());
         ASSERT_TRUE(detail->sourceUrl.has_value());
@@ -429,7 +429,7 @@ namespace jobpilot::service
             3);
 
         const std::optional<JobDetail> detail =
-            dao->FindActiveJobById(active);
+            dao->FindReviewableJobById(active);
 
         ASSERT_TRUE(detail.has_value());
         EXPECT_EQ(
@@ -454,11 +454,78 @@ namespace jobpilot::service
                 "2026-10-01 10:00:00");
 
         EXPECT_FALSE(
-            dao->FindActiveJobById(inactive)
+            dao->FindReviewableJobById(inactive)
                 .has_value());
         EXPECT_FALSE(
-            dao->FindActiveJobById(999999999ULL)
+            dao->FindReviewableJobById(999999999ULL)
                 .has_value());
+    }
+
+    // 0015A review gate: the public detail read and the internal read are
+    // different questions, so they are different methods. A row that is still
+    // queued for review is indistinguishable from a missing row in public, while
+    // the review surface and the worker keep reading it.
+    TEST_F(JobDaoTest, PublicDetailHidesQueuedRowsWhileReviewStillReadsThem)
+    {
+        const std::uint64_t queued =
+            AddJob(
+                "Queued Co",
+                "Queued Job",
+                "Shenzhen",
+                "Queued description",
+                1,
+                "2026-10-01 10:00:00");
+
+        pool->Execute(
+            "UPDATE jobs SET review_status = 1 WHERE id = ?",
+            {static_cast<std::int64_t>(queued)});
+
+        EXPECT_FALSE(
+            dao->FindPublicJobById(queued, false)
+                .has_value());
+
+        // The 0015A rollback switch is the only way a queued row becomes
+        // readable through the public method, and it changes visibility only.
+        const std::optional<JobDetail> rolledBack =
+            dao->FindPublicJobById(queued, true);
+
+        ASSERT_TRUE(rolledBack.has_value());
+        EXPECT_EQ(
+            rolledBack->summary.title,
+            "Queued Job");
+
+        // An application may only reference a publicly visible job; the check
+        // the application transaction makes follows the same rule and reports a
+        // queued job exactly like a missing one.
+        {
+            auto transaction = pool->BeginTransaction();
+
+            EXPECT_FALSE(
+                dao->PublicJobExists(
+                    transaction,
+                    queued,
+                    false));
+            EXPECT_TRUE(
+                dao->PublicJobExists(
+                    transaction,
+                    queued,
+                    true));
+            EXPECT_FALSE(
+                dao->PublicJobExists(
+                    transaction,
+                    999999999ULL,
+                    true));
+
+            transaction.Rollback();
+        }
+
+        const std::optional<JobDetail> reviewable =
+            dao->FindReviewableJobById(queued);
+
+        ASSERT_TRUE(reviewable.has_value());
+        EXPECT_EQ(
+            reviewable->summary.title,
+            "Queued Job");
     }
 
     TEST_F(JobDaoTest, FiltersSalaryAndSkillAndLoadsBulkRequirements)
@@ -726,7 +793,7 @@ namespace jobpilot::service
             UpsertExtraJob(noDeadline);
 
         const std::optional<JobDetail> dateOnlyDetail =
-            dao->FindActiveJobById(dateOnlyId);
+            dao->FindReviewableJobById(dateOnlyId);
 
         ASSERT_TRUE(dateOnlyDetail.has_value());
         EXPECT_EQ(
@@ -751,7 +818,7 @@ namespace jobpilot::service
             std::optional<bool>(true));
 
         const std::optional<JobDetail> explicitDetail =
-            dao->FindActiveJobById(explicitId);
+            dao->FindReviewableJobById(explicitId);
 
         ASSERT_TRUE(explicitDetail.has_value());
         EXPECT_EQ(
@@ -762,7 +829,7 @@ namespace jobpilot::service
             std::optional<bool>(false));
 
         const std::optional<JobDetail> unknownDetail =
-            dao->FindActiveJobById(unknownId);
+            dao->FindReviewableJobById(unknownId);
 
         ASSERT_TRUE(unknownDetail.has_value());
         EXPECT_EQ(
@@ -772,7 +839,7 @@ namespace jobpilot::service
             unknownDetail->summary.deadlineDateOnly.has_value());
 
         const std::optional<JobDetail> emptyDetail =
-            dao->FindActiveJobById(emptyId);
+            dao->FindReviewableJobById(emptyId);
 
         ASSERT_TRUE(emptyDetail.has_value());
         EXPECT_FALSE(

@@ -458,10 +458,22 @@ GET /api/v1/jobs
 - 0015A 的查询过滤/排序（`education_max` / `job_nature` / `deadline_before|after` /
   `open_only` / `sort`）已在 Step 6/3 落地，`docs/03` §9.2 的索引注记与本节同步
   （ExecPlan 0015A §5.6）。
-- **公共可见性（0015A item 4）**：默认只返回 `review_status = 0`（clean）的岗位；
-  `needs_review`/`quarantined` 仅能通过受保护的内部复核端点访问（`docs/03` §9.3）。
-  这是 0015A 唯一的行为变更；回滚开关 `JOB_PUBLIC_INCLUDE_NEEDS_REVIEW=true`
-  只改变可见性、不改任何数据。
+- **公共可见性（0015A item 4；2026-10-11 收紧到全部公共读取路径）**：默认只有
+  `review_status = 0`（clean）的岗位出现在公共面，而且这条规则覆盖**所有**公共读取，
+  不只是列表：`GET /api/v1/jobs`、`GET /api/v1/jobs/recommended`、
+  `GET /api/v1/jobs/{id}`（含随详情返回的 `requirements`）、`POST /api/v1/ai/match`
+  的任务创建、`POST /api/v1/resumes/artifacts`（简历定制引用岗位时）以及创建申请
+  （`POST /api/v1/applications`）时的岗位校验。未获准公开的岗位在这些路径上一律按
+  "不存在"处理（详情 404、code 40001 / `kJobNotFound`），因此接口不会泄漏该岗位是否
+  存在，列表也不会泄漏它。
+  `needs_review`/`quarantined` 仅能通过受保护的内部端点访问（`docs/03` §9.3）：审核
+  队列、审核决定，以及 AI worker 的 `GET /internal/ai/tasks/{id}/input` 不受限制——
+  否则被路由到审核的岗位将无法审核、已排队的任务也无法处理。
+  回滚开关 `JOB_PUBLIC_INCLUDE_NEEDS_REVIEW=true` 只把上述**公共**读取恢复到 0015A 之前
+  的可见性，不改变任何数据，也不影响内部端点。
+  实现上 DAO 用两个语义明确的方法区分两类读取：`FindPublicJobById`（公共，带可见性
+  谓词）与 `FindReviewableJobById`（内部/worker，只要求岗位处于 active），申请校验用
+  `PublicJobExists`；不存在一个"查 Active Job"同时服务两边的模糊入口。
 
 0014 增量字段（Step 4，**只新增响应键，不改既有键**；本阶段不新增请求参数）：
 

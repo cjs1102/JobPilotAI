@@ -12,6 +12,7 @@
 #include "jobpilot/service/ai/match_result.h"
 #include "jobpilot/service/ai/match_result_json.h"
 #include "jobpilot/service/ai/match_rule.h"
+#include "jobpilot/service/job/job_visibility.h"
 
 namespace jobpilot::service
 {
@@ -116,7 +117,9 @@ namespace jobpilot::service
         try
         {
             const std::optional<JobDetail> job =
-                jobDao_.FindActiveJobById(jobId);
+                jobDao_.FindPublicJobById(
+                    jobId,
+                    PublicVisibilityIncludesNeedsReview());
 
             if (!job.has_value())
             {
@@ -413,7 +416,8 @@ namespace jobpilot::service
             }
 
             const std::optional<JobDetail> job =
-                jobDao_.FindActiveJobById(task->jobId.value());
+                jobDao_.FindReviewableJobById(
+                task->jobId.value());
 
             const std::optional<ResumeRecord> resume =
                 resumeDao_.FindOwnedResume(

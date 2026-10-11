@@ -143,11 +143,16 @@ tools/dev/demo-gate.sh                  # end-to-end gate: import -> search -> m
   是唯一生成器，不需要 AI key。
 - **截止时间不驱动生命周期**：`deadline` 只是展示字段，本阶段没有「过期自动关闭」
   或过期提示；过期的岗位仍然可见（已知可见性限制）。
-- **书签小工具：浏览器端提取可用，发布链路尚未端到端验收**。离线测试（node + fixture）
-  覆盖提取逻辑；在真实登录墙岗位页（Edge）运行可生成 JSON，且未观察到书签发起的网络
+- **书签小工具的发布链路已在真实采集样本上完成端到端验收（审核路径）**。离线测试（node +
+  fixture）覆盖提取逻辑；在真实登录墙岗位页（Edge）运行可生成 JSON，且未观察到书签发起的网络
   请求——该请求侧观察是**一次运行的结果**，不构成形式化安全证明，「无网络请求、无凭据」
-  以代码与离线测试为准。`publish-capture`、后端导入与 MySQL 持久化这条发布链路**尚未**
-  做过真机端到端验收。验证范围与限制见
+  以代码与离线测试为准。`tools/dev/capture-acceptance.sh` 现在覆盖两条路径：干净样本必须
+  变成公开可见的岗位；被 0015A 预检路由到审核队列的真实样本则在隔离栈上完成
+  dry-run → 导入 → 审核队列 → 数据库 → 公共可见性逐项断言（11 项，`CAPTURE_ACCEPTANCE_OK`），
+  并且**不会**出现在公共列表、搜索或按 id 详情里。
+  该真实样本仍在审核队列中（`resolution=open`）：它的 `company` 取到的是平台名、
+  `description` 混入了导航/推荐岗位/页脚，因此需要人工复核后再决定是否公开——这类未经清洗的
+  真实岗位不应被当作可直接展示的数据。验证范围与限制见
   [`docs/exec-plans/completed/0014-china-campus-sources-and-manual-capture.md`](docs/exec-plans/completed/0014-china-campus-sources-and-manual-capture.md)
   §19.6。
 

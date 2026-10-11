@@ -8,6 +8,7 @@
 #include "jobpilot/core/logger.h"
 #include "jobpilot/database/mysql_pool.h"
 #include "jobpilot/service/job/job_dao_interface.h"
+#include "jobpilot/service/job/job_visibility.h"
 #include "jobpilot/service/resume/resume_dao_interface.h"
 
 namespace jobpilot::service
@@ -103,9 +104,10 @@ namespace jobpilot::service
             auto transaction =
                 pool_.BeginTransaction();
 
-            if (!jobDao_.ActiveJobExists(
+            if (!jobDao_.PublicJobExists(
                     transaction,
-                    jobId))
+                    jobId,
+                    PublicVisibilityIncludesNeedsReview()))
             {
                 return ServiceResult<ApplicationCreateData>{
                     ErrorCode::kJobNotFound,

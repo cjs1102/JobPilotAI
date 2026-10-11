@@ -15,10 +15,12 @@
 > **0017 (ops hardening and acceptance closure)** is complete and archived too,
 > with its single L4 green, so **no plan is active** and the recorded MVP roadmap
 > is complete through packaging. Carried forward: 0014's Step 5 stays
-> environment-limited, the bookmarklet's publish/read-back acceptance now has a
-> one-command scaffold (`tools/dev/capture-acceptance.sh`, synthetic path proven
-> end to end) that still needs one real-machine JSON from the owner, 0015's D6
-> stays deferred by owner decision, 0017 found one real contract gap
+> environment-limited, and the bookmarklet's publish/read-back acceptance has now
+> been run **on a real capture sample** (`tools/dev/capture-acceptance.sh
+> --expect-review`: 11 assertions green on an isolated stack, the sample routed to
+> the review queue exactly as the 0015A pre-flight demands and never exposed on the
+> public detail/list/search), so no owner-run is outstanding for that step; 0015's
+> D6 stays deferred by owner decision, 0017 found one real contract gap
 > (`publish-capture` sends `published_at`, but `/internal/jobs/import` neither
 > documented nor parsed it) which **0017A fixed on 2026-10-10** — see
 > `## Completed Plan (0017)` and `completed/0017A-manual-import-published-at.md` —

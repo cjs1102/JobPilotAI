@@ -725,25 +725,52 @@ namespace jobpilot::service
         return records;
     }
 
-    std::optional<JobDetail> JobDao::FindActiveJobById(
+    std::optional<JobDetail> JobDao::FindPublicJobById(
+        std::uint64_t jobId,
+        bool includeNeedsReview)
+    {
+        return QueryJobDetail(jobId, includeNeedsReview);
+    }
+
+    std::optional<JobDetail> JobDao::FindReviewableJobById(
         std::uint64_t jobId)
     {
+        // Internal/ops semantics: the review state of the row is irrelevant, the
+        // row only has to be active. Kept as a separate entry point so no call
+        // site can confuse "the public may read this" with "an operator or the
+        // worker may process this".
+        return QueryJobDetail(jobId, true);
+    }
+
+    std::optional<JobDetail> JobDao::QueryJobDetail(
+        std::uint64_t jobId,
+        bool includeNeedsReview)
+    {
+        std::string sql =
+            "SELECT id, company, title, location, "
+            "salary_min, salary_max, salary_currency, "
+            "source, create_time, update_time, "
+            "published_at, last_seen_at, last_verified_at, "
+            "source_status, closed_at, "
+            "education_required, experience_years_min, "
+            "experience_years_max, job_nature, deadline, "
+            "deadline_date_only, "
+            "TIMESTAMPDIFF(SECOND, last_seen_at, NOW()), "
+            "description, source_url, status "
+            "FROM jobs "
+            "WHERE id = ? AND status = 1 ";
+
+        // 0015A: a public read never returns a row that is still queued for
+        // review. The response is the same as for a missing row.
+        if (!includeNeedsReview)
+        {
+            sql += "AND review_status = 0 ";
+        }
+
+        sql += "LIMIT 1";
+
         const jobpilot::core::Result result =
-            pool_.Query(
-                "SELECT id, company, title, location, "
-                "salary_min, salary_max, salary_currency, "
-                "source, create_time, update_time, "
-                "published_at, last_seen_at, last_verified_at, "
-                "source_status, closed_at, "
-                "education_required, experience_years_min, "
-                "experience_years_max, job_nature, deadline, "
-                "deadline_date_only, "
-                "TIMESTAMPDIFF(SECOND, last_seen_at, NOW()), "
-                "description, source_url, status "
-                "FROM jobs "
-                "WHERE id = ? AND status = 1 "
-                "LIMIT 1",
-                {jobId});
+            pool_.Query(sql, {jobId});
 
         if (result.rowCount() == 0)
         {
@@ -785,16 +812,26 @@ namespace jobpilot::service
         return detail;
     }
 
-    bool JobDao::ActiveJobExists(
+    bool JobDao::PublicJobExists(
         jobpilot::core::ConnectionPool::Transaction &transaction,
-        std::uint64_t jobId)
+        std::uint64_t jobId,
+        bool includeNeedsReview)
     {
+        std::string sql =
+            "SELECT id FROM jobs "
+            "WHERE id = ? AND status = 1 ";
+
+        // 0015A: an application may only reference a publicly visible job, so a
+        // queued row fails this check with the same error as a missing one.
+        if (!includeNeedsReview)
+        {
+            sql += "AND review_status = 0 ";
+        }
+
+        sql += "LIMIT 1";
+
         const jobpilot::core::Result result =
-            transaction.Query(
-                "SELECT id FROM jobs "
-                "WHERE id = ? AND status = 1 "
-                "LIMIT 1",
-                {jobId});
+            transaction.Query(sql, {jobId});
 
         return result.rowCount() == 1;
     }

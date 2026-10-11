@@ -8,8 +8,8 @@
   "removed": [],
   "survivors": [],
   "counts": {
-    "before": 309,
-    "after": 309,
+    "before": 312,
+    "after": 312,
     "removed": 0,
     "survivors": 0,
     "candidates_evaluated": 66,
@@ -1017,6 +1017,7 @@
     "k = 0: no candidate satisfied all three clauses of the merge rule, so no test source was edited.",
     "Each evaluated entry records the clause that failed; 'decision' is the audit verdict for the pair.",
     "RECORD-ONLY cases are documented in the report; they are kept and are not counted as removals.",
-    "external/integration labelled cases: 4 candidate directions touched external-labelled SchemaTest cases and all were rejected, so no failure-mode case was merged away."
+    "external/integration labelled cases: 4 candidate directions touched external-labelled SchemaTest cases and all were rejected, so no failure-mode case was merged away.",
+    "2026-10-11 (release-candidate close-out): three cases were ADDED by the needs_review visibility fix (JobDaoTest.PublicDetailHidesQueuedRowsWhileReviewStillReadsThem, JobHttpTest.HidesQueuedJobsFromPublicDetailAndList, JobQualityTest.PublicVisibilitySwitchParsesTheDocumentedValues), so counts.before/after moved 309 -> 312. Nothing was removed, no evaluated pair is affected, and the audit's k = 0 conclusion stands; the point of the guard is that the live CTest list still matches this map."
   ]
 }

@@ -14,15 +14,23 @@ Companion artifacts: [`test-merge-map.json`](test-merge-map.json) (machine-reada
 checker). The map cannot drift from this report: the checker reads the counts block below and
 the live `ctest -N` list and fails when any of the three disagree.
 
-<!-- audit-counts: {"before":309,"after":309,"removed":0,"survivors":0,"candidates_evaluated":66,"candidate_pairs_unordered":50,"record_only":47,"cap":20} -->
+<!-- audit-counts: {"before":312,"after":312,"removed":0,"survivors":0,"candidates_evaluated":66,"candidate_pairs_unordered":50,"record_only":47,"cap":20} -->
 
 ## 1. Verdict
 
 | Quantity | Value |
 |---|---|
-| CTest cases before the audit | **309** |
+| CTest cases before the audit | **312** (309 at audit time; see the 2026-10-11 note) |
 | CTest cases removed by this audit (k) | **0** |
-| CTest cases after the audit | **309** |
+| CTest cases after the audit | **312** (nothing removed) |
+
+> **2026-10-11:** three cases were added by the `needs_review` visibility fix
+> (`JobDaoTest.PublicDetailHidesQueuedRowsWhileReviewStillReadsThem`,
+> `JobHttpTest.HidesQueuedJobsFromPublicDetailAndList`,
+> `JobQualityTest.PublicVisibilitySwitchParsesTheDocumentedValues`), so the live
+> `ctest -N` count moved 309 → 312 and this block follows it. The audit itself is
+> unchanged: k = 0 removals, the same 66 evaluated pairs, the same rule. The
+> transcript below is the audit-time snapshot and is deliberately left as it was.
 | Candidates mechanically/manually evaluated | 66 directed (50 unordered pairs) |
 | Candidates passing all clauses of the hard merge rule | 0 |
 | Candidates reported as NOT PROVEN | 1 (§4, loop-iteration equivalence) |

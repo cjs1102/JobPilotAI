@@ -362,7 +362,7 @@ createTime=1787378565000    # UTC 2026-08-22 06:02:45
 
 ```bash
 # 1) Git / 测试计数
-cd /home/dev/projects/JobPilotAI
+cd "$(git rev-parse --show-toplevel)"
 git status -sb
 git rev-parse HEAD origin/main
 git ls-files | wc -l

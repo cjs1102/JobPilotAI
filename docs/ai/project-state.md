@@ -47,6 +47,35 @@ This is the concise takeover entry. Detailed evidence and historical sections
 are preserved in
 [references/project-state-full.md](references/project-state-full.md).
 
+## Active Plan (0018)
+
+[`active/0018-nowcoder-campus-source.md`](../exec-plans/active/0018-nowcoder-campus-source.md)
+— approved 2026-10-19, implemented on `feat/0018-nowcoder`; **awaiting the
+Supervisor's closeout VERDICT, not merged to `main`**. Summary:
+
+- Added the `nowcoder` provider: login-free SSR list at
+  `/jobs/school/jobs`, recursive `jobListData` lookup (no hardcoded module
+  number), native + aggregator record mapping, row-level diagnostics,
+  in-batch dedupe, 48 KiB cap, and **always `complete=false`** (max 20 rows,
+  no pagination, order jitter).
+- Registered `nowcoder` in the four places: Python `SUPPORTED_PROVIDERS`,
+  `PROVIDERS`, CLI choices (derived), and C++ `IsSupportedObservationSource`;
+  `docs/04` §5.5.1 records the contract.
+- Evidence: Python `Ran 479 tests ... OK`; C++ Debug/UBSan `312/312`;
+  live dry-run `20 job(s), complete=False`; isolated publish 19 rows (single
+  board) and 12 rows (second board, 7 s for two boards); review queue 0.
+- L4 (project `jobpilot-l4-0018`, 13418/16418, scratch
+  `jobpilot_l4_0018_scratch`): builds all rc=0; Debug 312/312, UBSan 312/312,
+  **ASan 311/312** with one `registration failed` timeout and 0 sanitizer
+  diagnostics. Targeted ASan re-runs of both affected tests pass alone; a full
+  ASan re-run fails a different registration-heavy test. Classified as a
+  harness/3 s-client-timeout issue, not a 0018 product regression; the
+  Supervisor decides whether to accept it or require a separate test-timeout
+  fix. **Do not describe the ASan matrix as fully green.**
+- The pre-protocol docs commit `a351984` is on `main`; implementation commits
+  are on the feature branch. No history rewrite, no force-push, no merge before
+  VERDICT.
+
 ## Current Stage
 
 - Architecture direction is now open-source first and self-hosted, with a

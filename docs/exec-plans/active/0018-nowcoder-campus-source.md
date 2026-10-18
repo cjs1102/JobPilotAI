@@ -421,10 +421,10 @@ native     := ext is str and ext 可解析为 JSON object
 
 ```bash
 # A. 静态与 Python
-cd /home/dev/projects/JobPilotAI/source_adapters
+cd "$(git rev-parse --show-toplevel)/source_adapters"
 python3 -m unittest jobpilot_sources.tests.test_provider_nowcoder -v
 python3 -m unittest discover -s jobpilot_sources/tests -t .
-cd /home/dev/projects/JobPilotAI
+cd "$(git rev-parse --show-toplevel)"
 python3 tools/checks/no_submission_path.py           # rc=0
 python3 tools/checks/release_preflight.py             # 8 pass / 0 fail / 0 skip
 tools/checks/history_secret_scan.sh                   # 0 credential-shape
@@ -507,15 +507,61 @@ tools/dev/ci-status.sh --limit 5
 ## 15. 当前进度（实施时维护）
 
 ```text
-P0 合同与来源登记        [ ] 未开始
-P1 四处注册与共享层小改  [ ] 未开始
-P2 provider 与 fixtures  [ ] 未开始
-P3 受控 live dry-run     [ ] 未开始
-P4 隔离栈受控发布（V5）  [ ] 未开始
-P5 文档同步 + L4 + 归档  [ ] 未开始
+P0 合同与来源登记        [x] docs/04 §5.5.1、source_adapters/README 登记表、README/AGENTS
+P1 四处注册与共享层小改  [x] config/providers/C++ allowlist + diagnostics + 5s Fetcher
+P2 provider 与 fixtures  [x] nowcoder.py + 8 个 fixture + 33 个新 Python 用例
+P3 受控 live dry-run     [x] board=后端，20 jobs，diagnostics=0，complete=False
+P4 隔离栈受控发布（V5）  [x] 单板 19 created；多板 2 板/7s/12 created；拆除证据已留
+P5 文档同步 + L4 + 归档  [x] L4 已跑；ASan 1 例超时待 Supervisor 判定；CI 待推送后核验
 ```
 
-每完成一个阶段，在本节记录：提交 sha、实际命令、原始 pass 行、未运行项。
+已记录的证据（收口时补原始行与提交 sha）：
+
+- P2：`Ran 479 tests ... OK`（source_adapters 全量；0017 记录为 446，新增 33）。
+- P3：`[nowcoder] 后端: 20 job(s), board_complete=False, 1 batch(es),
+  publish_complete=False, diagnostics=0 [dry-run]`。
+- P4 单板：`created=19 updated=0 closed=0 complete=False diagnostics=1`
+  （1 条 `duplicate_in_batch`）；DB 19 行、全部 `review_status=0`；公开列表
+  `total=19`；detail `source_url`/`posted_at`/`deadline` 正确；review queue `total=0`。
+- P4 多板：`后端` 19 行（2 created + 17 updated）+ `C++|深圳` 12 created，
+  两块合计 7s（5s 间隔生效）；DB 33 行；公开列表 `后端` total=23、`C++` total=16。
+- P4 拆除：`docker compose -p jobpilot-nowcoder-0018 down -v` 删除 2 容器、1 卷、
+  1 网络；剩余容器/卷为空；端口 18088/13318/16318 已释放；`TEARDOWN_OK`。
+
+### P5 L4（唯一一次矩阵）
+
+- 隔离：project `jobpilot-l4-0018`，MySQL `13418` / Redis `16418`，
+  独立卷 `jobpilot-l4-0018_mysql_data`，scratch 库 `jobpilot_l4_0018_scratch`；
+  起止 2026-10-19 03:10–03:37 CST；开发栈 `jobpilot-mysql`/`jobpilot-redis` 未被触碰。
+- 主机探针：`test_bcrypt` **9363 ms**（阈值 14000 ms）。
+- 构建：debug / asan / ubsan / service-release / root-release 全部 `rc=0`。
+- CTest：Debug **312/312**（82.21 s），UBSan **312/312**（59.54 s），
+  ASan **311/312**（100.51 s）。
+- Sanitizer 诊断：Debug / ASan / UBSan 均为 **0**。
+- Python：`source_adapters` **Ran 479 tests, OK**；`ai_worker` **Ran 190 tests, OK**。
+- Review-backfill isolation：dev `[ SKIPPED ]`（6 passed + 1 skipped）；
+  scratch `[ PASSED ] 7 tests`。
+- 拆除：L4 结束后 project 容器/卷/网络全部移除，端口释放；开发容器仍在。
+
+**ASan 异常（未写成通过）**：L4 的 ASan 段有 1 个用例失败
+`ResumeHttpTest.EnforcesCrossUserIsolation`，异常文本 `registration failed`，
+耗时 22.35 s，sanitizer 诊断 0。按 agent-workflow §3/§4 做定向复现：
+
+- 单独重跑同一 ASan 用例（新隔离栈 `jobpilot-asan-0018`，13518/16518）：
+  `[ PASSED ] 1 test`，1.76 s。
+- 单独重跑另一个注册密集用例
+  `ResumeHttpTest.ManagesTailoredArtifactsWithinTheConfirmationBoundary`：
+  `[ PASSED ] 1 test`，3.36 s。
+- 重跑完整 ASan ctest（同一隔离栈）：**311/312**，失败换成
+  `ResumeHttpTest.ManagesTailoredArtifactsWithinTheConfirmationBoundary`
+  （`registration failed`，36.15 s），sanitizer 诊断 0。
+- 证据指向测试 harness 的 3 s 客户端接收超时
+  （`service/tests/test_resume_http.cpp:103-105`）与宿主机/ASan 负载下的
+  registration bcrypt 超时，而非 0018 改动的产品逻辑（0018 未触碰
+  auth/resume 代码；Debug/UBSan 同用例全绿）。**最终 ASan 矩阵不是全绿**，
+  这一点留给 Supervisor 判定：接受为 harness/environment 限制，或要求单独的
+  测试超时修复计划。
+- TSan 仍不在本阶段矩阵内（沿用 0017 决定）；未运行，不得写成通过。
 
 ## 16. 已知问题与后续
 

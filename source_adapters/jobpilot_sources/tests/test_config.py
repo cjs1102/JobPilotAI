@@ -93,6 +93,48 @@ class LoadConfigTest(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load_config(path)
 
+    def test_accepts_multiple_nowcoder_boards(self) -> None:
+        document = base_config(
+            sources=[
+                {"type": "nowcoder", "board": "后端"},
+                {"type": "nowcoder", "board": "C++|深圳"},
+            ]
+        )
+        config = self.load(document)
+
+        self.assertEqual(
+            [source.board for source in config.sources],
+            ["后端", "C++|深圳"],
+        )
+
+    def test_rejects_invalid_nowcoder_boards(self) -> None:
+        for board in (
+            "|深圳",
+            "后端|",
+            "a|b|c",
+            "后端\t深圳",
+            "x" * 65,
+            "后端|" + ("x" * 33),
+            "x" * 129,
+        ):
+            with self.subTest(board=board):
+                document = base_config(
+                    sources=[{"type": "nowcoder", "board": board}]
+                )
+                with self.assertRaises(ConfigError):
+                    self.load(document)
+
+    def test_rejects_duplicate_nowcoder_board(self) -> None:
+        document = base_config(
+            sources=[
+                {"type": "nowcoder", "board": "后端"},
+                {"type": "nowcoder", "board": "后端"},
+            ]
+        )
+
+        with self.assertRaises(ConfigError):
+            self.load(document)
+
     def test_enabled_sources_filters_and_selects_provider(self) -> None:
         document = base_config()
         document["sources"][1]["enabled"] = False

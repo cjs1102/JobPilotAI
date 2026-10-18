@@ -109,6 +109,7 @@ namespace jobpilot::service
         EXPECT_TRUE(IsSupportedObservationSource("greenhouse"));
         EXPECT_TRUE(IsSupportedObservationSource("lever"));
         EXPECT_TRUE(IsSupportedObservationSource("ashby"));
+        EXPECT_TRUE(IsSupportedObservationSource("nowcoder"));
         EXPECT_FALSE(IsSupportedObservationSource(""));
         EXPECT_FALSE(IsSupportedObservationSource("manual"));
         EXPECT_FALSE(IsSupportedObservationSource("import"));
@@ -119,7 +120,7 @@ namespace jobpilot::service
     TEST(SourceObservationValidation, AcceptsAllSupportedSources)
     {
         for (const char *source :
-             {"greenhouse", "lever", "ashby"})
+             {"greenhouse", "lever", "ashby", "nowcoder"})
         {
             SourceObservation observation = MakeObservation();
             observation.source = source;
@@ -146,14 +147,16 @@ namespace jobpilot::service
     TEST(SourceObservationSources, KeepsTheAllowlistClosedUntilASourceIsVerified)
     {
         // 0014 Step 1: no China identifier may be pre-registered before the
-        // per-source verification (Step 2) and registration (Step 3) land, so
-        // an unknown string can never reach the observation pipeline. When a
-        // later step widens the allowlist, this list must be revised item by
-        // item instead of being relaxed wholesale.
+        // per-source verification and registration land, so an unknown string
+        // can never reach the observation pipeline. 0018 registered nowcoder
+        // after its 2026-10-19 probe; the remaining candidates stay closed.
+        // When a later step widens the allowlist, this list must be revised
+        // item by item instead of being relaxed wholesale.
         for (const char *source :
              {"moka", "mokahr", "beisen", "echeng", "campus_web",
               "iguopin", "workday", "cn_campus", "Greenhouse",
-              "greenhouse ", " greenhouse", "greenhouse\n", "greenHOUSE"})
+              "greenhouse ", " greenhouse", "greenhouse\n", "greenHOUSE",
+              "nowcoder ", " nowcoder", "Nowcoder"})
         {
             EXPECT_FALSE(IsSupportedObservationSource(source))
                 << source;

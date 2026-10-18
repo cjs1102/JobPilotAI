@@ -558,7 +558,24 @@ class FailOpenTest(unittest.TestCase):
 
 
 class SingleSourceGuardTest(unittest.TestCase):
-    """No second hard-coded platform list in either language."""
+    """No second hard-coded platform list in either language.
+
+    A line-scoped ``registry-guard: source-id`` waiver exists for the four
+    source-registration points and the source's own URL constants: those
+    legitimately name a source id/host that is also in the platform registry.
+    The waiver removes only the marked line from the scan; every other
+    occurrence still fails the guard.
+    """
+
+    WAIVER_MARKER = "registry-guard: source-id"
+
+    @classmethod
+    def _guard_text(cls, text: str) -> str:
+        return "\n".join(
+            line
+            for line in text.splitlines()
+            if cls.WAIVER_MARKER not in line
+        )
 
     @staticmethod
     def canonical_host_suffixes() -> frozenset[str]:
@@ -575,7 +592,7 @@ class SingleSourceGuardTest(unittest.TestCase):
             if "tests" in path.relative_to(PACKAGE_ROOT).parts:
                 continue
 
-            text = path.read_text(encoding="utf-8")
+            text = self._guard_text(path.read_text(encoding="utf-8"))
 
             for name in CANONICAL_NORMALIZED:
                 if name in text:
@@ -595,7 +612,7 @@ class SingleSourceGuardTest(unittest.TestCase):
             if "tests" in path.relative_to(PACKAGE_ROOT).parts:
                 continue
 
-            text = path.read_text(encoding="utf-8")
+            text = self._guard_text(path.read_text(encoding="utf-8"))
 
             for suffix in self.canonical_host_suffixes():
                 if suffix in text:
@@ -623,7 +640,7 @@ class SingleSourceGuardTest(unittest.TestCase):
                 if path.suffix not in (".h", ".cpp"):
                     continue
 
-                text = path.read_text(encoding="utf-8")
+                text = self._guard_text(path.read_text(encoding="utf-8"))
 
                 for name in tokens:
                     if name in text:

@@ -46,6 +46,7 @@ Status vocabulary used below:
 | `docs/ai/README.md` | AI context router | Which document to read for which task; diff-first reading policy | Agents | `CURRENT` | — |
 | `docs/ai/agent-workflow.md` | Agent workflow and verification rules | Verification levels L1–L5, when a suite may run, harness prerequisites, one review per stage | Agents | `CURRENT` | `build/l4-0017/` (scratch harness) |
 | `docs/ai/project-state.md` | Current project state (731 lines) | Stage-by-stage state, carried-forward items, what is genuinely open | Agents, maintainer | `CURRENT` (updated 2026-10-11) | whole repo |
+| `docs/ai/CURRENT_STATE.md` | Handoff verification report (2026-10-19) | Git/CI facts, §23 fact checklist, document-code conflicts, capability-matrix update | Agents, maintainer, release reviewer | `CURRENT` (dated 2026-10-19; a point-in-time report, not a living document) | whole repo |
 | `docs/ai/archive/next-phase-plan-2026-10.md` | Archived next-phase plan | An earlier plan sketch; kept for context | Agents | `REFERENCE` (archived) | — |
 | `docs/ai/references/github_resources.md` | GitHub resource research | 655-line survey used for the open-source plan | Maintainer | `REFERENCE` | — |
 | `docs/ai/references/project-state-full.md` | Historical project-state snapshot | Long-form state at an earlier point | Agents | `HISTORICAL` | — |
@@ -93,7 +94,7 @@ Status vocabulary used below:
 | Path | Document | Purpose | Audience | Validity | Related code |
 |---|---|---|---|---|---|
 | `docs/exec-plans/README.md` | ExecPlan protocol | Required sections, when a plan is needed | Agents | `CURRENT` | — |
-| `docs/exec-plans/active/` | — | **Empty. There is no active plan** (verified 2026-10-11) | — | — | — |
+| `docs/exec-plans/active/0018-nowcoder-campus-source.md` | Active plan 0018 | First China source: nowcoder campus SSR list, four-place registration, fixtures, controlled live smoke | Agents, maintainer | `ACTIVE` (approved 2026-10-19; time-boxed 2–3 working days) | `source_adapters/jobpilot_sources/providers/nowcoder.py` (to be added) |
 | `docs/exec-plans/completed/0001…0017A` | 20 archived plans | The history of every stage, each with its evidence, decisions and L4 results. Notable: `0014` (China sources + manual capture, 1264 lines), `0015`/`0015A` (tailoring, explainable matching, quality gate), `0016` (packaging, demo gate), `0017` (ops hardening, L4), `0017A` (the `published_at` contract gap) | Agents needing the "why" | `HISTORICAL` by definition, but each is the **authority for its stage's decisions** | the module named in each plan |
 
 ## 7. Ingestion, sources and tools
@@ -160,6 +161,7 @@ code does, and what was done.
 | DC-6 | `docs/07-deployment.md` (historical) | Deployment instructions for the earlier shape of the project | The current run path is `README` → `tools/dev/bootstrap.sh` → `docker compose up`, and the image is built by `image.yml` | **Known historical document**; README is authoritative |
 | DC-7 | `docs/quality/README.md` verification levels vs `AGENTS.md` | Both describe verification levels and the L4 rule | They agree in substance; `AGENTS.md` adds the P1 freeze and the L4 exclusivity rule | No conflict; read both |
 | DC-8 | `source_adapters/README.md` source register | Marks candidates as "unverified" / "OUT" | No code registers any of those identifiers — `SUPPORTED_PROVIDERS` and the C++ allowlist still contain only greenhouse/lever/ashby | No conflict; **this is the correct state** (see handoff §10) |
+| DC-9 | `docs/ai/project-state.md` §Verified Snapshot | Records "Opt-in live smoke: Greenhouse 217, Lever 10, Ashby 160" | No raw command/date/response evidence was found in the repository; handoff §5 row 2 and §20 V5 say no live board run is recorded | **Recorded 2026-10-19**: mark as unverified in `project-state.md`; a separate follow-up (proposed 0019) must re-run and record raw output or keep the unverified label. Not a 0018 blocker |
 
 ## 13. How to keep this index true
 

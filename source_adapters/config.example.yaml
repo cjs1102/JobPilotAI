@@ -22,3 +22,16 @@ sources:
     board: example-company
     company: Example Company
     enabled: true
+
+  # China campus source (ExecPlan 0018). board is "<keyword>" or
+  # "<keyword>|<city>". Multiple nowcoder boards are allowed in this list;
+  # they are fetched sequentially with a 5 s minimum interval. Every result is
+  # complete=false because one query returns at most 20 rows and has no
+  # pagination - it is a bounded window, not a full scan. Disabled by default.
+  - type: nowcoder
+    board: "后端"
+    enabled: false
+
+  # - type: nowcoder
+  #   board: "C++|深圳"
+  #   enabled: false

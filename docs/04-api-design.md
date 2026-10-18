@@ -759,8 +759,8 @@ X-Internal-Token: <environment secret>
 ```
 
 - `source` 必填，来源类型标识，必须落在 C++ allowlist
-  `IsSupportedObservationSource` 内（当前 `greenhouse` / `lever` / `ashby`；
-  0014 的 China 来源标识按计划 Step 3 在实测登记后加入，本阶段不预先扩大）。
+  `IsSupportedObservationSource` 内（当前 `greenhouse` / `lever` / `ashby` /
+  `nowcoder`；0018 按 2026-10-19 的实测登记加入 `nowcoder`，其余 China 来源仍未注册）。
 - `source_scope` 必填，board / scope 标识，用于隔离不同 board 的缺失判定。
 - `complete=true` 表示适配器能证明本次已观测该 scope 的完整岗位集合。
 - `observed_at` 必填，本次观测时间。
@@ -796,7 +796,7 @@ X-Internal-Token: <environment secret>
   （`items[]` / `findings` / `needs_review` / `rejected` / `clean`），
   `reject` 同样返回 `400` + `data.diagnostic{code,field,reason}` 且不写入任何行。
   判定在写库前完成：被拒绝的观测不会打开事务，因此也不会刷新 freshness 或关闭岗位。
-  结构化适配器（`greenhouse`/`lever`/`ashby`）只可能命中硬缺陷码，见 `docs/03` §9.3。
+  结构化适配器（`greenhouse`/`lever`/`ashby`/`nowcoder`）只可能命中硬缺陷码，见 `docs/03` §9.3。
 
 批量与完整性约束：
 
@@ -837,9 +837,39 @@ X-Internal-Token: <environment secret>
   这是「人工胜出」的另一半。
 - `deadline` 不参与生命周期：过期与否都不触发关闭（见 5.1 的可见性限制）。
 
-实现说明：适配器代码位于 `source_adapters/`（Greenhouse / Lever / Ashby，
+实现说明：适配器代码位于 `source_adapters/`（Greenhouse / Lever / Ashby / nowcoder，
 fixture 驱动，可选 live smoke）；配置、运行方式与归一化规则见
 [`source_adapters/README.md`](../source_adapters/README.md)。
+
+#### 5.5.1 `nowcoder`（0018，中国校招公开列表）
+
+- **来源**：`https://www.nowcoder.com/jobs/school/jobs?search=<关键词>&city=<中文城市>`；
+  页面是免登录 SSR，内嵌 `window.__INITIAL_STATE__`，岗位数组在递归找到的
+  `jobListData`（模块号随构建变化，不得硬编码）。`/jobs/*` 未被 robots.txt 禁止；
+  `/search`、`/nccommon`、`/ab/ab-test-flow` 被禁止。
+- **board 规格**：`<keyword>` 或 `<keyword>|<city>`（如 `后端`、`C++|深圳`）。
+  `source_scope` 就是该 board 字符串；多个 board 可在 `sources:` 列表中并列配置，
+  一次 run 顺序处理，provider 级最小间隔 5 秒；每 board 只发一次列表请求，不翻页、
+  不请求详情。建议一次 run 不超过 3 个 board。
+- **完整性**：一次查询最多返回 20 条，且没有可用翻页；结果顺序在两次请求间可能抖动。
+  因此 `complete` **必须为 `false`**。payload、文档、运行输出三处必须一致；不得把
+  一次 20 条窗口描述为“全量扫描”。`complete=false` 时服务端不关闭任何岗位。
+- **空结果**：`jobListData: []` 是合法空结果；适配器不发布（`complete=false` 且
+  `jobs` 为空时没有合法 payload）。
+- **两种记录形态**：
+  - 原生岗：id 为 5–6 位；`jobName` / `companyNameText` / `jobCity` / `salaryText`；
+    `ext` 是 JSON 字符串，含 `requirements` + `infos`（JD）。
+  - 内推聚合岗：id 为 12+ 位；`jobTitle` / `companyName` / `salary` / `description`
+    （HTML 内联 JD）；`platform` 可能是 `moka` 等；`city` 可能为空。
+- **字段约定**：`source_url = https://www.nowcoder.com/jobs/detail/<id>`；
+  `external_id = str(id)`；`source = nowcoder`；`source_scope = board`。
+  聚合岗详情 SSR 里的 `jobDetailUrl`（外部 Moka 申请链接）**本阶段不落库**；
+  `apply_url` 仍不存在。未知 `eduLevel` 编码、歧义薪资、缺失城市一律省略，不猜测。
+- **去重**：同一 board 批次内按规范化 `title + company + location` 去重；跨 board /
+  跨来源 canonical 去重不在本阶段（`uk_source_url` 仍只保证同 URL 幂等）。
+- **频率与停止条件**：诚实 UA、低频、无并发；遇到 403/429/登录墙/验证码/结构异常
+  停止，不绕过、不代理轮换、不复用登录 cookie。
+- **合规边界**：robots 允许 + 免登录是工程前提，不是法律意见；ToS 接受由 owner 记录。
 
 ### 5.6 岗位复核（Review Queue，0015A）
 

@@ -1,7 +1,8 @@
 # JobPilotAI Source Adapters
 
-Python adapters that fetch public job sources (Greenhouse, Lever, Ashby, and the
-0014 China framework), normalize them into the platform job contract, and publish
+Python adapters that fetch public job sources (Greenhouse, Lever, Ashby,
+nowcoder, and the 0014 China framework), normalize them into the platform job
+contract, and publish
 **one observation per board** through the C++ internal API. Adapters never write
 the database directly
 ([ADR-0008](../docs/adr/0008-source-adapters-and-job-discovery.md),
@@ -34,8 +35,9 @@ source_adapters/
     ├── data/         (0015A)   # platform_names.yaml — the ONE platform list
     ├── capture/      (0014)    # bookmarklet.js + artifact parser + local publisher
     │                           #   (+ quality.py: 0015A pre-flight mirror)
-    ├── providers/              # greenhouse.py, lever.py, ashby.py, base.py,
-    │                           #   public_page.py (0014 generic public page)
+    ├── providers/              # greenhouse.py, lever.py, ashby.py,
+    │                           #   nowcoder.py (0018 China campus SSR),
+    │                           #   base.py, public_page.py (0014 generic page)
     └── tests/                  # unittest suite + recorded fixtures
 ```
 
@@ -95,6 +97,7 @@ without a company name would have to be invented, so such rows are skipped.
 | Greenhouse | `boards-api.greenhouse.io/v1/boards/{board}/jobs?content=true` | JSON | Complete only when `meta.total` equals the returned row count |
 | Lever | `api.lever.co/v0/postings/{board}?mode=json` | JSON | Complete by contract (the array is the whole board) |
 | Ashby | `api.ashbyhq.com/posting-api/job-board/{board}?includeCompensation=true` | JSON | Complete by contract; `isListed: false` postings are dropped |
+| `nowcoder` (0018) | `https://www.nowcoder.com/jobs/school/jobs?search=<keyword>&city=<city>` (SSR `window.__INITIAL_STATE__` → `jobListData`) | text | **Always incomplete**: at most 20 rows per query, no usable pagination, order jitter; `complete=false` is mandatory |
 | `public_page` (0014) | the configured absolute list URL (HTML / JSON / JSON-LD / RSS / sitemap) | text | Complete only when a JSON payload states a total equal to the returned row count; HTML/JSON-LD/feed pages can never prove completeness |
 
 ## Normalization rules
@@ -437,6 +440,15 @@ Every China-source fetch goes through `fetch.Fetcher`, which enforces:
 - **XML safety**: RSS/Atom/sitemap documents that declare `DOCTYPE`/`ENTITY` are
   refused outright (no `defusedxml` dependency is allowed).
 
+**nowcoder (0018)**: one list request per board, no detail requests and no
+concurrency; the provider declares `MIN_INTERVAL_SECONDS = 5.0`, and `run_sync`
+keeps one Fetcher per provider type so the gap also applies between multiple
+nowcoder boards in one run. Each board is a separate `source_scope`
+(`<keyword>` or `<keyword>|<city>`); more than 3 boards in one run logs a
+warning. Every result is `complete=false` because the 20-row window cannot prove
+a full board; the run output says so explicitly. 403/429/login walls/CAPTCHA are
+stop conditions, never retried around.
+
 ## Source register (来源登记表, 2026-10-09)
 
 Method: for each candidate, `robots.txt` was fetched first and parsed with
@@ -451,7 +463,7 @@ cookie/UA spoofing, no redirect circumvention. Verdicts:
 | 2 | **Moka** `app.mokahr.com` | S1 国内 ATS 公开页 | `200`: two specific paths disallowed (`/social-recruitment/lingjuninvest/46355`, `/social-recruitment/shopee/74378`); the campus/social tenant roots are **allowed**, no `Crawl-delay` | tenant roots `302`; the shell carries no 登录/CAPTCHA markers | **Candidate, shape unverified.** A plain GET of a tenant root self-redirects (`/campus-recruitment/lingjuninvest` → `/…/36723` → `302` to itself, 10-hop loop) → the public list URL/API for a tenant is still unverified. Not worked around. |
 | 3 | **清华就业中心** `career.tsinghua.edu.cn` | S3 高校就业网 | `404` → no rules published → **allowed** | landing page `200 text/html` (38 KB, real content), no 登录/CAPTCHA markers | **Not usable (Step 5 re-verified).** This host publishes announcements only (`/tzgg.htm`, `/xwrd.htm`, `/gjzz.htm`, `/gatxs.htm`, `/jyrl.htm`); its 「招聘信息」 nav points at **another host**, `career.cic.tsinghua.edu.cn/xsglxt/f/jyxt/anony/xxfb`, whose `robots.txt` returns **HTTP 503** (persistent: 4 attempts, both schemes, ~12 min) → RFC 9309 "unavailable" → fail-closed `Disallowed` → the list was **not read**. |
 | 4 | **南大就业门户** `job.nju.edu.cn` | S3 高校就业网 | `/robots.txt` returns the SPA HTML with `200` → **no parseable rules → allowed** | landing page `200` but a JS SPA shell ("南京大学就业门户管理后台") | **Unverified.** JS-rendered (and titled a management portal); a plain GET yields no job list. Needs the school's public API. |
-| 5 | **牛客** `www.nowcoder.com` | S4 公开聚合 | `200`: `Disallow: /search`, `/nccommon`, `/ab/ab-test-flow`; `/` allowed | `/` is `200` but a logged-out shell with 登录 markers; the job-list path was not read | **Unverified / not automated.** `/search` is robots-disallowed anyway and no login-free job list was proven. |
+| 5 | **牛客** `www.nowcoder.com` | S4 公开聚合 | `200`: `Disallow: /search`, `/nccommon`, `/ab/ab-test-flow`; `/jobs/*` allowed (0018 re-probe 2026-10-19) | `/jobs/school/jobs` is `200` SSR, no login markers, `jobListData` present; `/search` remains disallowed | **Registered (`nowcoder`, 0018).** Login-free SSR list; at most 20 rows/query, no pagination, order jitter → **`complete=false` always**. Two record shapes (native / aggregator). Manual capture remains the channel for login-walled paths. |
 | 6 | **北森** `www.zhiye.com` | S1 国内 ATS 公开页 | **unavailable** — TLS certificate verify failed (self-signed) → fail closed | — | **OUT this stage.** The certificate is not bypassed; re-check when a valid tenant endpoint is known. |
 | 7 | **北大就业网** `job.pku.edu.cn` | S3 | DNS failure → fail closed | — | **Unverified / unreachable** from this host. |
 | 8 | **浙大就业网** `career.zju.edu.cn` | S3 | DNS failure → fail closed | — | **Unverified / unreachable** from this host. |
@@ -514,6 +526,39 @@ permission / a documented public 国聘 API, or a re-probe of
 `career.cic.tsinghua.edu.cn` robots once it stops returning 503 (then its anonymous
 list can be verified and an adapter built).
 
+### 0018 re-verification (2026-10-19) — nowcoder campus list
+
+The 0014 verdict above was based on the `/search` route; it did not test the
+campus list. ExecPlan 0018 re-probed `GET /jobs/school/jobs` (9 read-only
+requests, honest UA, no login, no CAPTCHA/signature/TLS bypass, within the
+5-minute candidate budget). Machine-readable record:
+`jobpilot_sources/tests/fixtures/cn_source_probe_2026-10-19.json`; robots text:
+`.../fixtures/nowcoder_robots_2026-10-19.txt`.
+
+- **robots**: `200`, 619 bytes; only `/search`, `/nccommon` and
+  `/ab/ab-test-flow` are disallowed. `/jobs/school/jobs` and
+  `/jobs/detail/<id>` are allowed; no `Crawl-delay`.
+- **SSR**: the page embeds `window.__INITIAL_STATE__`; the postings are under a
+  `jobListData` key whose module number changes between builds (observed
+  `app.132`). The provider searches recursively and never hardcodes the number.
+- **Bound**: one query returns at most 20 rows; `page=2` and `pageSize=100` did
+  not paginate; two runs overlapped 19/20 ids (order jitter). An explicit empty
+  `jobListData` is a valid no-match result.
+- **Shapes**: native postings (5–6 digit id; `jobName`/`companyNameText`/
+  `jobCity`/`salaryText`; `ext` JSON with `requirements` + `infos`) and
+  aggregated referral postings (12+ digit id; `jobTitle`/`companyName`/
+  `salary`/`description` HTML; `platform` e.g. `moka`).
+- **Detail correction**: both shapes' `/jobs/detail/<id>` pages had SSR in this
+  sample; the aggregator detail carried `globalJobId`, `originId`,
+  `platform=moka` and a `jobDetailUrl` to Moka. The first slice does not need
+  detail pages because the list already carries the JD.
+- **Unknown-parameter correction**: the earlier claim that unknown parameters
+  yield a degraded empty shell was not reproduced with `page`/`foo`/`pageSize`;
+  the parser still fails closed when `__INITIAL_STATE__` or `jobListData` is
+  absent.
+- **Compliance**: robots-allowed, login-free, low-frequency, no bypass. This is
+  not a legal opinion; ToS acceptance is an owner decision.
+
 ### Registration status (read before adding a China source)
 
 Once a source passes verification, its identifier must be added in **four**
@@ -526,10 +571,11 @@ places at the same time (`docs/04` §5.5):
    `service/src/job/source_observation.cpp`
 
 Adding fewer than four leaves the pipeline broken (config-time rejection, or a
-runtime `400` from the observation endpoint). **As of this stage no China
-identifier is registered**: the framework and the generic `public_page` provider
-are fixture-tested only, and `SUPPORTED_PROVIDERS`/`PROVIDERS` still list exactly
-`greenhouse`, `lever`, `ashby`. Registering a verified source is a coordinated
+runtime `400` from the observation endpoint). **As of 0018, `nowcoder` is
+registered in all four places**: `SUPPORTED_PROVIDERS` / `PROVIDERS` are
+`greenhouse`, `lever`, `ashby`, `nowcoder`, and the C++ allowlist matches. The
+other China candidates in the register remain unregistered; manual capture is
+still the channel for them. Registering another verified source is a coordinated
 change that also touches the C++ allowlist.
 
 ## Batch rules

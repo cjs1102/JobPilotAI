@@ -42,3 +42,14 @@ the documents below are the contracts and the evidence behind it.
 16. [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) — the release gate: what must be
     true before an outside reader can trust a tag, which parts are automated, and
     which parts only the repository owner can confirm.
+
+## To take over the project
+
+17. [`CLAUDE_CODE_HANDOFF.md`](CLAUDE_CODE_HANDOFF.md) — the handoff written on
+    2026-10-11: the git baseline, the 38-row capability matrix, completed work and
+    its evidence, open work, known bugs, technical debt, the China-source register,
+    verification items, release blockers, and the protocol for the first phase
+    (verify the facts → `CURRENT_STATE.md` → `EXEC_PLAN.md` → wait for approval).
+18. [`PROJECT_DOCUMENTATION_INDEX.md`](PROJECT_DOCUMENTATION_INDEX.md) — every
+    tracked document with purpose, audience, validity (`CURRENT` / `HISTORICAL` /
+    `STALE` / `MISSING`), related code, and the `DOCUMENT_CONFLICT` records.

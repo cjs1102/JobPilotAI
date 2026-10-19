@@ -128,8 +128,14 @@ documented additive upgrade + CI forward/backward test (Option B; no migration
 runner). Source coverage: Lever/Ashby `applyUrl`; nowcoder native
 `redirectExternalUrl` only when explicit; Greenhouse and nowcoder aggregator
 NULL; manual import accepts the field but the bookmarklet does not extract it.
-The 2026-10-19 dev database has the upgrade applied for local tests; the
-closeout evidence (upgrade script output, CI run, L4) is pending.
+Implementation is complete on `feat/0020-apply-url`: the upgrade pair passes
+forward/backward/re-forward/idempotent on a scratch DB; targeted C++ tests are
+72/72; full Python is 481 OK; CTest remains 312. The stage L4 (project
+`jobpilot-l4-0020`, MySQL 14018 / Redis 17018, scratch
+`jobpilot_l4_0020_scratch`, 14:12–14:28) is **green**: Debug/ASan/UBSan each
+**312/312**, 0 sanitizer diagnostics, builds all rc=0, Python 481 + 190 OK,
+review isolation dev SKIP / scratch 7, teardown complete. The dev database has
+the upgrade applied. CI/REQUEST for 0020 are pending the owner's PR.
 
 ## Current Stage
 

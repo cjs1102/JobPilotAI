@@ -373,12 +373,44 @@ git diff --check
 ## 13. 当前进度
 
 ```text
-P0 合同 + upgrade 文件    [ ] 未开始（等待批准）
-P1 写入链路 + DAO         [ ] 未开始
-P2 读取 + API             [ ] 未开始
-P3 Providers              [ ] 未开始
-P4 迁移测试 + CI          [ ] 未开始
-P5 L4 + 守卫 + REQUEST    [ ] 未开始
+P0 合同 + upgrade 文件    [x] schema/upgrade/testdata/CI step/docs
+P1 写入链路 + DAO         [x] applyUrl + COALESCE + boundary validation
+P2 读取 + API             [x] list/recommended/detail apply_url
+P3 Providers              [x] Lever/Ashby explicit; nowcoder redirect; Greenhouse null
+P4 迁移测试 + CI          [x] upgrade forward/back/re-forward/idempotent
+P5 L4 + 守卫 + REQUEST    [x] L4 green; CI pending PR
+```
+
+Evidence (2026-10-19):
+
+```text
+# upgrade script (scratch DB)
+forward: varchar(512)|YES|<null>; no index
+backward: absent
+re-forward: present
+idempotent up: "apply_url already exists; skipped"
+idempotent down: "apply_url absent; skipped"
+SCHEMA_UPGRADE_OK
+
+# targeted C++
+ctest -R 'SchemaTest|JobIngestion|SourceSync|JobHttp'
+100% tests passed, 0 tests failed out of 72
+
+# full Python
+Ran 481 tests ... OK
+CTest count: 312 (unchanged)
+
+# L4: project jobpilot-l4-0020, MySQL 14018 / Redis 17018,
+# scratch jobpilot_l4_0020_scratch, 14:12:14–14:28:15
+probe: test_bcrypt 6142ms
+debug: 100% tests passed, 0 failed out of 312 (67.34 s)
+asan:  100% tests passed, 0 failed out of 312 (88.80 s)
+ubsan: 100% tests passed, 0 failed out of 312 (59.20 s)
+sanitizer diagnostics: 0 / 0 / 0
+builds: debug/asan/ubsan/service-release/root-release rc=0
+python: sources 481 OK; ai_worker 190 OK
+review: dev SKIPPED (6 passed); scratch PASSED 7
+teardown: project containers/volumes removed; ports free; dev containers untouched
 ```
 
 ## 14. 批准后动作

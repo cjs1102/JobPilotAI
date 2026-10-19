@@ -308,7 +308,8 @@ namespace jobpilot::service
     {
         return source == "greenhouse" ||
                source == "lever" ||
-               source == "ashby";
+               source == "ashby" ||
+               source == "nowcoder";  // registry-guard: source-id
     }
 
     bool IsValidDbTimestamp(

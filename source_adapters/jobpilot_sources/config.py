@@ -12,7 +12,11 @@ from typing import Any, Mapping
 
 import yaml
 
-SUPPORTED_PROVIDERS = ("greenhouse", "lever", "ashby")
+SUPPORTED_PROVIDERS = ("greenhouse", "lever", "ashby", "nowcoder")  # registry-guard: source-id
+
+MAX_NOWCODER_BOARD_BYTES = 128
+MAX_NOWCODER_KEYWORD_BYTES = 64
+MAX_NOWCODER_CITY_BYTES = 32
 
 
 class ConfigError(Exception):
@@ -56,6 +60,58 @@ def _require_text(value: Any, label: str) -> str:
     return value.strip()
 
 
+def _validate_board_spec(board: str, index: int) -> None:
+    """Validate ``<keyword>`` or ``<keyword>|<city>`` for the campus source.
+
+    The board string is also the ``source_scope``, so it must stay well inside
+    the platform's 128-byte limit. The keyword may not be empty; a ``|`` means a
+    city must follow it. Control characters are rejected so a YAML line cannot
+    smuggle a URL or a header into the request path.
+    """
+
+    label = f"sources[{index}].board"
+
+    if len(board.encode("utf-8")) > MAX_NOWCODER_BOARD_BYTES:
+        raise ConfigError(
+            f"{label} must be <= {MAX_NOWCODER_BOARD_BYTES} UTF-8 bytes"
+        )
+
+    if any(ord(character) < 32 for character in board):
+        raise ConfigError(f"{label} must not contain control characters")
+
+    parts = board.split("|")
+
+    if len(parts) > 2:
+        raise ConfigError(
+            f"{label} must be '<keyword>' or '<keyword>|<city>'"
+        )
+
+    keyword = parts[0].strip()
+
+    if not keyword:
+        raise ConfigError(f"{label} requires a non-empty keyword")
+
+    if len(keyword.encode("utf-8")) > MAX_NOWCODER_KEYWORD_BYTES:
+        raise ConfigError(
+            f"{label} keyword must be <= "
+            f"{MAX_NOWCODER_KEYWORD_BYTES} UTF-8 bytes"
+        )
+
+    if len(parts) == 2:
+        city = parts[1].strip()
+
+        if not city:
+            raise ConfigError(
+                f"{label} has an empty city after '|'; omit the '|' instead"
+            )
+
+        if len(city.encode("utf-8")) > MAX_NOWCODER_CITY_BYTES:
+            raise ConfigError(
+                f"{label} city must be <= "
+                f"{MAX_NOWCODER_CITY_BYTES} UTF-8 bytes"
+            )
+
+
 def _parse_source(raw: Any, index: int) -> SourceConfig:
     if not isinstance(raw, Mapping):
         raise ConfigError(f"sources[{index}] must be a mapping")
@@ -75,6 +131,9 @@ def _parse_source(raw: Any, index: int) -> SourceConfig:
         raw.get("board"),
         f"sources[{index}].board",
     )
+
+    if source_type == "nowcoder":  # registry-guard: source-id
+        _validate_board_spec(board, index)
 
     enabled = raw.get("enabled", True)
 

@@ -1,0 +1,109 @@
+{
+  "probe_version": 1,
+  "probe_date": "2026-10-19",
+  "user_agent": "jobpilot-source-adapters/0.1 (+https://github.com/jobpilotai; public job board reader)",
+  "budget": {
+    "candidate": "nowcoder",
+    "requests": 9,
+    "request_budget_minutes": 5,
+    "notes": "one robots.txt, four list variants, one empty-keyword list, two detail pages"
+  },
+  "robots": {
+    "url": "https://www.nowcoder.com/robots.txt",
+    "status": 200,
+    "content_type": "text/plain",
+    "content_bytes": 619,
+    "disallow": [
+      "/search",
+      "/nccommon",
+      "/ab/ab-test-flow"
+    ],
+    "crawl_delay_seconds": null,
+    "verdicts": {
+      "/jobs/school/jobs": "allowed",
+      "/jobs/school/jobs?search=C%2B%2B": "allowed",
+      "/jobs/detail/404338": "allowed",
+      "/search": "disallowed",
+      "/nccommon/x": "disallowed",
+      "/ab/ab-test-flow/x": "disallowed",
+      "/": "allowed"
+    }
+  },
+  "list": {
+    "url_template": "https://www.nowcoder.com/jobs/school/jobs?search=<keyword>&city=<city>",
+    "status": 200,
+    "ssr_marker": "window.__INITIAL_STATE__",
+    "job_list_key": "jobListData",
+    "module_number_observed": "app.132",
+    "module_number_is_stable": false,
+    "max_rows_observed": 20,
+    "pagination": "none",
+    "page_parameter_effect": "ignored; page=2 returned 20 rows with 19/20 overlap with the first page",
+    "page_size_parameter_effect": "ignored; pageSize=100 still returned 20 rows",
+    "unknown_parameter_effect": "not reproduced as a degraded shell in this probe; foo=bar returned 20 rows",
+    "empty_result": "200 with jobListData=[] for a no-match keyword",
+    "order_jitter": "two runs of search=backend overlapped 19 of 20 ids"
+  },
+  "record_shapes": {
+    "native": {
+      "id_digits": "5-6",
+      "fields": [
+        "jobName",
+        "companyNameText",
+        "jobCity",
+        "salaryText",
+        "ext"
+      ],
+      "ext": "JSON string with requirements and infos",
+      "observed_id": "404338"
+    },
+    "aggregator": {
+      "id_digits": "12+",
+      "fields": [
+        "jobTitle",
+        "companyName",
+        "salary",
+        "description",
+        "platform"
+      ],
+      "description": "HTML inline JD",
+      "observed_id": "30300000146411",
+      "observed_platform": "moka"
+    }
+  },
+  "detail": {
+    "native": {
+      "url": "https://www.nowcoder.com/jobs/detail/404338",
+      "ssr": true,
+      "fields": [
+        "id",
+        "jobName",
+        "jobCity",
+        "ext",
+        "jobCompany.companyName"
+      ]
+    },
+    "aggregator": {
+      "url": "https://www.nowcoder.com/jobs/detail/30300000146411",
+      "ssr": true,
+      "fields": [
+        "globalJobId",
+        "originId",
+        "platform",
+        "jobDetailUrl",
+        "description",
+        "salary",
+        "education",
+        "publishedAt",
+        "openAt",
+        "status"
+      ],
+      "note": "SSR was present in this sample; the first slice does not need detail pages because the list already carries the JD"
+    }
+  },
+  "differences_from_prior_probe": [
+    "An earlier session reported that unknown parameters produce a degraded empty shell; this probe did not reproduce it. The parser still fails closed when __INITIAL_STATE__ or jobListData is absent.",
+    "An earlier session reported that aggregator detail pages have no SSR; this probe found SSR with globalJobId and platform=moka."
+  ],
+  "conclusion": "nowcoder /jobs/school/jobs is a login-free, robots-allowed SSR list with a bounded 20-row window and no pagination; every observation must be complete=false."
+}

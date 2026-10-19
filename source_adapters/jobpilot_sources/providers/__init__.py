@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import ashby, greenhouse, lever
+from . import ashby, greenhouse, lever, nowcoder  # registry-guard: source-id
 from .base import BoardResult, ProviderError
 
 PROVIDERS = {
     module.PROVIDER: module
-    for module in (greenhouse, lever, ashby)
+    for module in (greenhouse, lever, ashby, nowcoder)  # registry-guard: source-id
 }
 
 

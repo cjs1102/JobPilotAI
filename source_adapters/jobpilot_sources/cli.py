@@ -78,24 +78,50 @@ def run_sync(
 
     http = client or HttpClient()
     text_fetcher = fetcher
+    provider_fetchers: dict[str, Fetcher] = {}
     observed_at = clock()
     failures = 0
+    sources = config.enabled_sources(provider)
+    campus_boards = sum(
+        1 for source in sources
+        if source.type == "nowcoder"  # registry-guard: source-id
+    )
 
-    for source in config.enabled_sources(provider):
+    if campus_boards > 3:
+        log(
+            "warning: more than 3 campus source boards in one run; "
+            "each board is one request with a 5 s gap - split the run"
+        )
+
+    for source in sources:
         module = provider_module(source.type)
         label = f"[{source.type}] {source.board}"
 
         try:
-            if getattr(module, "FETCH_MODE", "json") == "text" and (
-                text_fetcher is None
-            ):
-                text_fetcher = Fetcher()
+            source_fetcher = text_fetcher
+
+            if getattr(module, "FETCH_MODE", "json") == "text":
+                min_interval = getattr(module, "MIN_INTERVAL_SECONDS", None)
+
+                if min_interval is not None and fetcher is None:
+                    # Keep one Fetcher per provider type so the interval also
+                    # applies between multiple boards of the same provider.
+                    source_fetcher = provider_fetchers.get(source.type)
+
+                    if source_fetcher is None:
+                        source_fetcher = Fetcher(
+                            min_interval_seconds=float(min_interval)
+                        )
+                        provider_fetchers[source.type] = source_fetcher
+                elif source_fetcher is None:
+                    source_fetcher = Fetcher()
+                    text_fetcher = source_fetcher
 
             payload = fetch_board_payload(
                 module,
                 board=source.board,
                 http=http,
-                fetcher=text_fetcher,
+                fetcher=source_fetcher,
             )
             board = module.parse_board(
                 payload,
@@ -106,6 +132,14 @@ def run_sync(
             failures += 1
             log(f"{label}: fetch failed: {error}")
             continue
+
+        diagnostics = getattr(board, "diagnostics", ()) or ()
+
+        if diagnostics:
+            log(
+                f"{label}: diagnostics={len(diagnostics)} "
+                f"sample={list(diagnostics[:5])}"
+            )
 
         try:
             batches = build_batches(
@@ -127,12 +161,20 @@ def run_sync(
             )
             continue
 
+        if source.type == "nowcoder":  # registry-guard: source-id
+            log(
+                f"{label}: bounded window: at most 20 rows per query, "
+                "no pagination; complete=false is intentional "
+                "(not a full scan)"
+            )
+
         if dry_run:
             log(
                 f"{label}: {len(board.jobs)} job(s), "
                 f"board_complete={board.complete}, "
                 f"{len(batches)} batch(es), "
-                f"publish_complete={batches[0]['complete']} [dry-run]"
+                f"publish_complete={batches[0]['complete']}, "
+                f"diagnostics={len(diagnostics)} [dry-run]"
             )
             continue
 
@@ -155,7 +197,8 @@ def run_sync(
         log(
             f"{label}: {len(board.jobs)} job(s) -> "
             f"created={created} updated={updated} closed={closed} "
-            f"complete={batches[0]['complete']}"
+            f"complete={batches[0]['complete']} "
+            f"diagnostics={len(diagnostics)}"
         )
 
     return 1 if failures else 0

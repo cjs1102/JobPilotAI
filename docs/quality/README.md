@@ -154,6 +154,14 @@ INTERNAL_API_TOKEN=dummy python3 -m jobpilot_sources sync \
   --config /path/to/live-config.yaml --dry-run
 ```
 
+**Recorded-result status (2026-10-19):** `docs/ai/project-state.md` records
+"Greenhouse 217 / Lever 10 / Ashby 160", but no raw command/date/response
+evidence exists in the repository (the handoff says no live board run was
+recorded). Those counts are **unverified**; do not cite them as release
+evidence. A separate follow-up (proposed 0019) must re-run the smoke and record
+the raw output, or keep the unverified label. The 0018 nowcoder live smoke is
+separate and its evidence is in the 0018 ExecPlan.
+
 ## ASan
 
 ```bash

@@ -39,3 +39,7 @@ class BoardResult:
     jobs: list[dict[str, Any]] = field(default_factory=list)
     complete: bool = False
     total: int | None = None
+    #: Row-level skips/diagnostics. Providers that cannot parse a row keep the
+    #: rest of the board and report a stable ``reason`` here instead of failing
+    #: the whole observation. Existing providers leave it empty.
+    diagnostics: list[dict[str, Any]] = field(default_factory=list)

@@ -139,18 +139,21 @@ class RegisterConsistencyTest(unittest.TestCase):
         self.assertIn("signature", self.readme.lower())
         self.assertIn("OUT", self.readme)
 
-    def test_readme_still_lists_the_three_registered_providers_only(self) -> None:
-        # Guards against an accidental registration while no source is verified.
+    def test_readme_lists_the_registered_providers(self) -> None:
+        # 0018 registered nowcoder after the 2026-10-19 probe; the four-place
+        # allowlist test is the drift guard, this assertion records the intent.
         from jobpilot_sources.config import SUPPORTED_PROVIDERS
 
         self.assertEqual(
-            SUPPORTED_PROVIDERS, ("greenhouse", "lever", "ashby")
+            SUPPORTED_PROVIDERS,
+            ("greenhouse", "lever", "ashby", "nowcoder"),
         )
 
         from jobpilot_sources.providers import PROVIDERS
 
         self.assertEqual(
-            sorted(PROVIDERS), ["ashby", "greenhouse", "lever"]
+            sorted(PROVIDERS),
+            ["ashby", "greenhouse", "lever", "nowcoder"],
         )
 
     def test_fixture_is_plain_json_without_binary(self) -> None:

@@ -85,8 +85,16 @@ tools/dev/demo-gate.sh                  # end-to-end gate: import -> search -> m
 
 ### Python `source_adapters/`
 
-- **公开来源适配器（0012）**：Greenhouse / Lever / Ashby，fixture 驱动，通过
+- **公开来源适配器（0012 / 0018）**：Greenhouse / Lever / Ashby，以及
+  **nowcoder（牛客校招，0018）**，fixture 驱动，通过
   `POST /internal/jobs/source-sync` 发布观测；适配器从不直连数据库。
+- **nowcoder（0018）**：读取 `https://www.nowcoder.com/jobs/school/jobs` 的
+  免登录 SSR 列表（robots 允许 `/jobs/*`），支持 `<keyword>` / `<keyword>|<city>`
+  多板配置，板间最小间隔 5 秒；单次查询最多 20 条、无翻页、顺序有抖动，因此
+  **始终 `complete=false`**——这是有界观测窗口，不是全量扫描。两种记录形态
+  （原生岗 `ext` JSON、内推聚合岗 HTML description）均已归一化；不再依赖
+  “聚合详情页无 SSR”的旧判断。来源登记与 2026-10-19 证据见
+  [`source_adapters/README.md`](source_adapters/README.md)。
 - **0014 采集框架**：robots.txt 逐路径判定（fail-closed）、Crawl-delay 下限、
   有界重试与退避、每次请求超时、诚实 User-Agent、charset 优先级
   （BOM > header > meta > utf-8）、HTML/JSON-LD/RSS/sitemap/JSON 解析、SSRF 守卫
@@ -125,14 +133,17 @@ tools/dev/demo-gate.sh                  # end-to-end gate: import -> search -> m
 
 ## 未实现 / 非目标（不要误读为已具备）
 
-- **没有真实的国内来源适配器**。0014 Step 5（首个真实中国来源）结论是
-  **环境受限（environment-limited）**：国聘的岗位列表只能通过其客户端签名
-  （`Sign`/`T`/`Nonce`，反自动化风控）访问；清华就业网的岗位列表主机
-  `career.cic.tsinghua.edu.cn` 的 `robots.txt` 持续返回 503 → 按 fail-closed 不读取。
-  因此**未编写国内来源适配器，也未注册任何国内 source 标识**；当前注册来源仍只有
-  `greenhouse` / `lever` / `ashby`。证据：
-  [`source_adapters/README.md`](source_adapters/README.md) 的「来源登记表」与
-  [`cn_source_probe_2026-10-09.json`](source_adapters/jobpilot_sources/tests/fixtures/cn_source_probe_2026-10-09.json)。
+- **国内来源只有 nowcoder（0018）一个，且是有界窗口**。0014 Step 5 的国聘/清华
+  结论仍是环境受限：国聘岗位列表只能通过客户端签名访问；清华列表主机
+  `career.cic.tsinghua.edu.cn` 的 `robots.txt` 持续 503。0018 另行复核了牛客
+  `/jobs/school/jobs`（免登录、robots 允许、SSR），并将其注册为 `nowcoder`；
+  但单次最多 20 条、无翻页、顺序抖动，**`complete=false` 是强制的**，不得描述为
+  “全量扫描”。其他国内来源仍未注册；当前 allowlist 为
+  `greenhouse` / `lever` / `ashby` / `nowcoder`。证据：
+  [`source_adapters/README.md`](source_adapters/README.md) 的「来源登记表」、
+  [`cn_source_probe_2026-10-09.json`](source_adapters/jobpilot_sources/tests/fixtures/cn_source_probe_2026-10-09.json)
+  与
+  [`cn_source_probe_2026-10-19.json`](source_adapters/jobpilot_sources/tests/fixtures/cn_source_probe_2026-10-19.json)。
 - **不自动化登录墙**：不做自动登录、绕 CAPTCHA、伪造 cookie/UA、代理池；登录墙岗位
   只允许人工采集（书签小工具）。
 - **不做通用爬虫/自动投递**：没有通用 HTML 爬虫、没有自动投递、没有 RabbitMQ /

@@ -1,0 +1,14 @@
+User-agent:*
+Disallow:/search
+Disallow:/nccommon
+Disallow:/ab/ab-test-flow
+Sitemap:https://www.nowcoder.com/sitemap.xml
+Sitemap:https://www.nowcoder.com/sitemap.html
+Sitemap:https://www.nowcoder.com/sitemap.txt
+Sitemap:https://www.nowcoder.com/sitemap.xml
+Sitemap:https://www.nowcoder.com/sitemap/nowpick/sitemap.xml
+Sitemap:https://www.nowcoder.com/sitemap/circle/sitemap.xml
+Sitemap:https://www.nowcoder.com/sitemap/user/sitemap.xml
+Sitemap:https://www.nowcoder.com/sitemap/subject/sitemap.xml
+Sitemap:https://www.nowcoder.com/sitemap/comment/sitemap.xml
+Sitemap:https://www.nowcoder.com/sitemap/question/sitemap.xml

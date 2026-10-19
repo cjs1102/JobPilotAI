@@ -5,7 +5,13 @@
 C++17 Linux backend for an AI-assisted job application platform. `service/` is
 the canonical runnable entry; root CMake is the unified developer entry.
 
-Current phase: **0017 ops hardening and acceptance closure is complete and
+Current phase: **0018 nowcoder campus source is active** (approved 2026-10-19,
+time-boxed 2–3 working days) — the first China source, a login-free SSR list with
+a bounded 20-row window and mandatory `complete=false`; see
+`docs/exec-plans/active/0018-nowcoder-campus-source.md`. The 0017 close-out below
+remains the most recent completed stage.
+
+**0017 ops hardening and acceptance closure is complete and
 archived** (`docs/exec-plans/completed/0017-ops-hardening-and-acceptance-closure.md`)
 — CI now compiles the tree once (the `build` job uploads the release build tree
 and `integration` consumes it; the container job moved to
@@ -26,13 +32,15 @@ nine 2-second-timeout HTTP cases went red; the harness now refuses to run when
 its `test_bcrypt` probe exceeds 14 s). CI after the change is green on every push
 and the `integration` job dropped from 5m21s to 1m16s–1m49s
 (`tools/dev/ci-status.sh`, plan §10.3).
-**No plan is active** and the recorded MVP roadmap is complete through
+**0018 is the only active plan**; the recorded MVP roadmap is complete through
 packaging — 0013-0017 and the 0015A hardening are all archived under
 `docs/exec-plans/completed/`. Carried forward, not done:
-- 0014's Step 5 (first real China source) is **environment-limited**: no
-  compliant, reusable China list contract could be verified, so no China source
-  adapter is implemented and no China `source` identifier is registered (only
-  `greenhouse`/`lever`/`ashby`).
+- 0014's Step 5 (first real China source) was **environment-limited** for the
+  candidates it tested, but 0018 registered one compliant candidate, `nowcoder`
+  (login-free, robots-allowed `/jobs/school/jobs`; max 20 rows/query, no
+  pagination, always `complete=false`). The allowlist is now
+  `greenhouse`/`lever`/`ashby`/`nowcoder`; other China sources remain
+  unregistered.
 - The bookmarklet's **publish/read-back acceptance** now has a one-command
   scaffold (`tools/dev/capture-acceptance.sh`, green end to end against the
   synthetic sample); only the extraction step has been run on a real login-walled

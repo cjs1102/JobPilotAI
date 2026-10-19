@@ -29,6 +29,16 @@
 > old personal access token are owner actions listed in
 > [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
+> **2026-10-19 update — 0018 is active.** The Claude Code takeover verification
+> is recorded in [`CURRENT_STATE.md`](CURRENT_STATE.md); its key finding is that
+> nowcoder's `/jobs/school/jobs` page is a login-free, robots-allowed SSR list
+> (max 20 rows per query, no pagination, two record shapes). The approved plan
+> [`../exec-plans/active/0018-nowcoder-campus-source.md`](../exec-plans/active/0018-nowcoder-campus-source.md)
+> adds the first China source (`nowcoder`) with `complete=false`. The recorded
+> live-smoke counts below (Greenhouse 217 / Lever 10 / Ashby 160) are **unverified**
+> because no raw evidence exists in the repository; see DC-9 in the documentation
+> index and follow-up 0019. Do not cite them as verified until re-run.
+
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
 continue without asking the user to replay project history.
@@ -36,6 +46,35 @@ continue without asking the user to replay project history.
 This is the concise takeover entry. Detailed evidence and historical sections
 are preserved in
 [references/project-state-full.md](references/project-state-full.md).
+
+## Active Plan (0018)
+
+[`active/0018-nowcoder-campus-source.md`](../exec-plans/active/0018-nowcoder-campus-source.md)
+— approved 2026-10-19, implemented on `feat/0018-nowcoder`; **awaiting the
+Supervisor's closeout VERDICT, not merged to `main`**. Summary:
+
+- Added the `nowcoder` provider: login-free SSR list at
+  `/jobs/school/jobs`, recursive `jobListData` lookup (no hardcoded module
+  number), native + aggregator record mapping, row-level diagnostics,
+  in-batch dedupe, 48 KiB cap, and **always `complete=false`** (max 20 rows,
+  no pagination, order jitter).
+- Registered `nowcoder` in the four places: Python `SUPPORTED_PROVIDERS`,
+  `PROVIDERS`, CLI choices (derived), and C++ `IsSupportedObservationSource`;
+  `docs/04` §5.5.1 records the contract.
+- Evidence: Python `Ran 479 tests ... OK`; C++ Debug/UBSan `312/312`;
+  live dry-run `20 job(s), complete=False`; isolated publish 19 rows (single
+  board) and 12 rows (second board, 7 s for two boards); review queue 0.
+- L4 (project `jobpilot-l4-0018`, 13418/16418, scratch
+  `jobpilot_l4_0018_scratch`): builds all rc=0; Debug 312/312, UBSan 312/312,
+  **ASan 311/312** with one `registration failed` timeout and 0 sanitizer
+  diagnostics. Targeted ASan re-runs of both affected tests pass alone; a full
+  ASan re-run fails a different registration-heavy test. Classified as a
+  harness/3 s-client-timeout issue, not a 0018 product regression; the
+  Supervisor decides whether to accept it or require a separate test-timeout
+  fix. **Do not describe the ASan matrix as fully green.**
+- The pre-protocol docs commit `a351984` is on `main`; implementation commits
+  are on the feature branch. No history rewrite, no force-push, no merge before
+  VERDICT.
 
 ## Current Stage
 
@@ -556,6 +595,10 @@ HTTP request
   1m16s–1m49s and the new `Coverage map guard` step passed in every run.
 - Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
   all published with `complete=false` only where the 200-job limit required it.
+  **UNVERIFIED (2026-10-19):** no raw command/date/response evidence for these
+  three counts exists in the repository; the handoff says no live board run was
+  recorded. Treat as unverified until a follow-up task (proposed 0019) re-runs
+  and records the raw output.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test
   data was cleaned afterward.
 

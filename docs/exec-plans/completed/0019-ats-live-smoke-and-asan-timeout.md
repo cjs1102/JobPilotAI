@@ -1,9 +1,13 @@
 # ExecPlan 0019 — ATS live-smoke evidence + sanitizer-aware HTTP test timeout
 
-> 状态：**ACTIVE（2026-10-19，由 VERDICT-0018 的 Approved next step 授权）**
+> 状态：**COMPLETED（2026-10-19 合并；VERDICT-0019 PASS 附条件）**
 > 分支：`feat/0019-ats-live-smoke`
+> 合并：`0c24c45`（PR #2 merge commit）；最终 head `c945eea`
 > 基线：`main@cc9b333`（0018 的 merge commit；PR #1 已由 owner 合并）
 > 时间盒：2–3 个工作日；到点提交收口报告，不做无限打磨。
+> 收口条件：UBSan 宏缺口接受；ATS 以 2026-10-19 快照 `232/10/167` 为证据
+> （旧 `217/10/160` historical/unverified）；历史 home path ×10 record-only；
+> 合并后 main 的 `ci` + `image` 双绿；下一阶段由 owner 指定。
 
 ## 1. 背景与当前状态
 
@@ -259,7 +263,7 @@ P1 ATS live smoke      [x] Greenhouse 232 / Lever 10 / Ashby 167, all complete
 P2 ASan 超时修复       [x] 10 HTTP test clients use HttpTestTimeoutSeconds; Debug rc=0
 P3 ASan 重跑           [x] 312/312, 108.02 s, sanitizer diagnostics 0
 P4 L4                  [x] Debug/ASan/UBSan 312/312; builds rc=0; 0 diagnostics
-P5 文档/CI/REQUEST     [ ] 未开始
+P5 文档/CI/REQUEST     [x] REQUEST-0019 + PR #2 ci 39203694811 green; merged 0c24c45
 ```
 
 P0 证据：
@@ -312,6 +316,13 @@ python: source_adapters Ran 479 OK; ai_worker Ran 190 OK
 review: dev [ SKIPPED ] (6 passed), scratch [ PASSED ] 7 tests
 teardown: project containers/volumes/networks removed; ports free;
           dev containers jobpilot-mysql/jobpilot-redis untouched
+```
+
+Post-merge main CI (2026-10-19):
+
+```text
+ci    39205581874 completed/success 5m32s (build 4m02s + suite 1m23s)
+image 39205581917 completed/success 3m06s (container 3m01s)
 ```
 
 ## 11. 已知问题与后续

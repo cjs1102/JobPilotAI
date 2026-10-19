@@ -29,19 +29,19 @@
 > old personal access token are owner actions listed in
 > [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-> **2026-10-19 update — 0018 merged; 0019 active.** The Claude Code takeover
+> **2026-10-19 update — 0019 merged; no active plan.** The Claude Code takeover
 > verification is recorded in [`CURRENT_STATE.md`](CURRENT_STATE.md). 0018
-> (`nowcoder` campus source) was merged at `cc9b333` via PR #1 after
-> VERDICT-0018 PASS with conditions. Main CI after the merge: `ci`
-> `39200537331` (5m36s; build 4m08s + suite 1m21s) and `image`
-> `39200537315` (2m51s), both **completed/success**. The 0018 ASan matrix was
-> **311/312**, accepted by the verdict as a harness/environment 3 s client
-> timeout (not a 0018 product regression, and **not** "all green"); 0019 must
-> fix the sanitizer-aware timeout and re-run ASan. The historical live-smoke
-> counts (Greenhouse 217 / Lever 10 / Ashby 160) were re-run on 2026-10-19:
-> **Greenhouse 232 / Lever 10 / Ashby 167**, with raw output in
-> `build/0019/ats-live-smoke.log`; the old numbers are historical/unverified,
-> not constants. See `## Completed Plan (0018)` and `## Active Plan (0019)`.
+> (`nowcoder`) merged at `cc9b333` (PR #1); 0019 (ATS live smoke + sanitizer
+> timeout) merged at `0c24c45` (PR #2) after VERDICT-0019 PASS with conditions.
+> Main CI after the 0019 merge: `ci` `39205581874` (5m32s; build 4m02s +
+> suite 1m23s) and `image` `39205581917` (3m06s; container 3m01s), both
+> **completed/success**. The 0019 ASan
+> re-run is **312/312** with 0 sanitizer diagnostics (one isolated
+> review-backfill SKIP); L4 Debug/ASan/UBSan each **312/312**. The 2026-10-19
+> ATS snapshot is **232 / 10 / 167**; the old 217/10/160 is
+> historical/unverified and is **not** a constant or a coverage promise.
+> TSan is not covered. See `## Completed Plan (0018)` and
+> `## Completed Plan (0019)`.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -89,20 +89,32 @@ VERDICT-0018 PASS with conditions**. Summary:
 - The pre-protocol docs commit `a351984` is part of the merge history; no
   history rewrite, no force-push.
 
-## Active Plan (0019)
+## Completed Plan (0019)
 
-[`active/0019-ats-live-smoke-and-asan-timeout.md`](../exec-plans/active/0019-ats-live-smoke-and-asan-timeout.md)
-— active on `feat/0019-ats-live-smoke`; not merged, REQUEST pending. Scope:
-H-2 ATS live-smoke evidence + sanitizer-aware HTTP test timeout + ASan re-run.
-Current evidence: ATS dry-run 2026-10-19 → Greenhouse 232, Lever 10, Ashby 167,
-all `board_complete=True`, log `build/0019/ats-live-smoke.log`; the timeout
-helper has been applied to all 10 HTTP test clients (Debug build rc=0;
-targeted HTTP tests 33/33); the ASan re-run is **312/312 in 108.02 s with 0
-sanitizer diagnostics** (`build/0019/asan-rerun.log`), and the stage L4 is
-**green**: Debug / ASan / UBSan each **312/312** (91.69 / 101.06 / 63.76 s),
-sanitizer diagnostics 0, builds all rc=0, Python 479 + 190 OK, review
-isolation dev SKIP / scratch 7, isolated stack `jobpilot-l4-0019`
-(13918/16918) torn down. CI/REQUEST for 0019 are pending.
+[`completed/0019-ats-live-smoke-and-asan-timeout.md`](../exec-plans/completed/0019-ats-live-smoke-and-asan-timeout.md)
+— **merged at `0c24c45` via PR #2 (merge commit) after VERDICT-0019 PASS with
+conditions**. Scope: H-2 ATS live-smoke evidence + sanitizer-aware HTTP test
+timeout + ASan re-run.
+
+- ATS live smoke 2026-10-19 (dry-run, no writes): Greenhouse **232**, Lever
+  **10**, Ashby **167**, all `board_complete=True`; log
+  `build/0019/ats-live-smoke.log`. The old 217/10/160 is historical/unverified,
+  not a constant or coverage promise.
+- Timeout helper applied to all 10 HTTP test clients; no assertion lines
+  changed. ASan/TSan get 5x; GCC has no UBSan macro, so UBSan keeps 3 s and
+  passed. TSan is not covered.
+- ASan re-run **312/312** in 108.02 s, 0 sanitizer diagnostics (one isolated
+  review-backfill SKIP); L4 Debug/ASan/UBSan each **312/312** (91.69 / 101.06 /
+  63.76 s), builds all rc=0, Python 479 + 190 OK, review isolation dev SKIP /
+  scratch 7, stack `jobpilot-l4-0019` torn down.
+- Guard evidence: preflight 8/0/0 (actionlint 1.7.7); coverage 312→312 PASS;
+  no-submission rc=0; history 172 commits, 0 credential-shape (home path ×10,
+  RFC1918 ×14); `git diff --check` clean.
+- PR #2 `ci` run `39203694811` completed/success 5m21s (build 3m57s + suite
+  1m18s); `image` not triggered on the PR (no image-path change). Main CI after
+  the merge: `ci` `39205581874` completed/success 5m32s (build 4m02s + suite
+  1m23s); `image` `39205581917` completed/success 3m06s (container 3m01s).
+- Next stage: **owner-specified**; the worker must not start one.
 
 ## Current Stage
 

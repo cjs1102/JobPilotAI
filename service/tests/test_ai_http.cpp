@@ -36,6 +36,7 @@
 #include "jobpilot/service/user/user_service.h"
 #include "test_job_support.h"
 #include "test_user_support.h"
+#include "http_test_timeout.h"
 
 namespace jobpilot::service
 {
@@ -97,7 +98,7 @@ namespace jobpilot::service
             }
 
             timeval timeout{};
-            timeout.tv_sec = 3;
+            timeout.tv_sec = jobpilot::test::HttpTestTimeoutSeconds(3);
 
             if (::setsockopt(
                     socketFd,

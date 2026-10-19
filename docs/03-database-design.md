@@ -116,6 +116,7 @@ CREATE TABLE jobs (
     description    TEXT         DEFAULT NULL COMMENT '岗位描述',
     source         VARCHAR(32)  NOT NULL DEFAULT 'manual' COMMENT 'manual/import/crawler 或 allowlist 观测来源标识(0014)',
     source_url     VARCHAR(255) DEFAULT NULL COMMENT '来源链接(去重键)',
+    apply_url      VARCHAR(512) DEFAULT NULL COMMENT '实际申请链接(0020; source_url 是原始公告页)',
     status         TINYINT      NOT NULL DEFAULT 1 COMMENT '1有效 0下线',
     source_scope   VARCHAR(128) DEFAULT NULL COMMENT '来源 board/scope 标识(0012)',
     external_id    VARCHAR(255) DEFAULT NULL COMMENT '来源侧岗位ID(0012)',
@@ -238,6 +239,9 @@ CREATE TABLE notifications (
 | jobs | 按公司/地点/状态过滤；按来源 scope 观测 | `idx_company` `idx_location` `idx_status` `idx_source_scope_status` |
 | ai_tasks | 用户查任务 + Worker 捞待办 + 租约扫描 | `idx_user_status` `idx_status` `idx_type_status` `idx_status_lease` |
 | notifications | 用户查未读 | `idx_user_status` |
+
+> 0020 的 `apply_url` **不新增索引**：它只用于展示，不参与搜索、排序、去重或
+> freshness；索引没有查询证据支撑。
 
 > 0014 的 6 个新列（`education_required` / `experience_years_*` / `job_nature` /
 > `deadline` / `deadline_date_only`）在 0014 阶段**不新增索引**（计划曾提议
@@ -556,6 +560,12 @@ CREATE TABLE job_review_items(...)              -- 异常与复核审计（reaso
 - 观测路径对来源可缺省的新字段沿用 0012 的 `COALESCE(VALUES(x), x)` 保护：
   本次观测未带 `deadline`/`deadline_date_only` 时不得抹掉已观测值；人工路径保持
   整组覆盖语义。
+- **0020 `apply_url`**：`jobs.apply_url VARCHAR(512) DEFAULT NULL`，既有行 NULL，
+  无 backfill、无索引；`source_url` 仍是 `uk_source_url` 幂等键，`apply_url` 不参与
+  去重/freshness/质量门/排序。只接受空值或绝对 `http(s)` URL；长度按 **字符**
+  （UTF-8 码点，与 MySQL `VARCHAR(512)` 一致）校验，>512 字符拒绝，绝不截断。
+  两条写入路径（import / source-sync）都用
+  `apply_url = COALESCE(VALUES(apply_url), apply_url)`：省略不清空已有值。
 
 ### 9.4 既有库升级
 
@@ -615,6 +625,24 @@ ALTER TABLE job_review_items
 
 既有值（`rejected`/`needs_review`）不受影响；本 ALTER 幂等可重复执行，
 不新增列、不改默认值、不改索引。
+
+0020 增量（`apply_url`）：
+
+```sql
+-- 文件：database/upgrades/0020_jobs_apply_url.up.sql
+-- 幂等：先用 information_schema 检查，重复执行输出 note 而不报 duplicate column。
+ALTER TABLE jobs
+    ADD COLUMN apply_url VARCHAR(512) DEFAULT NULL
+        COMMENT '实际申请链接(0020; source_url 是原始公告页)';
+```
+
+回滚文件 `database/upgrades/0020_jobs_apply_url.down.sql` 执行
+`ALTER TABLE jobs DROP COLUMN apply_url`；**仅用于 scratch/测试或明确放弃该字段**，
+会丢失已存值。生产回滚首选代码 revert（旧代码忽略该列，无数据丢失）。
+
+CI 强制：`tools/checks/test_schema_upgrade.sh` 在独立 scratch 库上跑
+forward → backward → re-forward → 重复 up/down 幂等；`integration` job 已加入该步骤。
+全新安装走 `database/schema/03_job.sql`（已含该列），既有库走本段 upgrade 文件。
 
 ### 9.5 实施顺序
 

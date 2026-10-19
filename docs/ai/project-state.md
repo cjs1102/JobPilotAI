@@ -29,10 +29,12 @@
 > old personal access token are owner actions listed in
 > [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-> **2026-10-19 update — 0019 merged; no active plan.** The Claude Code takeover
+> **2026-10-19 update — 0019 merged; 0020 active.** The Claude Code takeover
 > verification is recorded in [`CURRENT_STATE.md`](CURRENT_STATE.md). 0018
 > (`nowcoder`) merged at `cc9b333` (PR #1); 0019 (ATS live smoke + sanitizer
 > timeout) merged at `0c24c45` (PR #2) after VERDICT-0019 PASS with conditions.
+> 0020 (`apply_url` end to end) is active on `feat/0020-apply-url` after
+> VERDICT-0020-plan; see `## Active Plan (0020)`.
 > Main CI after the 0019 merge: `ci` `39205581874` (5m32s; build 4m02s +
 > suite 1m23s) and `image` `39205581917` (3m06s; container 3m01s), both
 > **completed/success**. The 0019 ASan
@@ -115,6 +117,19 @@ timeout + ASan re-run.
   the merge: `ci` `39205581874` completed/success 5m32s (build 4m02s + suite
   1m23s); `image` `39205581917` completed/success 3m06s (container 3m01s).
 - Next stage: **owner-specified**; the worker must not start one.
+
+## Active Plan (0020)
+
+[`active/0020-apply-url.md`](../exec-plans/active/0020-apply-url.md) — active on
+`feat/0020-apply-url`; plan approved by `VERDICT-0020-plan.md`. Scope:
+nullable `jobs.apply_url`, import/source-sync plumbing (COALESCE), public
+list/recommended/detail field, explicit-source-only extraction, and the
+documented additive upgrade + CI forward/backward test (Option B; no migration
+runner). Source coverage: Lever/Ashby `applyUrl`; nowcoder native
+`redirectExternalUrl` only when explicit; Greenhouse and nowcoder aggregator
+NULL; manual import accepts the field but the bookmarklet does not extract it.
+The 2026-10-19 dev database has the upgrade applied for local tests; the
+closeout evidence (upgrade script output, CI run, L4) is pending.
 
 ## Current Stage
 

@@ -60,6 +60,7 @@ additive `ALTER` block, by hand:
 | 0013 | AI task tables | `docs/03-database-design.md` §8 |
 | 0014 | China campus source columns | `docs/03-database-design.md` §9 |
 | 0015 | profile candidate columns and `resume_artifacts` | `docs/03-database-design.md` §10 |
+| 0020 | `jobs.apply_url` (nullable, no index) | `database/upgrades/0020_jobs_apply_url.up.sql` (contract: `docs/03` §9.4) |
 
 Rules:
 
@@ -67,8 +68,13 @@ Rules:
   deliberately **no migration runner and no schema-version table** (0016 §11
   decision 7): an upgrade is a human reading an additive statement.
 - **Re-running a block reports `Duplicate column name`. That is expected.** The
-  blocks are additive and not idempotent, and that error is MySQL telling you
-  the change is already applied; skip it and continue.
+  older blocks (0012-0015) are additive and not idempotent, and that error is
+  MySQL telling you the change is already applied; skip it and continue.
+- **0020 is the exception:** `database/upgrades/0020_jobs_apply_url.up.sql` and
+  `.down.sql` check `information_schema` first, so they are safe to re-run
+  (they print a note instead of failing). The CI step
+  `tools/checks/test_schema_upgrade.sh` proves forward, backward, re-forward and
+  idempotent runs on a scratch database.
 - A new table added with `CREATE TABLE IF NOT EXISTS` (for example
   `07_resume_artifact.sql` in 0015) is safe to re-run.
 - Do not edit an already-applied block: append a new stage's block instead, so

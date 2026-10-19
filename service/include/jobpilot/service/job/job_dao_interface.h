@@ -35,6 +35,9 @@ namespace jobpilot::service
         // a caller need not fetch every detail row to open the posting. The
         // detail path copies its own value here so both agree byte for byte.
         std::optional<std::string> sourceUrl;
+        // 0020: the explicit application link from the source, if any. The
+        // public API always emits the key (null when absent).
+        std::optional<std::string> applyUrl;
         std::optional<FreshnessState> freshness;
 
         // 0014 incremental projection (docs/03 section 9). deadline is the

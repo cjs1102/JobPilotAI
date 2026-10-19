@@ -446,6 +446,10 @@ namespace jobpilot::service
                     value,
                     "published_at",
                     &item->publishedAt) ||
+                !GetOptionalString(
+                    value,
+                    "apply_url",
+                    &job.applyUrl) ||
                 !GetOptionalUnsigned(
                     value,
                     "education_required",

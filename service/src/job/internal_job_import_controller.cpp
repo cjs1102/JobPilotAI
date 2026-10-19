@@ -458,7 +458,11 @@ namespace jobpilot::service
                 !GetOptionalString(
                     value,
                     "published_at",
-                    &job.publishedAt))
+                    &job.publishedAt) ||
+                !GetOptionalString(
+                    value,
+                    "apply_url",
+                    &job.applyUrl))
             {
                 return false;
             }

@@ -937,6 +937,8 @@ namespace jobpilot::service
         validJob["job_nature"] = 1;
         validJob["deadline"] = "2026-10-31 04:00:00";
         validJob["deadline_date_only"] = true;
+        validJob["apply_url"] =
+            "https://example.invalid/apply/extra-valid";
 
         const auto accepted =
             SendRequest(
@@ -959,7 +961,8 @@ namespace jobpilot::service
             pool->Query(
                 "SELECT education_required, experience_years_min, "
                 "experience_years_max, job_nature, deadline, "
-                "deadline_date_only FROM jobs WHERE source_url = ?",
+                "deadline_date_only, apply_url "
+                "FROM jobs WHERE source_url = ?",
                 {JobUrl(scope, "extra-valid")});
 
         ASSERT_EQ(stored.rowCount(), 1U);
@@ -981,6 +984,9 @@ namespace jobpilot::service
         EXPECT_EQ(
             jobpilot::test::RequireValue(stored.value(0, 5)),
             "1");
+        EXPECT_EQ(
+            jobpilot::test::RequireValue(stored.value(0, 6)),
+            "https://example.invalid/apply/extra-valid");
 
         auto statusFor =
             [this](nlohmann::json job)
@@ -1033,6 +1039,22 @@ namespace jobpilot::service
             MakeJobJson("greenhouse", scope, "extra-flag");
         flagWithoutDeadline["deadline_date_only"] = false;
         EXPECT_EQ(statusFor(flagWithoutDeadline), 400);
+
+        nlohmann::json applyRelative =
+            MakeJobJson("greenhouse", scope, "extra-apply-relative");
+        applyRelative["apply_url"] = "/relative/apply";
+        EXPECT_EQ(statusFor(applyRelative), 400);
+
+        nlohmann::json applyJavascript =
+            MakeJobJson("greenhouse", scope, "extra-apply-javascript");
+        applyJavascript["apply_url"] = "javascript:alert(1)";
+        EXPECT_EQ(statusFor(applyJavascript), 400);
+
+        nlohmann::json applyTooLong =
+            MakeJobJson("greenhouse", scope, "extra-apply-too-long");
+        applyTooLong["apply_url"] =
+            "https://e.co/" + std::string(500, 'x');
+        EXPECT_EQ(statusFor(applyTooLong), 400);
     }
 
     TEST_F(SourceSyncHttpTest, KeepsObservedDeadlineWhenANewFetchOmitsIt)

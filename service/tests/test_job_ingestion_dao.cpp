@@ -92,6 +92,9 @@ namespace jobpilot::service
             // 0017A: the manual import path now carries the optional publication
             // instant into jobs.published_at.
             createdJob.publishedAt = "2026-09-20 00:00:00";
+            // 0020: the explicit application link round-trips.
+            createdJob.applyUrl =
+                "https://example.invalid/apply/created";
 
             auto transaction =
                 pool->BeginTransaction();
@@ -117,6 +120,10 @@ namespace jobpilot::service
         EXPECT_EQ(
             job->summary.publishedAt,
             std::optional<std::string>("2026-09-20 00:00:00"));
+        EXPECT_EQ(
+            job->summary.applyUrl,
+            std::optional<std::string>(
+                "https://example.invalid/apply/created"));
     }
 
     TEST_F(JobIngestionDaoTest, UpdatesExistingJobByIdempotentSourceUrl)
@@ -127,6 +134,9 @@ namespace jobpilot::service
             JobImportData createdJob = MakeJob("Before Update");
             // 0017A: stored on insert; the next upsert omits it on purpose.
             createdJob.publishedAt = "2026-09-20 00:00:00";
+            // 0020: stored on insert; the next upsert omits it on purpose.
+            createdJob.applyUrl =
+                "https://example.invalid/apply/before";
 
             auto transaction =
                 pool->BeginTransaction();
@@ -172,6 +182,10 @@ namespace jobpilot::service
             EXPECT_EQ(
                 preserved->summary.publishedAt,
                 std::optional<std::string>("2026-09-20 00:00:00"));
+            EXPECT_EQ(
+                preserved->summary.applyUrl,
+                std::optional<std::string>(
+                    "https://example.invalid/apply/before"));
 
             // ... and a payload that does carry it overwrites the stored value.
             JobImportData republished =
@@ -179,6 +193,8 @@ namespace jobpilot::service
             republished.company = "Updated Company";
             republished.location = "Shanghai";
             republished.publishedAt = "2026-10-01 12:30:00";
+            republished.applyUrl =
+                "https://example.invalid/apply/after";
 
             auto transaction =
                 pool->BeginTransaction();
@@ -233,6 +249,10 @@ namespace jobpilot::service
         EXPECT_EQ(
             job->summary.publishedAt,
             std::optional<std::string>("2026-10-01 12:30:00"));
+        EXPECT_EQ(
+            job->summary.applyUrl,
+            std::optional<std::string>(
+                "https://example.invalid/apply/after"));
     }
 
     TEST_F(JobIngestionDaoTest, ReplacesRequirementsAsSet)

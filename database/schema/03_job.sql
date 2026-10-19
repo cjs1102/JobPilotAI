@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     description      TEXT         DEFAULT NULL COMMENT '岗位描述',
     source           VARCHAR(32)  NOT NULL DEFAULT 'manual' COMMENT 'manual/import/crawler 或 allowlist 观测来源标识(0014)',
     source_url       VARCHAR(255) DEFAULT NULL COMMENT '来源链接(去重键)',
+    apply_url        VARCHAR(512) DEFAULT NULL COMMENT '实际申请链接(0020; source_url 是原始公告页)',
     status           TINYINT      NOT NULL DEFAULT 1 COMMENT '1有效 0下线',
     source_scope     VARCHAR(128) DEFAULT NULL COMMENT '来源 board/scope 标识(0012)',
     external_id      VARCHAR(255) DEFAULT NULL COMMENT '来源侧岗位ID(0012)',

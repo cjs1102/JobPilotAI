@@ -332,6 +332,10 @@ namespace jobpilot::service
                 {std::uint64_t(20),
                  std::uint64_t(35),
                  newerId});
+            pool->Execute(
+                "UPDATE jobs SET apply_url = ? WHERE id = ?",
+                {"https://example.invalid/apply/older",
+                 olderId});
 
             jobpilot::test::InsertJobRequirement(
                 pool.get(),
@@ -547,6 +551,24 @@ namespace jobpilot::service
         EXPECT_EQ(empty->statusCode, 200);
         EXPECT_TRUE(
             empty->jsonBody["data"]["list"].empty());
+
+        // 0020: the list projection always carries apply_url; olderId has an
+        // explicit value and newerId projects JSON null.
+        const std::optional<HttpResponseData> withApply =
+            SendRequest(
+                "/api/v1/jobs?keyword=" +
+                searchToken +
+                "%20older");
+
+        ASSERT_TRUE(withApply.has_value());
+        ASSERT_TRUE(withApply->hasJson);
+        EXPECT_EQ(withApply->statusCode, 200);
+        ASSERT_EQ(
+            withApply->jsonBody["data"]["list"].size(),
+            1U);
+        EXPECT_EQ(
+            withApply->jsonBody["data"]["list"][0]["apply_url"],
+            "https://example.invalid/apply/older");
     }
 
     TEST_F(JobHttpTest, ReturnsDetailAndNotFound)
@@ -571,6 +593,23 @@ namespace jobpilot::service
         EXPECT_EQ(
             detail->jsonBody["data"]["requirements"][0]["level"],
             3);
+        // 0020: the detail always emits apply_url; newerId has none.
+        ASSERT_TRUE(
+            detail->jsonBody["data"].contains("apply_url"));
+        EXPECT_TRUE(
+            detail->jsonBody["data"]["apply_url"].is_null());
+
+        const std::optional<HttpResponseData> withApply =
+            SendRequest(
+                "/api/v1/jobs/" +
+                std::to_string(olderId));
+
+        ASSERT_TRUE(withApply.has_value());
+        ASSERT_TRUE(withApply->hasJson);
+        EXPECT_EQ(withApply->statusCode, 200);
+        EXPECT_EQ(
+            withApply->jsonBody["data"]["apply_url"],
+            "https://example.invalid/apply/older");
 
         const std::optional<HttpResponseData> inactive =
             SendRequest(

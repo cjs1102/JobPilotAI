@@ -106,4 +106,5 @@ def _normalize_job(
         ),
         location=location,
         description=description,
+        apply_url=raw.get("applyUrl"),
     )

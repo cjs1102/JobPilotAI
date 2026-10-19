@@ -222,6 +222,10 @@ namespace
         EXPECT_NE(
             columns["jobs"].find("source_url"),
             columns["jobs"].end());
+        // 0020: the explicit application link is part of the jobs contract.
+        EXPECT_NE(
+            columns["jobs"].find("apply_url"),
+            columns["jobs"].end());
         EXPECT_NE(
             columns["applications"].find("resume_version_id"),
             columns["applications"].end());
@@ -293,6 +297,36 @@ namespace
         EXPECT_NE(indexes.find("idx_review_status"), indexes.end());
         EXPECT_NE(indexes.find("idx_deadline"), indexes.end());
         EXPECT_EQ(indexes.find("idx_nature_education"), indexes.end());
+
+        // 0020: apply_url is VARCHAR(512), nullable, default NULL, no index.
+        const jobpilot::core::Result applyColumn =
+            pool.Query(
+                "SELECT column_type, is_nullable, column_default "
+                "FROM information_schema.columns "
+                "WHERE table_schema = ? AND table_name = 'jobs' "
+                "AND column_name = 'apply_url'",
+                {database});
+
+        ASSERT_EQ(applyColumn.rowCount(), 1U);
+        EXPECT_EQ(
+            RequireValue(applyColumn.value(0, 0)),
+            "varchar(512)");
+        EXPECT_EQ(
+            RequireValue(applyColumn.value(0, 1)),
+            "YES");
+        EXPECT_FALSE(applyColumn.value(0, 2).has_value());
+
+        const jobpilot::core::Result applyIndex =
+            pool.Query(
+                "SELECT COUNT(*) FROM information_schema.statistics "
+                "WHERE table_schema = ? AND table_name = 'jobs' "
+                "AND column_name = 'apply_url'",
+                {database});
+
+        ASSERT_EQ(applyIndex.rowCount(), 1U);
+        EXPECT_EQ(
+            RequireValue(applyIndex.value(0, 0)),
+            "0");
     }
 
     // 0015 A2: the three nullable candidate columns on `profiles`, with the

@@ -123,11 +123,11 @@ namespace jobpilot::service
             transaction.Execute(
                 "INSERT INTO jobs "
                 "(company, title, location, salary_min, salary_max, "
-                "salary_currency, description, source, source_url, status, "
-                "education_required, experience_years_min, "
+                "salary_currency, description, source, source_url, apply_url, "
+                "status, education_required, experience_years_min, "
                 "experience_years_max, job_nature, deadline, "
                 "deadline_date_only, published_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?) "
                 "ON DUPLICATE KEY UPDATE "
                 "id = LAST_INSERT_ID(id), "
                 "company = VALUES(company), "
@@ -139,6 +139,7 @@ namespace jobpilot::service
                 "description = VALUES(description), "
                 "source = VALUES(source), "
                 "source_url = VALUES(source_url), "
+                "apply_url = COALESCE(VALUES(apply_url), apply_url), "
                 "education_required = VALUES(education_required), "
                 "experience_years_min = VALUES(experience_years_min), "
                 "experience_years_max = VALUES(experience_years_max), "
@@ -158,6 +159,7 @@ namespace jobpilot::service
                  OptionalStringParam(job.description),
                  job.source,
                  job.sourceUrl,
+                 OptionalStringParam(job.applyUrl),
                  OptionalSmallUnsignedParam(job.educationRequired),
                  OptionalSmallUnsignedParam(job.experienceYearsMin),
                  OptionalSmallUnsignedParam(job.experienceYearsMax),

@@ -55,6 +55,9 @@ class GreenhouseTest(unittest.TestCase):
             "Build backend services.\nC++ & Linux",
         )
         self.assertEqual(first["requirements"], [])
+        # 0020: Greenhouse's public board API has no explicit apply URL; the
+        # posting page must not be reused as one.
+        self.assertNotIn("apply_url", first)
 
         self.assertEqual(
             board.jobs[1]["published_at"],
@@ -143,6 +146,11 @@ class LeverTest(unittest.TestCase):
             "Own the customer relationship.\n\nWork with engineering.",
         )
         self.assertEqual(first["requirements"], [])
+        self.assertEqual(
+            first["apply_url"],
+            "https://jobs.lever.co/leverdemo/"
+            "ad208490-4052-4f91-a57e-433f2d1e484b/apply",
+        )
 
     def test_salary_is_not_converted_and_not_fabricated(self) -> None:
         board = lever.parse_board(
@@ -208,6 +216,11 @@ class AshbyTest(unittest.TestCase):
             "Design and build distributed systems.",
         )
         self.assertEqual(first["requirements"], [])
+        self.assertEqual(
+            first["apply_url"],
+            "https://jobs.ashbyhq.com/ramp/"
+            "34413f8d-26bf-4bbc-8ade-eb309a0e2245/application",
+        )
 
         for job in board.jobs:
             self.assertNotIn("unlisted-0001", job["source_url"])
@@ -257,6 +270,7 @@ class AdapterContractTest(unittest.TestCase):
         "salary_min",
         "salary_max",
         "salary_currency",
+        "apply_url",
     }
 
     def test_every_provider_job_matches_the_platform_contract(self) -> None:
@@ -297,6 +311,16 @@ class AdapterContractTest(unittest.TestCase):
                         job["published_at"],
                         "%Y-%m-%d %H:%M:%S",
                     )
+
+                if "apply_url" in job:
+                    self.assertIsInstance(job["apply_url"], str)
+                    self.assertTrue(
+                        job["apply_url"].startswith(
+                            ("http://", "https://")
+                        ),
+                        job["apply_url"],
+                    )
+                    self.assertLessEqual(len(job["apply_url"]), 512)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@
 #include <string>
 
 #include "jobpilot/service/job/job_extra_fields.h"
+#include "jobpilot/service/job/job_url.h"
 
 namespace jobpilot::service
 {
@@ -197,6 +198,12 @@ namespace jobpilot::service
                     job.description.value(),
                     kMaxDescriptionBytes,
                     false))
+            {
+                return false;
+            }
+
+            if (job.applyUrl.has_value() &&
+                !IsValidApplyUrl(job.applyUrl.value()))
             {
                 return false;
             }

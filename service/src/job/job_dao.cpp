@@ -28,7 +28,7 @@ namespace jobpilot::service
             "j.experience_years_max, j.job_nature, j.deadline, "
             "j.deadline_date_only, "
             "TIMESTAMPDIFF(SECOND, j.last_seen_at, NOW()), "
-            "j.source_url "
+            "j.source_url, j.apply_url "
             "FROM jobs j";
 
         // Whitelisted sort orders only; never string-interpolated from the
@@ -338,7 +338,7 @@ namespace jobpilot::service
             std::size_t sourceUrlColumn = kNoSourceUrlColumn)
         {
             const std::size_t expectedColumns =
-                sourceUrlColumn == kNoSourceUrlColumn ? 22U : 23U;
+                sourceUrlColumn == kNoSourceUrlColumn ? 22U : 24U;
 
             if (row.size() != expectedColumns)
             {
@@ -471,6 +471,12 @@ namespace jobpilot::service
                 row[sourceUrlColumn].has_value())
             {
                 summary.sourceUrl = row[sourceUrlColumn].value();
+            }
+
+            if (sourceUrlColumn != kNoSourceUrlColumn &&
+                row[sourceUrlColumn + 1].has_value())
+            {
+                summary.applyUrl = row[sourceUrlColumn + 1].value();
             }
 
             return summary;
@@ -756,7 +762,7 @@ namespace jobpilot::service
             "experience_years_max, job_nature, deadline, "
             "deadline_date_only, "
             "TIMESTAMPDIFF(SECOND, last_seen_at, NOW()), "
-            "description, source_url, status "
+            "description, source_url, apply_url, status "
             "FROM jobs "
             "WHERE id = ? AND status = 1 ";
 
@@ -779,7 +785,7 @@ namespace jobpilot::service
 
         const auto &row = result.row(0);
 
-        if (row.size() != 25)
+        if (row.size() != 26)
         {
             throw std::runtime_error(
                 "job detail query returned an unexpected column count");
@@ -806,8 +812,14 @@ namespace jobpilot::service
         // source_url as the list projection (acceptance: identical value).
         detail.summary.sourceUrl = detail.sourceUrl;
 
+        // 0020: the detail projection carries apply_url after source_url.
+        if (row[24].has_value())
+        {
+            detail.summary.applyUrl = row[24].value();
+        }
+
         detail.status =
-            ParseInt32(row[24], "jobs.status");
+            ParseInt32(row[25], "jobs.status");
 
         return detail;
     }

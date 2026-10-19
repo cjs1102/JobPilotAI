@@ -201,6 +201,12 @@ jobs:
           mysql --host=127.0.0.1 --user=root -e "
             GRANT ALL PRIVILEGES ON *.* TO 'jobpilot_ci'@'%';"
 
+      # 0020: the additive jobs.apply_url upgrade must be proven forward,
+      # backward and idempotent. The script owns a scratch database and drops
+      # it; it never touches jobpilot_ci.
+      - name: Schema upgrade forward/backward test
+        run: tools/checks/test_schema_upgrade.sh
+
       # Printed so a failure documents its own environment: the server version,
       # the collation the schema asserts, how many tables the load produced, and
       # which accounts exist.

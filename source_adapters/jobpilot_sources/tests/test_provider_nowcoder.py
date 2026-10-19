@@ -125,6 +125,9 @@ class NativeFixtureTest(unittest.TestCase):
         self.assertNotIn("education_required", job)
         self.assertIn("进行3D打印机嵌入式系统软件开发", job["description"])
         self.assertIn("熟练掌握C/C++编程", job["description"])
+        # The trimmed fixture has no redirectExternalUrl; the detail page is
+        # not reused as an apply URL.
+        self.assertNotIn("apply_url", job)
         self.assertEqual(job["requirements"], [])
 
     def test_second_native_row_uses_config_fallback_only_when_needed(self) -> None:
@@ -167,6 +170,9 @@ class AggregatorFixtureTest(unittest.TestCase):
         self.assertIn("职位描述", job["description"])
         self.assertIn("负责无人驾驶网约车平台调度", job["description"])
         self.assertNotIn("<p>", job["description"])
+        # Aggregator apply URLs live only in the detail SSR; 0020 does not
+        # fetch detail pages and must not use data.router.
+        self.assertNotIn("apply_url", job)
 
 
 class FailClosedTest(unittest.TestCase):
@@ -265,6 +271,30 @@ class RowDiagnosticsTest(unittest.TestCase):
         self.assertEqual(board.jobs[0]["external_id"], "400001")
         self.assertEqual(board.diagnostics[0]["reason"], "duplicate_in_batch")
         self.assertEqual(board.diagnostics[0]["external_id"], "400002")
+
+    def test_native_redirect_external_url_is_the_only_apply_source(self) -> None:
+        board = self.parse(
+            [native_row(redirectExternalUrl="https://careers.example/apply/1")]
+        )
+        self.assertEqual(
+            board.jobs[0]["apply_url"],
+            "https://careers.example/apply/1",
+        )
+
+        # The nested data object is the second explicit location the site uses.
+        board = self.parse(
+            [native_row(data={"redirectExternalUrl": "https://careers.example/apply/2"})]
+        )
+        self.assertEqual(
+            board.jobs[0]["apply_url"],
+            "https://careers.example/apply/2",
+        )
+
+        # Non-http(s) values are omitted, not rewritten or rejected wholesale.
+        board = self.parse(
+            [native_row(redirectExternalUrl="javascript:alert(1)")]
+        )
+        self.assertNotIn("apply_url", board.jobs[0])
 
     def test_twenty_rows_are_accepted(self) -> None:
         rows = [

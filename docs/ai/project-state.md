@@ -29,15 +29,19 @@
 > old personal access token are owner actions listed in
 > [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-> **2026-10-19 update — 0018 is active.** The Claude Code takeover verification
-> is recorded in [`CURRENT_STATE.md`](CURRENT_STATE.md); its key finding is that
-> nowcoder's `/jobs/school/jobs` page is a login-free, robots-allowed SSR list
-> (max 20 rows per query, no pagination, two record shapes). The approved plan
-> [`../exec-plans/active/0018-nowcoder-campus-source.md`](../exec-plans/active/0018-nowcoder-campus-source.md)
-> adds the first China source (`nowcoder`) with `complete=false`. The recorded
-> live-smoke counts below (Greenhouse 217 / Lever 10 / Ashby 160) are **unverified**
-> because no raw evidence exists in the repository; see DC-9 in the documentation
-> index and follow-up 0019. Do not cite them as verified until re-run.
+> **2026-10-19 update — 0018 merged; 0019 active.** The Claude Code takeover
+> verification is recorded in [`CURRENT_STATE.md`](CURRENT_STATE.md). 0018
+> (`nowcoder` campus source) was merged at `cc9b333` via PR #1 after
+> VERDICT-0018 PASS with conditions. Main CI after the merge: `ci`
+> `39200537331` (5m36s; build 4m08s + suite 1m21s) and `image`
+> `39200537315` (2m51s), both **completed/success**. The 0018 ASan matrix was
+> **311/312**, accepted by the verdict as a harness/environment 3 s client
+> timeout (not a 0018 product regression, and **not** "all green"); 0019 must
+> fix the sanitizer-aware timeout and re-run ASan. The historical live-smoke
+> counts (Greenhouse 217 / Lever 10 / Ashby 160) were re-run on 2026-10-19:
+> **Greenhouse 232 / Lever 10 / Ashby 167**, with raw output in
+> `build/0019/ats-live-smoke.log`; the old numbers are historical/unverified,
+> not constants. See `## Completed Plan (0018)` and `## Active Plan (0019)`.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -47,11 +51,11 @@ This is the concise takeover entry. Detailed evidence and historical sections
 are preserved in
 [references/project-state-full.md](references/project-state-full.md).
 
-## Active Plan (0018)
+## Completed Plan (0018)
 
-[`active/0018-nowcoder-campus-source.md`](../exec-plans/active/0018-nowcoder-campus-source.md)
-— approved 2026-10-19, implemented on `feat/0018-nowcoder`; **awaiting the
-Supervisor's closeout VERDICT, not merged to `main`**. Summary:
+[`completed/0018-nowcoder-campus-source.md`](../exec-plans/completed/0018-nowcoder-campus-source.md)
+— approved 2026-10-19, **merged at `cc9b333` via PR #1 (merge commit) after
+VERDICT-0018 PASS with conditions**. Summary:
 
 - Added the `nowcoder` provider: login-free SSR list at
   `/jobs/school/jobs`, recursive `jobListData` lookup (no hardcoded module
@@ -69,12 +73,36 @@ Supervisor's closeout VERDICT, not merged to `main`**. Summary:
   **ASan 311/312** with one `registration failed` timeout and 0 sanitizer
   diagnostics. Targeted ASan re-runs of both affected tests pass alone; a full
   ASan re-run fails a different registration-heavy test. Classified as a
-  harness/3 s-client-timeout issue, not a 0018 product regression; the
-  Supervisor decides whether to accept it or require a separate test-timeout
-  fix. **Do not describe the ASan matrix as fully green.**
-- The pre-protocol docs commit `a351984` is on `main`; implementation commits
-  are on the feature branch. No history rewrite, no force-push, no merge before
-  VERDICT.
+  harness/3 s-client-timeout issue, not a 0018 product regression. **VERDICT-0018
+  accepted 311/312 as harness/environment-limited** with conditions: never write
+  "ASan all green"; 0019 must add a sanitizer-aware HTTP test-client timeout and
+  re-run ASan; keep the residual uncertainty (server-side bcrypt duration at the
+  failure instant was not instrumented).
+- Main CI after the merge: `ci` `39200537331` completed/success 5m36s
+  (`clean build` 4m08s + `full test suite` 1m21s); `image` `39200537315`
+  completed/success 2m51s (`container image and the end-to-end gate` 2m47s).
+- History disclosure: the history scanner now reports **home path x10**
+  (was x7) because the 0018 docs commits added strings; the current tree is
+  clean and there are still 0 credential-shape findings / 14 RFC1918 strings.
+  No history rewrite was performed; disposition is an owner decision, recorded
+  here for 0019.
+- The pre-protocol docs commit `a351984` is part of the merge history; no
+  history rewrite, no force-push.
+
+## Active Plan (0019)
+
+[`active/0019-ats-live-smoke-and-asan-timeout.md`](../exec-plans/active/0019-ats-live-smoke-and-asan-timeout.md)
+— active on `feat/0019-ats-live-smoke`; not merged, REQUEST pending. Scope:
+H-2 ATS live-smoke evidence + sanitizer-aware HTTP test timeout + ASan re-run.
+Current evidence: ATS dry-run 2026-10-19 → Greenhouse 232, Lever 10, Ashby 167,
+all `board_complete=True`, log `build/0019/ats-live-smoke.log`; the timeout
+helper has been applied to all 10 HTTP test clients (Debug build rc=0;
+targeted HTTP tests 33/33); the ASan re-run is **312/312 in 108.02 s with 0
+sanitizer diagnostics** (`build/0019/asan-rerun.log`), and the stage L4 is
+**green**: Debug / ASan / UBSan each **312/312** (91.69 / 101.06 / 63.76 s),
+sanitizer diagnostics 0, builds all rc=0, Python 479 + 190 OK, review
+isolation dev SKIP / scratch 7, isolated stack `jobpilot-l4-0019`
+(13918/16918) torn down. CI/REQUEST for 0019 are pending.
 
 ## Current Stage
 
@@ -593,12 +621,21 @@ HTTP request
   11m26s per push at the pre-0017 baseline `a8dd333` (`38058123275`: build 3m17s
   + suite 5m21s + image 2m48s), so the `integration` job alone went from 5m21s to
   1m16s–1m49s and the new `Coverage map guard` step passed in every run.
-- Opt-in live smoke (not part of CI): Greenhouse 217 jobs, Lever 10, Ashby 160,
-  all published with `complete=false` only where the 200-job limit required it.
-  **UNVERIFIED (2026-10-19):** no raw command/date/response evidence for these
-  three counts exists in the repository; the handoff says no live board run was
-  recorded. Treat as unverified until a follow-up task (proposed 0019) re-runs
-  and records the raw output.
+- Opt-in live smoke (not part of CI), **re-run 2026-10-19** by 0019:
+  `INTERNAL_API_TOKEN=dummy python3 -m jobpilot_sources sync --config
+  /tmp/0019-ats-live.yaml --dry-run` with boards `gitlab` (Greenhouse),
+  `leverdemo` (Lever), `ramp` (Ashby); raw output in
+  `build/0019/ats-live-smoke.log`:
+  - Greenhouse `gitlab`: **232** jobs, `board_complete=True`, 2 batches,
+    `publish_complete=False` (the 200-job batch limit), diagnostics 0;
+  - Lever `leverdemo`: **10** jobs, `board_complete=True`, 1 batch,
+    `publish_complete=True`, diagnostics 0;
+  - Ashby `ramp`: **167** jobs, `board_complete=True`, 1 batch,
+    `publish_complete=True`, diagnostics 0.
+  `--dry-run` means no database writes. The historical
+  217/10/160 counts were recorded without raw evidence; they remain
+  historical/unverified and are not constants. Counts drift with the hiring
+  season; this is a 2026-10-19 snapshot.
 - Real HTTP register/login/me and profile/skill ownership flows passed; test
   data was cleaned afterward.
 

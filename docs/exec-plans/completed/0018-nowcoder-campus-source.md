@@ -1,8 +1,12 @@
 # ExecPlan 0018 — 牛客校招来源接入（nowcoder campus source）
 
-> 状态：**ACTIVE（2026-10-19 批准）**
+> 状态：**COMPLETED（2026-10-19 合并；VERDICT-0018 PASS 附条件）**
 > 日期：2026-10-19
-> 基线：`main` @ `928d335`（与 `origin/main` 一致；批准时工作区只有本计划与 `docs/ai/CURRENT_STATE.md`）
+> 合并：`cc9b333`（PR #1 merge commit）；最终 head `6b6ef1a`
+> 基线：`main` @ `928d335`（批准时与 `origin/main` 一致；批准时工作区只有本计划与 `docs/ai/CURRENT_STATE.md`）
+> 收口条件：ASan 311/312 被接受为 harness/environment-limited（**不得写成
+> “ASan 全绿”**）；0019 必须实现 sanitizer-aware HTTP 测试超时并重跑 ASan；
+> 历史 home path 7→10 仅记录、不改写。详见 `VERDICT-0018-closeout.md`。
 > 时间盒：**2–3 个工作日**（2026-10-19 → 2026-10-21/22）。到点必须提交收口报告，不做无限打磨。
 >
 > 批准记录（2026-10-19，owner）：

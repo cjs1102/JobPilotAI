@@ -14,6 +14,7 @@
 
 #include "jobpilot/http/http_server.h"
 #include "jobpilot/network/event_loop.h"
+#include "http_test_timeout.h"
 
 namespace jobpilot::core
 {
@@ -72,7 +73,7 @@ int CreateClientSocket()
     }
 
     timeval timeout{};
-    timeout.tv_sec = 2;
+    timeout.tv_sec = jobpilot::test::HttpTestTimeoutSeconds(2);
     timeout.tv_usec = 0;
 
     if (setsockopt(

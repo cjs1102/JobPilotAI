@@ -29,7 +29,7 @@
 > old personal access token are owner actions listed in
 > [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-> **2026-10-20 update — 0019–0022 merged.** The Claude Code takeover
+> **2026-10-21 update — 0019–0023 merged.** The Claude Code takeover
 > verification is recorded in [`CURRENT_STATE.md`](CURRENT_STATE.md). 0018
 > (`nowcoder`) merged at `cc9b333` (PR #1); 0019 (ATS live smoke + sanitizer
 > timeout) merged at `0c24c45` (PR #2) after VERDICT-0019 PASS with conditions;
@@ -37,22 +37,26 @@
 > VERDICT-0020-closeout PASS with conditions; 0021 (docs/03–04 reconciliation)
 > merged at `d75b14e` (PR #4, merge commit) after VERDICT-0021-closeout PASS
 > with conditions; 0022 (minimal local Web UI) merged at `38bd484` (PR #5,
-> merge commit) after VERDICT-0022-closeout PASS with conditions. See
-> `## Completed Plan (0020)`, `## Completed Plan (0021)` and
-> `## Completed Plan (0022)`.
-> Main CI after the 0022 merge: `ci` `39446877179` (5m58s; build 4m26s +
-> suite 1m24s) and `image` `39446876743` (2m58s; container 2m53s), both
-> **completed/success**. The 0019 ASan
+> merge commit) after VERDICT-0022-closeout PASS with conditions; 0023 (release
+> readiness) merged at `539202f` (PR #6, merge commit) after
+> VERDICT-0023-closeout PASS with the benchmark-rework completion. See
+> `## Completed Plan (0020)`, `## Completed Plan (0021)`,
+> `## Completed Plan (0022)` and `## Completed Plan (0023)`.
+> Main CI after the 0023 merge: `ci` `39462589981` (11m02s; build 4m02s +
+> suite 1m50s) and `image` `39462589965` (2m44s; container 2m39s), both
+> **completed/success**; the PR image job `39461251212` also passed
+> `Verify the MariaDB client linkage` (`MARIA_DB_LINK_OK`) and the demo gate.
+> The 0022 main CI was `ci` `39446877179` (5m58s; build 4m26s + suite 1m24s)
+> and `image` `39446876743` (2m58s; container 2m53s). The 0019 ASan
 > re-run is **312/312** with 0 sanitizer diagnostics (one isolated
 > review-backfill SKIP); L4 Debug/ASan/UBSan each **312/312**. The 2026-10-19
 > ATS snapshot is **232 / 10 / 167**; the old 217/10/160 is
 > historical/unverified and is **not** a constant or a coverage promise.
 > TSan is not covered. See `## Completed Plan (0018)` and
 > `## Completed Plan (0019)`.
-> Next stage: **0023 release readiness** (owner roadmap; 0024 remains owner-only
-> publication), approved by `VERDICT-0023-plan` and active on
-> `feat/0023-release-readiness`. A history disclosure remains accepted/no-rewrite;
-> see `## Active Plan (0023)`.
+> Next stage: **0024 owner publication** (owner-only; no worker implementation).
+> The release-readiness work is merged; A history disclosure remains
+> accepted/no-rewrite. Wait for the owner’s 0024 instruction; do not start it.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -207,24 +211,25 @@ green (2m40s). Main CI after the merge: `ci` `39446877179` (5m58s; build 4m26s
 Conditions: nginx container path remains environment-limited (digest recorded;
 1.24.0 binary + Firefox UI smoke used); next stage is owner-specified 0023.
 
-## Active Plan (0023)
+## Completed Plan (0023)
 
-[`active/0023-release-readiness.md`](../exec-plans/active/0023-release-readiness.md)
-— approved 2026-10-20 by `VERDICT-0023-plan` PASS with 8 conditions; active on
-`feat/0023-release-readiness`. Scope: SECURITY/CONTRIBUTING (CoC deferred),
-hash-pinned Python locks, MariaDB Connector/C image switch, TSan first run,
-libbcrypt provenance, benchmark refresh, release-checklist/docs updates. No P1
-or business API change. Evidence so far: Python 3.12 lock install with
-`--require-hashes` and 481 + 190 suites OK; TSan 52/52 + 17/17 with no
-diagnostics (test-harness CMake launcher fix `3ea3bc5`); benchmark matrix and
-microbench **exclusively re-run 2026-10-21 00:38:57–00:48:41** (health
-13.4–16.1k req/s, jobs 180–194 req/s; 2026-10-06 32.7k health historical, the
-~2.4× difference and environment/load caveats documented in
-`docs/benchmarks/README.md`; raw `build/benchmarks-0023-exclusive/`);
-L4 Debug/ASan/UBSan each **312/312** (one known review-backfill SKIP), scratch
-backfill 7 passed, 0 sanitizer diagnostics; libbcrypt upstream unresolved with
-SHA-256 manifest; new MariaDB image CI is pending the owner-created PR and is a
-merge gate. Closeout pending.
+[`completed/0023-release-readiness.md`](../exec-plans/completed/0023-release-readiness.md)
+— **merged at `539202f` via PR #6 (merge commit) after VERDICT-0023-closeout
+PASS with the benchmark-rework condition completed**. Final head `b6eaaa6`;
+code head `933968a`. Scope: SECURITY/CONTRIBUTING (CoC deferred), hash-pinned
+Python locks, MariaDB Connector/C image switch, TSan first run, libbcrypt
+provenance, benchmark refresh, release-checklist/docs updates. No P1 or
+business API change. Evidence: Python lock install `--require-hashes` + 481/190
+suites; TSan 52/52 + 17/17, 0 diagnostics (test-harness CMake launcher fix
+`3ea3bc5`); benchmark matrix and microbench **exclusively re-run 2026-10-21
+00:38:57–00:48:41** (health 13.4–16.1k req/s, jobs 180–194 req/s; 2026-10-06
+32.7k health historical, ~2.4× difference and environment/load caveats
+documented in `docs/benchmarks/README.md`; raw
+`build/benchmarks-0023-exclusive/`); L4 Debug/ASan/UBSan each **312/312** (one
+known review-backfill SKIP), scratch backfill 7 passed, 0 sanitizer diagnostics;
+libbcrypt upstream unresolved with SHA-256 manifest. PR image `39461251212`
+passed `Verify the MariaDB client linkage` (`MARIA_DB_LINK_OK`) + demo gate;
+main CI after merge is green (`ci` `39462589981`, `image` `39462589965`).
 
 ## Current Stage
 
@@ -860,10 +865,14 @@ Performance baseline:
     VERDICT-0022-closeout PASS with conditions; main `ci` `39446877179` and
     `image` `39446876743` are both green, and the PR CI `Web UI smoke
     (Python fallback)` step is green (`39445774298`). The 0022 plan is archived
-    under `completed/`. **0023 release readiness** is the owner-selected next
-    stage, approved by `VERDICT-0023-plan` and active on
-    `feat/0023-release-readiness`; closeout pending. 0024 remains owner-only
-    publication and must not start before 0023 is merged.
+    under `completed/`.
+14. **0023 is merged** at `539202f` (PR #6, merge commit) after
+    VERDICT-0023-closeout PASS with the benchmark-rework condition completed;
+    main `ci` `39462589981` and `image` `39462589965` are both green, and the
+    PR image job `39461251212` passed `MARIA_DB_LINK_OK` + demo gate. The 0023
+    plan is archived under `completed/`. **0024 (owner publication)** is the
+    next owner-only action; the worker must not start it or make GitHub
+    visibility/metadata changes without an explicit owner instruction.
 
 Stage numbering (decided 2026-10-08). It supersedes older references inside the
 archived completed plans, which are historical evidence and are never rewritten:

@@ -1,7 +1,8 @@
 # ExecPlan 0023 — Release readiness
 
-> 状态：**ACTIVE（2026-10-20 批准；VERDICT-0023-plan PASS 附条件）**
+> 状态：**COMPLETED（2026-10-21 合并；VERDICT-0023-closeout PASS，压测返工完成）**
 > 分支：`feat/0023-release-readiness`
+> 合并：`539202f`（PR #6 merge commit）；最终 head `b6eaaa6`；code head `933968a`
 > 基线：`main@a346aa9`（0022 merge `38bd484`，PR #5；post-merge state `a346aa9`）
 > 时间盒：2 个工作日；发布准备，不做产品化功能。
 > 0022 合并后 main CI：`ci` `39446877179`（5m58s）与 `image` `39446876743`（2m58s）双绿；
@@ -432,7 +433,7 @@ P4 TSan                  [x] 完成（52/52 + 17/17；CMake launcher 修复）
 P5 libbcrypt             [x] 完成（unresolved + SHA-256 manifest）
 P6 docs checker (opt)    [x] deferred（已批准）
 P7 benchmark             [x] 完成（独占重跑 00:38:57–00:48:41；matrix + microbench；原始日志）
-P8 closeout + L4         [x] L4 312/312 ×3；closeout 待评审
+P8 closeout + L4         [x] L4 312/312 ×3；closeout PASS；PR #6 合并 `539202f`
 ```
 
 ## 12. 批准后动作

@@ -36,8 +36,12 @@ Port overrides: `JOBPILOT_WEB_HOST_PORT` (default 8081),
 ### 镜像记录
 
 `docker/nginx/default.conf` is the reviewed config. The compose image tag is
-`nginx:1.27-alpine`; the digest is environment-specific and should be recorded
-after the first CI pull:
+`nginx:1.27-alpine`. On 2026-10-20 Docker Hub resolved that tag to the
+multi-arch manifest digest
+`sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10`;
+the image could not be pulled on this VM (`EOF` from registry-1.docker.io), so
+the local checks used the nginx **binary** (1.24.0) plus the same config. After
+a successful CI pull, record the platform digest here with:
 
 ```bash
 docker image inspect nginx:1.27-alpine --format '{{index .RepoDigests 0}}'

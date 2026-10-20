@@ -124,7 +124,9 @@ checklist 的 SECURITY/CONTRIBUTING 缺失项改为完成；索引新增文档�
       --output-file ai_worker/requirements.lock ai_worker/pyproject.toml
   ```
   若 `pip-compile` 不可用，用 `pip download --no-deps` + `pip hash` 生成同样的
-  exact-pin/hash 文件；不提交 pip-tools 到运行时依赖。
+  exact-pin/hash 文件；不提交 pip-tools 到运行时依赖。**本次实际实现**因 PyPI
+  TLS 间歇失败，使用 `pip download` 的 CPython 3.12 manylinux wheel hash；lock
+  目标与更新命令记录在 `CONTRIBUTING.md`，不声称覆盖其他 Python 平台。
 - CI `integration`：
   - apt 增加 `python3-venv`；
   - 创建临时 venv，`pip install --require-hashes -r` 两个 lock；
@@ -422,15 +424,15 @@ git diff --check
 ## 11. 当前进度
 
 ```text
-P0 计划 + REQUEST        [ ] 等待 VERDICT-0023-plan
-P1 SECURITY/CONTRIBUTING [ ] 未开始
-P2 Python lock           [ ] 未开始
-P3 MariaDB V8            [ ] 未开始
-P4 TSan                  [ ] 未开始
-P5 libbcrypt             [ ] 未开始
-P6 docs checker (opt)    [ ] 未开始
-P7 benchmark             [ ] 未开始
-P8 closeout + L4         [ ] 未开始
+P0 计划 + REQUEST        [x] PASS（VERDICT-0023-plan）
+P1 SECURITY/CONTRIBUTING [x] 完成（CoC deferred）
+P2 Python lock           [x] 完成（PyYAML 6.0.3 + hash；本地 venv 481/190）
+P3 MariaDB V8            [x] Dockerfile/CI 完成；新 image PR CI 待 owner（合并门）
+P4 TSan                  [x] 完成（52/52 + 17/17；CMake launcher 修复）
+P5 libbcrypt             [x] 完成（unresolved + SHA-256 manifest）
+P6 docs checker (opt)    [x] deferred（已批准）
+P7 benchmark             [x] 完成（matrix + microbench；原始日志）
+P8 closeout + L4         [x] L4 312/312 ×3；closeout 待评审
 ```
 
 ## 12. 批准后动作

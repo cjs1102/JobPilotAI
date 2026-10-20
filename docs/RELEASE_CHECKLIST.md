@@ -16,6 +16,13 @@
 > python3 tools/checks/release_preflight.py --allow-dirty   # preparation only, never the release commit
 > ```
 
+> **2026-10-21 — 0023 release-readiness update.** `SECURITY.md` and
+> `CONTRIBUTING.md` are now present; Python dependencies are hash-pinned; the
+> Dockerfile uses MariaDB Connector/C; TSan has a recorded first run; libbcrypt
+> records an explicit unresolved-upstream hash manifest; and the benchmark
+> baseline is refreshed. The current evidence is in **§9**; older rows below are
+> dated historical evidence unless they say otherwise.
+
 ## 1. Automated preflight
 
 Run the command above from the repository root and paste its whole output into
@@ -61,8 +68,8 @@ sentence. Paths are in the build host's Conan cache (`~/.conan2/p/…/p/licenses
 | nlohmann/json | 3.11.3 | MIT | `licenses/LICENSE.MIT` plus a `LICENSES/` directory |
 | GoogleTest | 1.14.0 | BSD-3-Clause | `p/licenses/LICENSE` — "Copyright 2008, Google Inc." |
 | hiredis | 1.2.0 | BSD-3-Clause | `licenses/COPYING` |
-| PyYAML | floor `>=6.0`, **no lock file** (6.0.1 installed here) | MIT | package metadata `License: MIT`; declared in `source_adapters/pyproject.toml` and `ai_worker/pyproject.toml` |
-| vendored `third_party/libbcrypt` | **no upstream revision recorded** | CC0 / public-domain dedication, Openwall `crypt_blowfish` with a permissive fallback | `PROVENANCE.md` + the licence headers inside `bcrypt.c` and `crypt_blowfish.c` |
+| PyYAML | `6.0.3`, exact hash-pinned `requirements.lock` in both Python packages (0023) | MIT | package metadata `License: MIT`; locks in `source_adapters/requirements.lock` and `ai_worker/requirements.lock`; CI uses `--require-hashes` |
+| vendored `third_party/libbcrypt` | upstream revision **unresolved from this host**; SHA-256 manifest recorded (0023) | CC0 / public-domain dedication, Openwall `crypt_blowfish` with a permissive fallback | `PROVENANCE.md` revision record + the licence headers inside `bcrypt.c` and `crypt_blowfish.c` |
 
 **MySQL C client: evaluated, with the smaller-risk option identified (2026-10-11).**
 The committed `Dockerfile` builds on `ubuntu:24.04` with `libmysqlclient-dev` and
@@ -97,6 +104,13 @@ ready: `libmysqlclient-dev` → `libmariadb-dev` + `libmariadb-dev-compat` in th
 builder, `libmysqlclient21` → `libmariadb3` in the runtime stage, and the two CI
 package lines. It is applied only together with that compatibility result, and the
 runner re-verifies the `ubuntu:24.04` shape end to end through the image job.
+
+**0023 update (2026-10-21): the switch is applied.** The committed `Dockerfile`
+now builds with `libmariadb-dev` + `libmariadb-dev-compat` and installs
+`libmariadb3`; the `image` workflow asserts `libmariadb.so.3` and the absence of
+`libmysqlclient`, then runs the demo gate against MySQL 8.0. The PR `image` job
+must be green before merge. This remains a factual licence/linkage record, not a
+legal conclusion; the Oracle evidence above is historical.
 
 ## 3. README and documentation for outsiders
 
@@ -331,3 +345,27 @@ CI: <run id> at <sha> — clean build: <status/duration>, full test suite: <stat
 Actions minutes used this month: <number> / <plan allowance>
 Open items carried forward: <list, or "none">
 ```
+
+## 9. 0023 release-readiness evidence (2026-10-21)
+
+This is the current evidence for the 0023 release-readiness stage. It
+supersedes older rows above where they conflict; the older rows remain dated
+history.
+
+| Item | Result | Evidence |
+|---|---|---|
+| `SECURITY.md` / `CONTRIBUTING.md` | **present**; private GitHub reporting, no personal email/path values; A history disclosure records facts + owner no-rewrite decision + no legal conclusion; CoC deferred until a reporting channel exists | `SECURITY.md`, `CONTRIBUTING.md`, `README.md`, preflight links |
+| Python lock | **applied**: `PyYAML==6.0.3` wheel hash in both per-package locks; local venv `--require-hashes` install; suites 481 + 190 OK; CI installs the locks in a venv | `source_adapters/requirements.lock`, `ai_worker/requirements.lock`, `.github/workflows/ci.yml`; exact local pip output in closeout |
+| MariaDB Connector/C (V8) | **Dockerfile switched** to `libmariadb-dev` + `libmariadb-dev-compat` (builder) and `libmariadb3` (runtime); image workflow asserts `libmariadb.so.3` and no `libmysqlclient` before demo gate. Local verification image `jobpilot-backend:verify` prints only `libmariadb.so.3`; **the new image build/CI run id is pending the owner-created PR and is a merge gate** | `Dockerfile`, `.github/workflows/image.yml`, `THIRD_PARTY_NOTICES.md`; local `ldd` output in closeout. No legal conclusion. |
+| TSan first run | **52/52** at `ctest --preset tsan` (47.06 s) and **17/17** at `tsan-external` (18.38 s); no `WARNING: ThreadSanitizer`/data-race output. A test-harness-only fix made the ASLR `setarch` launcher apply to every test target; no product/P1 code change | `service/CMakeLists.txt` commit `3ea3bc5`; raw logs `build/l4-0023/tsan.log`, `tsan-external.log` (gitignored) |
+| libbcrypt provenance | upstream revision **unresolved** from this host: GitHub API and `git ls-remote` fail at TLS (`SSL_ERROR_SYSCALL` / `gnutls_handshake`), so no commit/tag is invented; a SHA-256 manifest of the vendored sources is recorded | `third_party/libbcrypt/PROVENANCE.md` revision record; `THIRD_PARTY_NOTICES.md` |
+| Benchmark baseline | **refreshed 2026-10-21** on 4 vCPU/MySQL same host: health 2/4/8 × 32/128/512, DB jobs 2/4/8 × 32, 3 samples each, `pidstat` CPU/RSS; medians and raw-log path in `docs/benchmarks/README.md`; explicit “baseline, not threshold” | `docs/benchmarks/README.md`; raw `build/benchmarks-0023/` (gitignored); `BENCHMARK_MATRIX_OK` |
+| Docs checker | **deferred** (approved): 0021's temporary schema/router checks remain; permanent checker is a maintenance-stage candidate | 0021 plan/verdict; no new tool added |
+| L4 | Debug/ASan/UBSan each **312/312** (129.33 / 126.03 / 84.11 s), 1 known review-backfill SKIP each; Python lock suites 481 + 190; backfill dev SKIP / scratch **7 passed**; 0 sanitizer diagnostics; builds debug/asan/ubsan/release/root-release rc=0 | code head `933968a`; `build/l4-0023/` (gitignored) |
+| Isolation | L4 project `jobpilot-l4-0023` (MySQL 14023/Redis 17023) and benchmark project `jobpilot-bench-0023` (14024/17024) torn down with `down -v`; no containers/volumes/networks remain | closeout raw output |
+| A history | owner accepted, no rewrite; latest scanner output is recorded in the closeout (counts, never values) | `SECURITY.md` history section; `tools/checks/history_secret_scan.sh` |
+
+**Known non-blocking environments:** the new MariaDB image cannot be built on
+this VM (no `ubuntu:24.04`/Docker Hub), so its CI run id is pending the owner PR;
+`actionlint` remains unavailable locally; TSan is not in the regular CI/L4
+matrix; benchmark numbers are host-specific.

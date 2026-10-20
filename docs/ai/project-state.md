@@ -50,8 +50,9 @@
 > TSan is not covered. See `## Completed Plan (0018)` and
 > `## Completed Plan (0019)`.
 > Next stage: **0023 release readiness** (owner roadmap; 0024 remains owner-only
-> publication). Its plan is under review; no code/config change before
-> `VERDICT-0023-plan`. A history disclosure remains accepted/no-rewrite.
+> publication), approved by `VERDICT-0023-plan` and active on
+> `feat/0023-release-readiness`. A history disclosure remains accepted/no-rewrite;
+> see `## Active Plan (0023)`.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -205,6 +206,22 @@ green (2m40s). Main CI after the merge: `ci` `39446877179` (5m58s; build 4m26s
 + suite 1m24s) and `image` `39446876743` (2m58s; container 2m53s), both green.
 Conditions: nginx container path remains environment-limited (digest recorded;
 1.24.0 binary + Firefox UI smoke used); next stage is owner-specified 0023.
+
+## Active Plan (0023)
+
+[`active/0023-release-readiness.md`](../exec-plans/active/0023-release-readiness.md)
+— approved 2026-10-20 by `VERDICT-0023-plan` PASS with 8 conditions; active on
+`feat/0023-release-readiness`. Scope: SECURITY/CONTRIBUTING (CoC deferred),
+hash-pinned Python locks, MariaDB Connector/C image switch, TSan first run,
+libbcrypt provenance, benchmark refresh, release-checklist/docs updates. No P1
+or business API change. Evidence so far: Python 3.12 lock install with
+`--require-hashes` and 481 + 190 suites OK; TSan 52/52 + 17/17 with no
+diagnostics (test-harness CMake launcher fix `3ea3bc5`); benchmark matrix and
+microbench refreshed in `docs/benchmarks/README.md` (raw `build/benchmarks-0023/`);
+L4 Debug/ASan/UBSan each **312/312** (one known review-backfill SKIP), scratch
+backfill 7 passed, 0 sanitizer diagnostics; libbcrypt upstream unresolved with
+SHA-256 manifest; new MariaDB image CI is pending the owner-created PR and is a
+merge gate. Closeout pending.
 
 ## Current Stage
 
@@ -841,8 +858,9 @@ Performance baseline:
     `image` `39446876743` are both green, and the PR CI `Web UI smoke
     (Python fallback)` step is green (`39445774298`). The 0022 plan is archived
     under `completed/`. **0023 release readiness** is the owner-selected next
-    stage; its plan is under review. 0024 remains owner-only publication. Do
-    not start 0023 implementation or 0024 before the owner’s next instruction.
+    stage, approved by `VERDICT-0023-plan` and active on
+    `feat/0023-release-readiness`; closeout pending. 0024 remains owner-only
+    publication and must not start before 0023 is merged.
 
 Stage numbering (decided 2026-10-08). It supersedes older references inside the
 archived completed plans, which are historical evidence and are never rewritten:

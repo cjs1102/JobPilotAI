@@ -1,6 +1,6 @@
 # ExecPlan 0023 — Release readiness
 
-> 状态：**PLANNING（等待 VERDICT-0023-plan；批准前不写代码/配置/文档）**
+> 状态：**ACTIVE（2026-10-20 批准；VERDICT-0023-plan PASS 附条件）**
 > 分支：`feat/0023-release-readiness`
 > 基线：`main@a346aa9`（0022 merge `38bd484`，PR #5；post-merge state `a346aa9`）
 > 时间盒：2 个工作日；发布准备，不做产品化功能。
@@ -8,7 +8,10 @@
 > PR #5 的 `Web UI smoke (Python fallback)` 步骤 `39445774298` 为 success。
 > 路线：owner `STATUS-release-roadmap.md` 的 0023；0024（owner 发布动作）不在本阶段。
 > 历史披露 A（owner 2026-10-20 决定）：接受，不改写历史；SECURITY.md 记录事实。
-> 批准后按 P1→P8 小步实施；stage close 按 `docs/ai/agent-workflow.md` §2.1 跑一次 L4。
+> 批准记录：CoC deferred；PyYAML 6.0.3 + hashes；MariaDB image CI 必须绿；
+> TSan 最小修复在范围内、超范围停止；libbcrypt 回退 hash+unresolved；docs checker
+> deferred；benchmark 9+3×3 样本/2h；L4 一次（不含 TSan）；owner 合并。
+> 按 P1→P8 小步实施；stage close 按 `docs/ai/agent-workflow.md` §2.1 跑一次 L4。
 
 ## 1. 背景与当前状态
 

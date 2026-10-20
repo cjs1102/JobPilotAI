@@ -35,7 +35,9 @@ Status vocabulary used below:
 | `README.md` | Project README | What the project is, English Quick Start, current capabilities, explicit non-goals, contracts (F13/F14), build/verify commands | Everyone, first file to read | `CURRENT` | whole repo |
 | `AGENTS.md` | Project Guide | Hard constraints (dependency direction, P1 freeze, secrets, JSON/SQL/RAII rules), task routing, verification policy | Every agent/contributor | `CURRENT` | whole repo |
 | `.agents/skills/jobpilot-reactor-review/SKILL.md` | Reactor review skill | Mandatory checklist before touching `backend/{include,src}/jobpilot/{network,http}/` | Anyone changing the network layer | `CURRENT` | `backend/src/network`, `backend/src/http` |
-| `THIRD_PARTY_NOTICES.md` | Third-party notices | Licence of every dependency, verified from the pinned package; the MySQL client question | Maintainer, release reviewer | `CURRENT` | `service/conanfile.txt`, `third_party/`, `Dockerfile` |
+| `SECURITY.md` | Security policy | Supported versions, private reporting, local-demo boundaries, no-secrets policy, A history disclosure (facts only) | Everyone, release reviewer | `CURRENT` (2026-10-20) | `tools/checks/` |
+| `CONTRIBUTING.md` | Contribution guide | Setup, Python lock, branch/PR/review flow, P1 freeze, verification and non-goals | Contributors, agents | `CURRENT` (2026-10-20) | whole repo |
+| `THIRD_PARTY_NOTICES.md` | Third-party notices | Licence of every dependency, verified from the pinned package; MariaDB client and libbcrypt provenance | Maintainer, release reviewer | `CURRENT` | `service/conanfile.txt`, `third_party/`, `Dockerfile` |
 | `LICENSE` | MIT licence | The licence the repository ships | Everyone | `CURRENT` | — |
 | `docs/README.md` | Documentation map | Reading order and the historical/current split | Everyone | `CURRENT` | — |
 

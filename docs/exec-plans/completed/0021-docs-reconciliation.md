@@ -1,13 +1,15 @@
 # ExecPlan 0021 — docs/03–04 对账（DB/API 差异处置）
 
-> 状态：**ACTIVE（2026-10-20 批准；VERDICT-0021-plan PASS 附 7 条条件）**
+> 状态：**COMPLETED（2026-10-20 合并；VERDICT-0021-closeout PASS 附条件）**
 > 分支：`feat/0021-docs-reconciliation`
+> 合并：`d75b14e`（PR #4 merge commit）；最终 head `940ad4c`
 > 基线：`main@26c69d7`（0020 post-merge 状态提交；父提交 `c07c35a` 为 PR #3 merge）
 > 时间盒：1 个工作日；docs-only。
-> 批准记录：VERDICT-0021-plan 追加条件 1–7；closeout 必须附全量
-> CURRENT_STATE 覆盖表、schema/router 检查原始输出、preflight 与
-> `git diff --check`，并声明本阶段 L0、不引用 0020 测试证据。
-> 按同一监督协议写 `REQUEST-0021-closeout.md`；未获 closeout PASS 前不合并。
+> 批准记录：VERDICT-0021-plan 追加条件 1–7；closeout 附全量 CURRENT_STATE
+> 覆盖表、schema/router 检查原始输出、preflight 与 `git diff --check`，并声明
+> 本阶段 L0、不引用 0020 测试证据。
+> 收口条件：DB-4/H-2（`user_skills`）deferred；permanent docs checker 登记为
+> 后续候选；下一阶段由 owner 指定（路线 B：最小 Web UI）。
 
 ## 1. 背景与当前状态
 
@@ -324,7 +326,7 @@ P0 计划 + 差异复核          [x] 完成（VERDICT-0021-plan PASS）
 P1 docs/03 DB-1/2/3         [x] 完成（13 表、ER、jobs 列/索引、两张表 DDL）
 P2 docs/04 API-1/2/3/4      [x] 完成（reserved、9 internal、dev-only /hello、计数）
 P3 handoff/index/state 注记 [x] 完成（dated corrections、DC-10、resolution note）
-P4 验证 + REQUEST           [x] 完成（schema/router 原始输出、preflight 7/0/1、diff check rc=0；closeout 待评审）
+P4 验证 + REQUEST           [x] 完成（schema/router 原始输出、preflight 7/0/1、diff check rc=0；closeout PASS，PR #4 合并 `d75b14e`）
 ```
 
 ## 12. 批准后动作

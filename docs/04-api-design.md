@@ -56,7 +56,7 @@ GET /api/v1/{resource}?page=1&page_size=20
 
 ### 1.5 异步 AI 任务约定
 
-AI 接口均为异步：发起返回 `task_id`，客户端轮询 `GET /api/v1/ai/tasks/{task_id}`。
+AI 接口均为异步：发起返回 `task_id`，客户端轮询 `GET /api/v1/ai/tasks/{id}`。
 
 ```
 发起: POST /api/v1/ai/match   -> data: {"task_id": 1024}
@@ -1072,12 +1072,16 @@ POST /api/v1/ai/resume/optimize   body: {"job_id":20001,"resume_id":30001}
 POST /api/v1/ai/interview/generate body: {"job_id":20001,"skills":["C++","Linux"]}
 ```
 
+> **预留契约（未实现，2026-10-20）**：以上两条当前**不在**
+> `service/src/router.cpp` 注册，调用返回 **404**；保留为未来合同，不计入已
+> 实现 API。实现其中任何一条都需要另立 ExecPlan，不得直接依赖本文档。
+
 均返回 `{ "task_id": N }`。
 
 ### 7.3 任务查询（轮询）
 
 ```
-GET /api/v1/ai/tasks/{task_id}
+GET /api/v1/ai/tasks/{id}
 ```
 
 ```json
@@ -1179,14 +1183,34 @@ GET /health
 | PUT | /api/v1/applications/{id}/status | 是 | 更新状态 |
 | GET | /api/v1/applications/statistics | 是 | 统计 |
 | POST | /api/v1/ai/match | 是 | 岗位匹配(异步) |
-| POST | /api/v1/ai/resume/optimize | 是 | 简历优化(异步) |
-| POST | /api/v1/ai/interview/generate | 是 | 面试题(异步) |
-| GET | /api/v1/ai/tasks/{task_id} | 是 | 任务轮询 |
+| GET | /api/v1/ai/tasks/{id} | 是 | 任务轮询 |
 | GET | /health | 否 | 健康检查 |
+| POST | /hello | 否 | P1 回显/自测（dev-only，不计入业务公开） |
 | POST | /internal/jobs/import | Internal Token | 可信岗位导入 |
 | POST | /internal/jobs/source-sync | Internal Token | 来源观测同步（Source Adapter） |
+| GET | /internal/jobs/review-queue | Internal Token | 复核队列（0015A） |
+| POST | /internal/jobs/review/{id} | Internal Token | 复核决定（0015A） |
+| POST | /internal/jobs/review/backfill | Internal Token | 复核回填（0015A） |
+| POST | /internal/ai/tasks/claim | Internal Token | AI worker 认领任务（0013） |
+| POST | /internal/ai/tasks/{id}/complete | Internal Token | AI worker 完成任务（0013） |
+| POST | /internal/ai/tasks/{id}/fail | Internal Token | AI worker 失败上报（0013） |
+| GET | /internal/ai/tasks/{id}/input | Internal Token | AI worker 读取任务输入（0013） |
 
-> 内部接口（AI 服务取简历/岗位、Source Adapter 上报观测）为 `/internal/*`，仅内网可达，不对外暴露。
+> 计数（2026-10-20，从 `service/src/router.cpp` 重新推导）：已实现 **36** 条 =
+> **27 非内部**（25 业务公开 + `GET /health` + dev-only `POST /hello`）+
+> **9 internal**。9 条 internal 均需 `X-Internal-Token`；`internalApi.token`
+> 为空时这些路由不注册。`/hello` 是 P1 回显/自测路由，不属于公共 API
+> contract，不计入业务公开。
+
+### 9.1 预留/未实现（不计入已实现）
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|---|---|---|---|
+| POST | /api/v1/ai/resume/optimize | 是（将来） | 预留契约；当前未注册，404 |
+| POST | /api/v1/ai/interview/generate | 是（将来） | 预留契约；当前未注册，404 |
+
+> 内部接口（AI 服务取简历/岗位、Source Adapter 上报观测、0015A 复核）为
+> `/internal/*`，仅内网可达，不对外暴露。
 
 ## 10. Open-source MVP 边界
 

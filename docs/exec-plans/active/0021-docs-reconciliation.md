@@ -1,10 +1,13 @@
 # ExecPlan 0021 — docs/03–04 对账（DB/API 差异处置）
 
-> 状态：**PLANNING（等待 VERDICT-0021-plan；未获批准前不修改 docs/03、docs/04 或任何既有文档）**
+> 状态：**ACTIVE（2026-10-20 批准；VERDICT-0021-plan PASS 附 7 条条件）**
 > 分支：`feat/0021-docs-reconciliation`
 > 基线：`main@26c69d7`（0020 post-merge 状态提交；父提交 `c07c35a` 为 PR #3 merge）
 > 时间盒：1 个工作日；docs-only。
-> 批准后才改文档；按同一监督协议写 `REQUEST-0021-closeout.md`。
+> 批准记录：VERDICT-0021-plan 追加条件 1–7；closeout 必须附全量
+> CURRENT_STATE 覆盖表、schema/router 检查原始输出、preflight 与
+> `git diff --check`，并声明本阶段 L0、不引用 0020 测试证据。
+> 按同一监督协议写 `REQUEST-0021-closeout.md`；未获 closeout PASS 前不合并。
 
 ## 1. 背景与当前状态
 
@@ -289,6 +292,14 @@ this stage does not claim a code/sanitizer gate.
 
 ## 10. 开放问题 / 待批准决策
 
+> **VERDICT-0021-plan 决议（2026-10-20）：** DB-3 用 §3 全量 DDL（批准）；
+> API-3 `/hello` 只做 dev-only 文档标注（批准，不改 `router.cpp`）；
+> API-4 用带日期更正（批准）；0020 导致的 handoff `apply_url` 旧陈述用带日期
+> 更正（批准）；DB-4/H-2 `user_skills` 本阶段 deferred（批准，closeout 必须
+> 列出）；永久 docs checker 暂缓但登记为后续计划候选（批准）。
+> 追加条件：全量 CURRENT_STATE 覆盖表、H-1 处置、原始检查输出、L0 声明、
+> CURRENT_STATE 原文保留、计数规则写死、owner 合并后双绿。
+
 1. **DB-3 方式**：在 §3 复制两张表的完整 DDL（推荐），还是只加“见 §9.2/§10.6”
    指针？推荐完整 DDL，让“锁定版”真的可读。
 2. **API-3 `/hello`**：文档标注 dev-only（推荐，docs-only），还是从
@@ -309,11 +320,11 @@ this stage does not claim a code/sanitizer gate.
 ## 11. 当前进度
 
 ```text
-P0 计划 + 差异复核          [ ] 未开始（等待批准）
-P1 docs/03 DB-1/2/3         [ ] 未开始
-P2 docs/04 API-1/2/3/4      [ ] 未开始
-P3 handoff/index/state 注记 [ ] 未开始
-P4 验证 + REQUEST           [ ] 未开始
+P0 计划 + 差异复核          [x] 完成（VERDICT-0021-plan PASS）
+P1 docs/03 DB-1/2/3         [x] 完成（13 表、ER、jobs 列/索引、两张表 DDL）
+P2 docs/04 API-1/2/3/4      [x] 完成（reserved、9 internal、dev-only /hello、计数）
+P3 handoff/index/state 注记 [x] 完成（dated corrections、DC-10、resolution note）
+P4 验证 + REQUEST           [ ] 进行中（原始输出 + closeout）
 ```
 
 ## 12. 批准后动作

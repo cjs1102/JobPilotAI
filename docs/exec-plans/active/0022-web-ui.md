@@ -453,11 +453,12 @@ docs/ai/project-state.md  # 0022 active/completed evidence
 - [x] 运行 `tools/dev/web-smoke.sh`（isolated，Python fallback 与真实 nginx
       binary 两种 server 均通过；后续再跑一次 frozen head）。
 - [x] 真实 Firefox/geckodriver browser smoke（登录、简历、搜索/详情、收藏、状态板）。
-- [ ] 跑一次 L4（Debug/ASan/UBSan + Release builds + Python suites）并保存原始日志。
-- [ ] `python3 tools/checks/release_preflight.py`；`git diff --check`。
-- [ ] 写 `REQUEST-0022-closeout.md`（含 smoke 原始输出、browser smoke、L4、docs 更新、
+- [x] 跑一次 L4：Debug/ASan/UBSan 各 312/312（1 个 review-backfill SKIP），
+      Python 481/190 OK，backfill scratch 7 passed；日志在 `build/l4-0022/`。
+- [x] `python3 tools/checks/release_preflight.py` → 7/0/1；`git diff --check` rc=0。
+- [x] 写 `REQUEST-0022-closeout.md`（含 smoke 原始输出、browser smoke、L4、docs 更新、
       回滚）；停止等待 VERDICT。
-- [ ] 不合并、不启动 0023。
+- [x] 不合并、不启动 0023。
 
 ## 8. 验收命令清单
 
@@ -529,7 +530,7 @@ P3 列表/筛选/匹配           [x] 完成（jobs.js + 筛选/分页/match）
 P4 详情/简历/收藏           [x] 完成（detail + resume prerequisite + favourite）
 P5 状态板                   [x] 完成（applications.js + 状态推进/拒绝）
 P6 文档/截图步骤            [x] 完成（README + local-demo + index/project-state）
-P7 smoke + L4 + closeout    [ ] 进行中（nginx/Python smoke 已通过；L4/closeout 待跑）
+P7 smoke + L4 + closeout    [x] 验证完成（nginx/Python/Firefox smoke、L4 312/312 ×3、preflight 7/0/1）；closeout 待评审
 ```
 
 ## 12. 批准后动作

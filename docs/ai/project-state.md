@@ -188,6 +188,16 @@ nginx image. Verification: isolated compose smoke through the real nginx
 config (or Python fallback), `no_submission_path.py`, `innerHTML`/CDN/link
 checks, preflight, and one L4 at stage close.
 
+Implementation is committed at `2abbaa1`: `web/` + `docker/nginx/default.conf`
++ opt-in compose profile + `tools/dev/web-smoke.sh` / Python fallback +
+optional Firefox/geckodriver UI smoke + README/guide updates. Evidence:
+`web-smoke.sh` passed through both the Python fallback and a real nginx binary,
+including `BROWSER_SMOKE_OK` (login → resume → search/detail → favourite →
+status board) and isolated teardown (`WEB_SMOKE_TEARDOWN_OK`); L4 Debug/ASan/
+UBSan each **312/312** (one known review-backfill SKIP), Python 481 + 190 OK,
+backfill scratch 7 passed, 0 sanitizer diagnostics; preflight 7/0/1 and
+`git diff --check` rc=0. Closeout is pending review; no merge or 0023.
+
 ## Current Stage
 
 - Architecture direction is now open-source first and self-hosted, with a

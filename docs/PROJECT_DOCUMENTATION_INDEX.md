@@ -45,7 +45,7 @@ Status vocabulary used below:
 |---|---|---|---|---|---|
 | `docs/ai/README.md` | AI context router | Which document to read for which task; diff-first reading policy | Agents | `CURRENT` | — |
 | `docs/ai/agent-workflow.md` | Agent workflow and verification rules | Verification levels L1–L5, when a suite may run, harness prerequisites, one review per stage | Agents | `CURRENT` | `build/l4-0017/` (scratch harness) |
-| `docs/ai/project-state.md` | Current project state (907 lines) | Stage-by-stage state, carried-forward items, what is genuinely open | Agents, maintainer | `CURRENT` (updated 2026-10-20) | whole repo |
+| `docs/ai/project-state.md` | Current project state (917 lines) | Stage-by-stage state, carried-forward items, what is genuinely open | Agents, maintainer | `CURRENT` (updated 2026-10-20) | whole repo |
 | `docs/ai/CURRENT_STATE.md` | Handoff verification report (2026-10-19) | Git/CI facts, §23 fact checklist, document-code conflicts, capability-matrix update; 2026-10-20 resolution note | Agents, maintainer, release reviewer | `CURRENT` (dated 2026-10-19; point-in-time report plus dated resolution note) | whole repo |
 | `docs/ai/archive/next-phase-plan-2026-10.md` | Archived next-phase plan | An earlier plan sketch; kept for context | Agents | `REFERENCE` (archived) | — |
 | `docs/ai/references/github_resources.md` | GitHub resource research | 655-line survey used for the open-source plan | Maintainer | `REFERENCE` | — |

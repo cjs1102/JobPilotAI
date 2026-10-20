@@ -11,6 +11,13 @@ service_binary=$1
 duration=${2:-10s}
 threads=${3:-2}
 connections=${4:-32}
+# 0023: allow the DB-backed public jobs endpoint (or another path) without
+# changing existing callers. Keep the default at the original /health.
+path=${5:-${JOBPILOT_BENCHMARK_PATH:-/health}}
+case "$path" in
+    /*) ;;
+    *) echo "benchmark path must start with /: $path" >&2; exit 2 ;;
+esac
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd "$script_dir/../.." && pwd)
@@ -53,6 +60,7 @@ cleanup()
 trap cleanup EXIT INT TERM
 
 health_url="http://127.0.0.1:${port}/health"
+benchmark_url="http://127.0.0.1:${port}${path}"
 
 for _ in $(seq 1 50); do
     if curl --fail --silent --show-error \
@@ -74,7 +82,7 @@ if ! curl --fail --silent --show-error \
     exit 1
 fi
 
-echo "url=$health_url"
+echo "url=$benchmark_url"
 echo "duration=$duration"
 echo "threads=$threads"
 echo "connections=$connections"
@@ -84,4 +92,4 @@ wrk \
     -c "$connections" \
     -d "$duration" \
     --latency \
-    "$health_url"
+    "$benchmark_url"

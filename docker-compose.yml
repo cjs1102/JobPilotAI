@@ -91,6 +91,27 @@ services:
       start_period: 10s
 
 
+  web:
+    # 0022: opt-in static UI. It is deliberately not in the `app` profile so
+    # `docker compose --profile app up -d` (demo gate, image workflow) behaves
+    # exactly as before. Start it with both profiles:
+    #   docker compose --profile app --profile web up -d
+    profiles: ["web"]
+    image: ${JOBPILOT_WEB_IMAGE:-nginx:1.27-alpine}
+    container_name: ${JOBPILOT_WEB_CONTAINER_NAME:-jobpilot-web}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${JOBPILOT_WEB_HOST_PORT:-8081}:80"
+    volumes:
+      # The UI is plain HTML/CSS/JS: no build step, no web image to publish.
+      # Read-only bind mounts keep the dev loop immediate.
+      - ./web:/usr/share/nginx/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+
 volumes:
   mysql_data:
   resume_storage:

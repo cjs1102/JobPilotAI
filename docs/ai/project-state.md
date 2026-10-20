@@ -47,8 +47,9 @@
 > historical/unverified and is **not** a constant or a coverage promise.
 > TSan is not covered. See `## Completed Plan (0018)` and
 > `## Completed Plan (0019)`.
-> Next stage: **0022 minimal Web UI** (owner route B). Its plan is under review;
-> no code or config change is made before `VERDICT-0022-plan`.
+> Next stage: **0022 minimal Web UI** (owner route B), approved 2026-10-20 by
+> `VERDICT-0022-plan` PASS with 6 implementation conditions. It is active on
+> `feat/0022-web-ui`; see `## Active Plan (0022)`. No P1/backend/schema change.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -152,8 +153,9 @@ the upgrade applied. Final head `e01e283`.
   condition 3): DB tests run without `MYSQL_PASSWORD` fail as a SetUp
   exception/SEGFAULT instead of a readable SKIP. This is recorded for later
   maintenance and is not a 0020 defect.
-- Next stage: **0022 minimal Web UI** (owner route B); plan under review, no
-  code before `VERDICT-0022-plan`.
+- Next stage: **0022 minimal Web UI** (owner route B), approved by
+  `VERDICT-0022-plan`; see `## Active Plan (0022)`. Implementation is
+  UI/compose/docs only; no P1 or backend change.
 
 ## Completed Plan (0021)
 
@@ -170,6 +172,31 @@ unavailable), `git diff --check` rc=0. **Docs-only L0**: no code, schema,
 migration, API behavior or CI change; no L4 and no reuse of 0020 test evidence.
 Conditions: DB-4/H-2 (`user_skills`) deferred; permanent docs checker is a
 follow-up candidate; next stage is owner-specified.
+
+## Active Plan (0022)
+
+[`active/0022-web-ui.md`](../exec-plans/active/0022-web-ui.md) — approved
+2026-10-20 by `VERDICT-0022-plan` **PASS with 6 conditions**, active on
+`feat/0022-web-ui`. Scope: a native HTML/CSS/JS UI served by nginx
+(`nginx:1.27-alpine`) with a same-origin `/api`/`/health` reverse proxy; login/
+register, job list/filters, `rule_v1` match explanations, recommended view,
+detail with `apply_url`/`source_url` links, minimal resume setup (required by
+`POST /applications`), favourite and application status board. No P1, backend,
+schema, source or submission-path change. The `web` compose profile is opt-in;
+the Python stdlib static+proxy runner is the fallback for hosts without the
+nginx image. Verification: isolated compose smoke through the real nginx
+config (or Python fallback), `no_submission_path.py`, `innerHTML`/CDN/link
+checks, preflight, and one L4 at stage close.
+
+Implementation is committed at `2abbaa1`: `web/` + `docker/nginx/default.conf`
++ opt-in compose profile + `tools/dev/web-smoke.sh` / Python fallback +
+optional Firefox/geckodriver UI smoke + README/guide updates. Evidence:
+`web-smoke.sh` passed through both the Python fallback and a real nginx binary,
+including `BROWSER_SMOKE_OK` (login → resume → search/detail → favourite →
+status board) and isolated teardown (`WEB_SMOKE_TEARDOWN_OK`); L4 Debug/ASan/
+UBSan each **312/312** (one known review-backfill SKIP), Python 481 + 190 OK,
+backfill scratch 7 passed, 0 sanitizer diagnostics; preflight 7/0/1 and
+`git diff --check` rc=0. Closeout is pending review; no merge or 0023.
 
 ## Current Stage
 
@@ -728,7 +755,7 @@ Performance baseline:
 | Medium | Lever/Ashby company comes from configuration | Those APIs return no company name, so `company` falls back to config or the board token |
 | Medium | AI provider abstraction is not implemented yet | Core must remain functional without AI |
 | Medium | Ranking candidate set is capped at 2000 | Results expose `truncated=true` |
-| Low | No minimal end-user UI yet | Open-source demo remains API/CLI-first |
+| Low | Minimal Web UI is local-demo only | HTTP/localStorage, no production auth; no mobile/framework/build; see `docs/guides/local-demo.md` |
 
 ## Next Entry
 
@@ -801,8 +828,9 @@ Performance baseline:
     VERDICT-0021-closeout PASS with conditions; main `ci` `39378254785` and
     `image` `39378254777` are both green. The 0021 plan is archived under
     `completed/`. **0022 minimal Web UI** is the owner-selected next stage
-    (route B); its plan is under review, and no code or config change is made
-    before approval. Do not start implementation or touch P1.
+    (route B), approved by `VERDICT-0022-plan` and active on
+    `feat/0022-web-ui`; implementation is docs/UI/compose only and does not
+    touch P1. Do not start 0023 before the owner’s next instruction.
 
 Stage numbering (decided 2026-10-08). It supersedes older references inside the
 archived completed plans, which are historical evidence and are never rewritten:

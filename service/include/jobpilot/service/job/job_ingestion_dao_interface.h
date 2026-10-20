@@ -37,6 +37,12 @@ namespace jobpilot::service
         // that omits it preserves the stored value (COALESCE); it is never
         // cleared implicitly.
         std::optional<std::string> publishedAt;
+
+        // 0020. The actual application link when the source explicitly
+        // provides one. Optional and nullable; omitted never clears a stored
+        // value (COALESCE). Validated as an absolute http(s) URL of at most
+        // 512 characters at both write boundaries.
+        std::optional<std::string> applyUrl;
     };
 
     struct JobRequirementImportData

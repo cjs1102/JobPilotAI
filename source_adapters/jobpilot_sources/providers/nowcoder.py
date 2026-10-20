@@ -322,6 +322,14 @@ def _parse_row(
     if len(source_url.encode("utf-8")) > 255:
         raise _RowSkip("source_url_too_long", field="source_url")
 
+    row_data = row.get("data")
+    apply_url = first_present(
+        row.get("redirectExternalUrl"),
+        row_data.get("redirectExternalUrl")
+        if isinstance(row_data, Mapping)
+        else None,
+    )
+
     dedupe_key = (
         _fold(title),
         _fold(company_name),
@@ -352,6 +360,7 @@ def _parse_row(
         job_nature=job_nature,
         deadline=deadline,
         deadline_date_only=deadline_date_only,
+        apply_url=apply_url,
     )
 
 

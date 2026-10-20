@@ -81,6 +81,8 @@ namespace jobpilot::service
             const std::string &scope,
             const std::string &name,
             const std::optional<std::string> &publishedAt =
+                std::nullopt,
+            const std::optional<std::string> &applyUrl =
                 std::nullopt)
         {
             SourceObservationJob item;
@@ -95,6 +97,7 @@ namespace jobpilot::service
             item.job.sourceUrl = Url(scope, name);
             item.externalId = "ext-" + name;
             item.publishedAt = publishedAt;
+            item.job.applyUrl = applyUrl;
             item.requirements = {{"C++", 3}, {"Linux", 2}};
             return item;
         }
@@ -131,7 +134,7 @@ namespace jobpilot::service
             return pool->Query(
                 "SELECT id, status, source_status, missing_count, "
                 "closed_at, last_seen_at, last_verified_at, source_scope, "
-                "external_id, published_at "
+                "external_id, published_at, apply_url "
                 "FROM jobs WHERE source_url = ?",
                 {Url(scope, name)});
         }
@@ -164,7 +167,11 @@ namespace jobpilot::service
         SourceObservation observation =
             MakeObservation(scopeA, "2026-10-01 00:00:00");
         observation.jobs.push_back(
-            MakeObservedJob(scopeA, "one", "2026-09-20 08:00:00"));
+            MakeObservedJob(
+                scopeA,
+                "one",
+                "2026-09-20 08:00:00",
+                "https://example.invalid/apply/one"));
         observation.jobs.push_back(
             MakeObservedJob(scopeA, "two"));
 
@@ -187,12 +194,16 @@ namespace jobpilot::service
         EXPECT_EQ(Text(one, 0, 7), scopeA);
         EXPECT_EQ(Text(one, 0, 8), "ext-one");
         EXPECT_EQ(Text(one, 0, 9), "2026-09-20 08:00:00");
+        EXPECT_EQ(
+            Text(one, 0, 10),
+            "https://example.invalid/apply/one");
 
         const jobpilot::core::Result two = ReadJob(scopeA, "two");
 
         ASSERT_EQ(two.rowCount(), 1U);
         EXPECT_EQ(Text(two, 0, 2), "ok");
         EXPECT_TRUE(IsNull(two, 0, 9));
+        EXPECT_TRUE(IsNull(two, 0, 10));
 
         const jobpilot::core::Result requirements =
             pool->Query(
@@ -210,7 +221,12 @@ namespace jobpilot::service
     {
         SourceObservation first =
             MakeObservation(scopeA, "2026-10-01 00:00:00");
-        first.jobs.push_back(MakeObservedJob(scopeA, "one"));
+        first.jobs.push_back(
+            MakeObservedJob(
+                scopeA,
+                "one",
+                std::nullopt,
+                "https://example.invalid/apply/one"));
 
         const SourceObservationApplyResult created = Apply(first);
 
@@ -240,6 +256,10 @@ namespace jobpilot::service
         EXPECT_EQ(Text(one, 0, 2), "ok");
         EXPECT_EQ(Text(one, 0, 3), "0");
         EXPECT_EQ(Text(one, 0, 5), "2026-10-02 00:00:00");
+        // The second observation omitted apply_url; COALESCE preserves it.
+        EXPECT_EQ(
+            Text(one, 0, 10),
+            "https://example.invalid/apply/one");
     }
 
     TEST_F(SourceSyncDaoTest, CompleteAbsenceMarksMissingWithoutClosing)

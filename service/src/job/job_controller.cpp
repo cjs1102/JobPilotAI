@@ -764,6 +764,8 @@ namespace jobpilot::service
                  NullableString(summary.sourceStatus)},
                 {"source_url",
                  NullableString(summary.sourceUrl)},
+                {"apply_url",
+                 NullableString(summary.applyUrl)},
                 {"education_required",
                  NullableUnsigned(summary.educationRequired)},
                 {"experience_years_min",
@@ -1031,6 +1033,9 @@ namespace jobpilot::service
         data["source_url"] =
             NullableString(
                 result.value.sourceUrl);
+        data["apply_url"] =
+            NullableString(
+                result.value.summary.applyUrl);
         data["status"] =
             result.value.status;
 

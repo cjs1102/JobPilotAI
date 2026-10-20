@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import html
 import re
+import urllib.parse
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
@@ -26,6 +27,29 @@ _TAG_RE = re.compile(r"(?s)<[^>]+>")
 _BREAK_RE = re.compile(r"(?i)<br\s*/?>")
 _BLOCK_END_RE = re.compile(r"(?i)</(?:p|div|li|ul|ol|h[1-6]|tr|td)>")
 _WHITESPACE_RE = re.compile(r"[ \t\r\f\v]+")
+
+
+def _valid_apply_url(value: Any) -> str | None:
+    """Return an explicit absolute http(s) apply URL, or ``None``.
+
+    MySQL ``VARCHAR(512)`` counts characters, not bytes; Python ``len`` counts
+    code points, which matches that unit. Nothing is truncated or derived.
+    """
+
+    cleaned = clean_text(value)
+
+    if cleaned is None:
+        return None
+
+    parts = urllib.parse.urlsplit(cleaned)
+
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        return None
+
+    if len(cleaned) > 512:
+        return None
+
+    return cleaned
 
 
 def clean_text(value: Any) -> str | None:
@@ -177,6 +201,7 @@ def build_job(
     job_nature: Any = None,
     deadline: Any = None,
     deadline_date_only: Any = None,
+    apply_url: Any = None,
 ) -> dict[str, Any]:
     """Build the source-sync job object, omitting every unknown field.
 
@@ -206,6 +231,10 @@ def build_job(
         "location": clean_text(location),
         "description": description,
         "salary_currency": clean_text(salary_currency),
+        # 0020: only an explicit absolute http(s) URL of at most 512
+        # characters. Ambiguous values are omitted, never truncated or
+        # derived from source_url.
+        "apply_url": _valid_apply_url(apply_url),
     }
 
     for key, value in optional.items():

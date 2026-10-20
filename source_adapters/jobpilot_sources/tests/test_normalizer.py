@@ -169,6 +169,58 @@ class BuildJobTest(unittest.TestCase):
         self.assertEqual(job["salary_min"], 20)
         self.assertEqual(job["salary_max"], 35)
 
+    def test_apply_url_requires_absolute_http_and_character_cap(self) -> None:
+        valid = build_job(
+            source="lever",
+            source_url="https://example.invalid/5",
+            title="Backend",
+            company="Example",
+            apply_url="https://example.invalid/apply/5",
+        )
+        self.assertEqual(
+            valid["apply_url"], "https://example.invalid/apply/5"
+        )
+
+        for value in (
+            "javascript:alert(1)",
+            "data:text/plain,x",
+            "/relative/apply",
+            "ftp://example.invalid/apply",
+            "http://",
+            "http:///no-host",
+        ):
+            with self.subTest(value=value):
+                job = build_job(
+                    source="lever",
+                    source_url="https://example.invalid/6",
+                    title="Backend",
+                    company="Example",
+                    apply_url=value,
+                )
+                self.assertNotIn("apply_url", job)
+
+        prefix = "https://e.co/"
+        exactly_512 = prefix + ("x" * (512 - len(prefix)))
+        too_long = prefix + ("x" * (513 - len(prefix)))
+
+        accepted = build_job(
+            source="lever",
+            source_url="https://example.invalid/7",
+            title="Backend",
+            company="Example",
+            apply_url=exactly_512,
+        )
+        rejected = build_job(
+            source="lever",
+            source_url="https://example.invalid/8",
+            title="Backend",
+            company="Example",
+            apply_url=too_long,
+        )
+
+        self.assertEqual(accepted["apply_url"], exactly_512)
+        self.assertNotIn("apply_url", rejected)
+
     def test_negative_salary_is_dropped_not_fabricated(self) -> None:
         job = build_job(
             source="lever",

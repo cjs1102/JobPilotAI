@@ -54,6 +54,10 @@ tools/dev/demo-gate.sh                  # end-to-end gate: import -> search -> m
 - 简历：上传、分页列表、文本版本生成、版本列表。
 - 岗位读取：公开岗位搜索与分页、岗位详情与技能要求、`rule_v1` 确定性推荐排名
   （薪资格式/技能硬过滤、分数明细、稳定分页）。
+- 申请链接（0020）：列表、推荐、详情新增 `apply_url`（string|null）。仅当来源
+  **显式提供**时非空（Lever/Ashby 的 `applyUrl`、nowcoder 原生岗的
+  `redirectExternalUrl`）；Greenhouse 与 nowcoder 聚合岗为 `null`，不从
+  `source_url` 推导/拼接。
 - 投递：创建/列表/状态/统计，岗位与简历版本校验、重复投递保护、状态机。
 - 岗位导入（内部）：`POST /internal/jobs/import`，token 保护、`source_url` 幂等
   upsert、事务内整组替换技能要求，批次 `1..100`。

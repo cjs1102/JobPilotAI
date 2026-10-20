@@ -621,14 +621,18 @@ namespace jobpilot::service
                 "http-idempotent");
         sourceUrls.push_back(sourceUrl);
 
+        nlohmann::json createdJob =
+            MakeJobJson(sourceUrl, "Before");
+        createdJob["apply_url"] =
+            "https://example.invalid/apply/before";
+
         const auto created =
             SendRequest(
                 "POST",
                 "/internal/jobs/import",
                 nlohmann::json{
                     {"jobs",
-                     nlohmann::json::array(
-                         {MakeJobJson(sourceUrl, "Before")})}}
+                     nlohmann::json::array({createdJob})}}
                     .dump(),
                 internalToken);
 
@@ -665,6 +669,9 @@ namespace jobpilot::service
         EXPECT_EQ(
             detail->jsonBody["data"]["title"],
             "Before");
+        EXPECT_EQ(
+            detail->jsonBody["data"]["apply_url"],
+            "https://example.invalid/apply/before");
 
         nlohmann::json updatedJob =
             MakeJobJson(sourceUrl, "After");
@@ -708,6 +715,10 @@ namespace jobpilot::service
         EXPECT_EQ(
             updatedDetail->jsonBody["data"]["title"],
             "After");
+        // The update omitted apply_url; COALESCE preserves the stored value.
+        EXPECT_EQ(
+            updatedDetail->jsonBody["data"]["apply_url"],
+            "https://example.invalid/apply/before");
         EXPECT_EQ(
             updatedDetail->jsonBody["data"]["requirements"][0]
                                    ["skill"],
@@ -879,6 +890,72 @@ namespace jobpilot::service
         nonBooleanFlag["deadline"] = "2026-10-31 04:00:00";
         nonBooleanFlag["deadline_date_only"] = "yes";
         EXPECT_EQ(statusFor(nonBooleanFlag), 400);
+
+        nlohmann::json applyRelative = base;
+        applyRelative["source_url"] =
+            UniqueUrl("extra-apply-relative");
+        applyRelative["apply_url"] = "/relative/apply";
+        EXPECT_EQ(statusFor(applyRelative), 400);
+
+        nlohmann::json applyJavascript = base;
+        applyJavascript["source_url"] =
+            UniqueUrl("extra-apply-javascript");
+        applyJavascript["apply_url"] = "javascript:alert(1)";
+        EXPECT_EQ(statusFor(applyJavascript), 400);
+
+        nlohmann::json applyData = base;
+        applyData["source_url"] =
+            UniqueUrl("extra-apply-data");
+        applyData["apply_url"] = "data:text/plain,x";
+        EXPECT_EQ(statusFor(applyData), 400);
+
+        nlohmann::json applyNoHost = base;
+        applyNoHost["source_url"] =
+            UniqueUrl("extra-apply-no-host");
+        applyNoHost["apply_url"] = "http:///no-host";
+        EXPECT_EQ(statusFor(applyNoHost), 400);
+
+        nlohmann::json applyTooLong = base;
+        applyTooLong["source_url"] =
+            UniqueUrl("extra-apply-too-long");
+        applyTooLong["apply_url"] =
+            "https://e.co/" + std::string(500, 'x');
+        EXPECT_EQ(statusFor(applyTooLong), 400);
+
+        // One direct request pins the stable diagnostic code, not just 400.
+        nlohmann::json invalidApply = base;
+        const std::string invalidApplyUrl =
+            UniqueUrl("extra-apply-diagnostic");
+        sourceUrls.push_back(invalidApplyUrl);
+        invalidApply["source_url"] = invalidApplyUrl;
+        invalidApply["apply_url"] = "javascript:alert(1)";
+
+        const auto invalidApplyResponse =
+            SendRequest(
+                "POST",
+                "/internal/jobs/import",
+                nlohmann::json{
+                    {"jobs",
+                     nlohmann::json::array({invalidApply})}}
+                    .dump(),
+                internalToken);
+
+        ASSERT_TRUE(invalidApplyResponse.has_value());
+        ASSERT_TRUE(invalidApplyResponse->hasJson);
+        EXPECT_EQ(invalidApplyResponse->statusCode, 400);
+        EXPECT_EQ(
+            invalidApplyResponse->jsonBody["data"]["diagnostic"]["code"],
+            "apply_url_unusable");
+        EXPECT_EQ(
+            invalidApplyResponse->jsonBody["data"]["diagnostic"]["field"],
+            "apply_url");
+
+        nlohmann::json applyValid = base;
+        applyValid["source_url"] =
+            UniqueUrl("extra-apply-valid");
+        applyValid["apply_url"] =
+            "https://example.invalid/apply/valid";
+        EXPECT_EQ(statusFor(applyValid), 200);
 
         nlohmann::json dateOnlyValid = base;
         dateOnlyValid["source_url"] =

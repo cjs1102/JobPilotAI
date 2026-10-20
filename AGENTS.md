@@ -5,11 +5,12 @@
 C++17 Linux backend for an AI-assisted job application platform. `service/` is
 the canonical runnable entry; root CMake is the unified developer entry.
 
-Current phase: **0018 nowcoder campus source is active** (approved 2026-10-19,
-time-boxed 2–3 working days) — the first China source, a login-free SSR list with
-a bounded 20-row window and mandatory `complete=false`; see
-`docs/exec-plans/active/0018-nowcoder-campus-source.md`. The 0017 close-out below
-remains the most recent completed stage.
+Current phase: **0020 `apply_url` end to end is active** (plan approved by
+VERDICT-0020-plan, 2026-10-19) — a nullable `jobs.apply_url`, import/source-sync
+plumbing, public list/recommended/detail field, explicit-source-only extraction,
+and a CI-enforced additive upgrade test; see
+`docs/exec-plans/active/0020-apply-url.md`. 0018/0019 are complete and merged.
+The 0017 close-out below remains a historical completed stage.
 
 **0017 ops hardening and acceptance closure is complete and
 archived** (`docs/exec-plans/completed/0017-ops-hardening-and-acceptance-closure.md`)
@@ -32,8 +33,8 @@ nine 2-second-timeout HTTP cases went red; the harness now refuses to run when
 its `test_bcrypt` probe exceeds 14 s). CI after the change is green on every push
 and the `integration` job dropped from 5m21s to 1m16s–1m49s
 (`tools/dev/ci-status.sh`, plan §10.3).
-**0018 is the only active plan**; the recorded MVP roadmap is complete through
-packaging — 0013-0017 and the 0015A hardening are all archived under
+**0020 is the only active plan**; the recorded MVP roadmap is complete through
+packaging — 0013-0019 and the 0015A hardening are all archived under
 `docs/exec-plans/completed/`. Carried forward, not done:
 - 0014's Step 5 (first real China source) was **environment-limited** for the
   candidates it tested, but 0018 registered one compliant candidate, `nowcoder`

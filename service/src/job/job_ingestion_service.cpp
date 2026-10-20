@@ -13,6 +13,7 @@
 #include "jobpilot/database/mysql_pool.h"
 #include "jobpilot/service/job/job_extra_fields.h"
 #include "jobpilot/service/job/job_quality.h"
+#include "jobpilot/service/job/job_url.h"
 
 namespace jobpilot::service
 {
@@ -129,6 +130,12 @@ namespace jobpilot::service
                 job.salaryMax.has_value() &&
                 job.salaryMax.value() <
                     job.salaryMin.value())
+            {
+                return false;
+            }
+
+            if (job.applyUrl.has_value() &&
+                !IsValidApplyUrl(job.applyUrl.value()))
             {
                 return false;
             }
@@ -274,6 +281,16 @@ namespace jobpilot::service
                         "source_url_too_large",
                         "source_url",
                         "source_url exceeds 255 bytes");
+                }
+
+                if (job.applyUrl.has_value() &&
+                    !IsValidApplyUrl(job.applyUrl.value()))
+                {
+                    return reject(
+                        "apply_url_unusable",
+                        "apply_url",
+                        "apply_url must be an absolute http(s) URL "
+                        "of at most 512 characters");
                 }
 
                 if (!HasValueWithin(

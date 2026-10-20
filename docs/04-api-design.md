@@ -366,6 +366,7 @@ GET /api/v1/jobs
         "salary_max": 35,
         "source": "import",
         "source_url": "https://example.invalid/jobs/20001",
+        "apply_url": "https://example.invalid/apply/20001",
         "posted_at": "2026-09-20 08:00:00",
         "first_seen_at": "2026-09-21 10:00:00",
         "last_seen_at": "2026-10-08 12:00:00",
@@ -393,18 +394,21 @@ GET /api/v1/jobs
 **0015 阶段 B 增量契约（B0，全部可选、默认关闭）**
 
 **落地状态（避免文档与代码分歧）**：`with_match` 与 `strict` **均已落地**：
-- `with_match=true`：每行追加下表的匹配键；缺省时载荷与今天**逐字节一致**（有测试断言）；
+- `with_match=true`：每行追加下表的匹配键；缺省时**不追加这些匹配键**，且既有键
+  逐字节不变。0020 起基础载荷**始终**多一个 `apply_url` 键（见下），因此“与今天
+  逐字节一致”的旧表述专指 0015B 的匹配键，不再覆盖 0020 新增键；测试按此更新。
 - `strict=true`：在**与列表完全相同排序**的候选窗口上先排除 deal-breaker 行再分页，`total` 是
   **过滤后**可完整遍历的行数（不是未过滤的总数）；窗口受 `kMaxRankingCandidates = 2000` 封顶时，
   响应带 `"truncated": true`（未封顶或未使用 `strict` 时为 `false`），**绝不**返回与可遍历行数
   不一致的 `total`；
 - 两者都需要会话（解释/排除要用画像，与 `/recommended` 同规则；无 token → `401`）；
 - 两个参数只接受 `true|false`，其它值或重复出现 → `400`；
-- 使用 `strict=true` 时响应额外带 `truncated` 键（`with_match`/`strict` 都缺省时响应与今天完全一致）。
+- 使用 `strict=true` 时响应额外带 `truncated` 键（`with_match`/`strict` 都缺省时
+  不追加 0015B 匹配键；0020 的 `apply_url` 仍始终存在）。
 
 | 参数 | 默认 | 语义 |
 |---|---|---|
-| `with_match` | `false` | `false`：响应与今天**逐字节一致**（不出现下列任何键）。`true`：每个列表项追加 `score` / `score_version` / `matched_skills` / `missing_skills` / `reasons[]` / `deal_breakers[]` / `deadline_urgency` |
+| `with_match` | `false` | `false`：不出现下列任何匹配键；既有键逐字节不变，0020 的 `apply_url` 仍始终存在。`true`：每个列表项追加 `score` / `score_version` / `matched_skills` / `missing_skills` / `reasons[]` / `deal_breakers[]` / `deadline_urgency` |
 | `strict` | `false` | `false`（默认）：`deal_breakers[]` 只是**数据**，**不排除任何行**。`true`（显式 opt-in）：仅按文档化的 deal-breaker 码排除对应行；其它行不受影响 |
 
 - **权威声明（契约）**：`rule_v1` 是唯一权威的公开排序与分数来源；LLM/增强 worker 的结果
@@ -455,6 +459,14 @@ GET /api/v1/jobs
 - `source_url`：原始岗位链接（与 `GET /api/v1/jobs/{id}` 详情返回**同一个值**；
   没有值时返回 `null`，不返回空字符串）。列表因此不再需要为每一行再取一次详情才能
   打开原始岗位。该键同样出现在 `GET /api/v1/jobs/recommended` 的条目里。
+
+0020 增量（只新增一个响应键，既有键不变）：
+
+- `apply_url`：**实际申请链接**（string|null，**始终存在**）。与 `source_url` 的
+  区别：`source_url` 是原始公告/详情页；`apply_url` 是来源**显式提供**的申请入口。
+  没有显式值时为 `null`，**不从 `source_url` 推导/拼接**。只接受绝对 `http(s)`
+  URL，最大 **512 字符**（UTF-8 码点，与 `VARCHAR(512)` 一致），非法/超长不写入。
+  该键同样出现在 `/jobs/recommended` 与 `/jobs/{id}` 的响应里。
 - 0015A 的查询过滤/排序（`education_max` / `job_nature` / `deadline_before|after` /
   `open_only` / `sort`）已在 Step 6/3 落地，`docs/03` §9.2 的索引注记与本节同步
   （ExecPlan 0015A §5.6）。
@@ -529,6 +541,7 @@ GET /api/v1/jobs/{id}
       { "skill": "Redis", "level": 2 }
     ],
     "source_url": "https://...",
+    "apply_url": "https://.../apply",
     "created_at": "2026-08-09 10:00:00"
   }
 }
@@ -538,6 +551,7 @@ GET /api/v1/jobs/{id}
   `last_seen_at`、`last_verified_at`、`freshness`、`source_status`）。
 - 详情响应同样包含 5.1 的 0014 增量字段（`education_required`、
   `experience_years_min/max`、`job_nature`、`deadline`、`deadline_date_only`）。
+- 详情响应包含 0020 的 `apply_url`（string|null，始终存在），语义与 5.1 相同。
 
 ### 5.3 个性化岗位推荐
 
@@ -593,6 +607,8 @@ Authorization: Bearer <token>
 - 不调用 LLM 或 Embedding。
 - 可见性规则与 5.1 相同：默认排除 `closed` 与 `stale`，支持 `include_stale` /
   `posted_within_days`，响应条目同样带 `freshness` 等 0012 字段。
+- 推荐条目与 5.1 同形，因此也包含 `source_url` 与 0020 的 `apply_url`
+  （string|null，始终存在）。
 
 ### 5.4 岗位内部导入
 
@@ -621,6 +637,7 @@ X-Internal-Token: <environment secret>
       "description": "...",
       "source": "import",
       "source_url": "https://example.com/job/1",
+      "apply_url": "https://example.com/apply/1",
       "education_required": 3,
       "experience_years_min": 0,
       "experience_years_max": 3,
@@ -641,6 +658,12 @@ X-Internal-Token: <environment secret>
 `POST /internal/jobs/source-sync` 的 `published_at` 同形（没有 kind 标志）。它写入
 `jobs.published_at`，公开详情的 `posted_at` 即来自该列；请求省略该字段时不改写已有值
 （upsert 用 `COALESCE(VALUES(published_at), published_at)`，绝不隐式清空）。
+
+`apply_url` 为 0020 新增的**可选**字段：实际申请链接，空值或绝对 `http(s)` URL，
+最多 **512 字符**（UTF-8 码点）。它写入 `jobs.apply_url`，公开列表/推荐/详情的
+`apply_url` 即来自该列；省略时同样用
+`COALESCE(VALUES(apply_url), apply_url)`，不清空已有值。相对路径、`javascript:`、
+`data:` 或超过 512 字符的值使该 item 被拒绝并可诊断（绝不截断）。
 
 响应：
 
@@ -797,6 +820,9 @@ X-Internal-Token: <environment secret>
   `reject` 同样返回 `400` + `data.diagnostic{code,field,reason}` 且不写入任何行。
   判定在写库前完成：被拒绝的观测不会打开事务，因此也不会刷新 freshness 或关闭岗位。
   结构化适配器（`greenhouse`/`lever`/`ashby`/`nowcoder`）只可能命中硬缺陷码，见 `docs/03` §9.3。
+- 0020：job 对象与 5.4 同形，接受可选的 `apply_url`；校验与
+  `COALESCE(VALUES(apply_url), apply_url)` 语义同 5.4。provider 未拿到显式申请链接时
+  省略该键，服务端保留已有值。
 
 批量与完整性约束：
 

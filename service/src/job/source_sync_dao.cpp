@@ -129,14 +129,14 @@ namespace jobpilot::service
                 transaction.Execute(
                     "INSERT INTO jobs "
                     "(company, title, location, salary_min, salary_max, "
-                    "salary_currency, description, source, source_url, status, "
-                    "source_scope, external_id, published_at, "
+                    "salary_currency, description, source, source_url, apply_url, "
+                    "status, source_scope, external_id, published_at, "
                     "education_required, experience_years_min, "
                     "experience_years_max, job_nature, deadline, "
                     "deadline_date_only, "
                     "last_seen_at, last_verified_at, closed_at, "
                     "missing_count, source_status) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, "
                     "?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 'ok') "
                     "ON DUPLICATE KEY UPDATE "
                     "id = LAST_INSERT_ID(id), "
@@ -149,6 +149,7 @@ namespace jobpilot::service
                     "description = VALUES(description), "
                     "source = VALUES(source), "
                     "source_url = VALUES(source_url), "
+                    "apply_url = COALESCE(VALUES(apply_url), apply_url), "
                     "source_scope = VALUES(source_scope), "
                     "external_id = COALESCE(VALUES(external_id), external_id), "
                     "published_at = COALESCE(VALUES(published_at), published_at), "
@@ -178,6 +179,7 @@ namespace jobpilot::service
                      OptionalStringParam(job.description),
                      job.source,
                      job.sourceUrl,
+                     OptionalStringParam(job.applyUrl),
                      observation.sourceScope,
                      OptionalStringParam(item.externalId),
                      OptionalStringParam(item.publishedAt),

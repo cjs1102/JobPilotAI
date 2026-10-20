@@ -431,7 +431,7 @@ P3 MariaDB V8            [x] Dockerfile/CI 完成；新 image PR CI 待 owner（
 P4 TSan                  [x] 完成（52/52 + 17/17；CMake launcher 修复）
 P5 libbcrypt             [x] 完成（unresolved + SHA-256 manifest）
 P6 docs checker (opt)    [x] deferred（已批准）
-P7 benchmark             [x] 完成（matrix + microbench；原始日志）
+P7 benchmark             [x] 完成（独占重跑 00:38:57–00:48:41；matrix + microbench；原始日志）
 P8 closeout + L4         [x] L4 312/312 ×3；closeout 待评审
 ```
 

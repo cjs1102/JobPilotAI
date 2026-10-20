@@ -217,7 +217,10 @@ libbcrypt provenance, benchmark refresh, release-checklist/docs updates. No P1
 or business API change. Evidence so far: Python 3.12 lock install with
 `--require-hashes` and 481 + 190 suites OK; TSan 52/52 + 17/17 with no
 diagnostics (test-harness CMake launcher fix `3ea3bc5`); benchmark matrix and
-microbench refreshed in `docs/benchmarks/README.md` (raw `build/benchmarks-0023/`);
+microbench **exclusively re-run 2026-10-21 00:38:57–00:48:41** (health
+13.4–16.1k req/s, jobs 180–194 req/s; 2026-10-06 32.7k health historical, the
+~2.4× difference and environment/load caveats documented in
+`docs/benchmarks/README.md`; raw `build/benchmarks-0023-exclusive/`);
 L4 Debug/ASan/UBSan each **312/312** (one known review-backfill SKIP), scratch
 backfill 7 passed, 0 sanitizer diagnostics; libbcrypt upstream unresolved with
 SHA-256 manifest; new MariaDB image CI is pending the owner-created PR and is a

@@ -324,7 +324,7 @@ P0 计划 + 差异复核          [x] 完成（VERDICT-0021-plan PASS）
 P1 docs/03 DB-1/2/3         [x] 完成（13 表、ER、jobs 列/索引、两张表 DDL）
 P2 docs/04 API-1/2/3/4      [x] 完成（reserved、9 internal、dev-only /hello、计数）
 P3 handoff/index/state 注记 [x] 完成（dated corrections、DC-10、resolution note）
-P4 验证 + REQUEST           [ ] 进行中（原始输出 + closeout）
+P4 验证 + REQUEST           [x] 完成（schema/router 原始输出、preflight 7/0/1、diff check rc=0；closeout 待评审）
 ```
 
 ## 12. 批准后动作

@@ -3,7 +3,7 @@
 > 状态：**PLANNING（等待 VERDICT-0025-plan；批准前不改 README/图片/既有文档）**
 > 分支：`docs/0025-readme-and-usage`
 > 基线：`main@f788b06`（0023 merged；PR #6 `539202f`）
-> 类型：**docs-only，L0**；不改代码/API/schema/CI；不启动 0024。
+> 类型：**docs + developer demo tooling**（不碰 core/API/schema/CI）；L0 + shell smoke，不跑 L4；不启动 0024。
 
 ## 1. 背景
 
@@ -21,27 +21,30 @@ contract 表和内部运维细节。外部读者无法快速回答“这是什�
 
 1. 用**外部使用者视角**重写英文主 README，并附两张真实截图；中文另立
    `README.zh-CN.md`，语言切换链接，**不混合段**。
-2. Quick start 以 Docker Compose 为主路径（`.env` 两个密码 → compose up →
-   build backend → app profile → 8081），并写无 Docker Hub 时的
-   `web_static_proxy.py` 回退。
-3. 写清真实使用路径：采集/导入 → 搜索筛选 → 匹配解释 → 收藏/状态板 →
+2. 新增 `tools/dev/demo-up.sh`：Docker 检查 → 缺 `.env` 时随机生成密码 →
+   compose up → build backend → 启动 UI（nginx 不可用回退
+   `web_static_proxy.py`）→ 默认调用 seed → 打印访问地址。
+3. 新增 `tools/dev/demo-seed.sh` 与 `docs/examples/demo-jobs.json`：导入
+   10–20 条示例岗位（含 C++ 后端），首次打开即有内容，`source_url` 幂等。
+4. Quick Start 改成**一条命令启动**（`tools/dev/demo-up.sh`），并写无 Docker
+   Hub 时的回退说明。
+5. 写清真实使用路径：采集/导入 → 搜索筛选 → 匹配解释 → 收藏/状态板 →
    手动去原页面申请；明确本地 demo、无自动投递、数据不出本机。
-4. “What's included”按用户价值组织，不用 0014/0015/0022 等内部编号做标题。
-5. Verification 写 312 测试、ASan/UBSan/TSan、CI、benchmark **13.4k** 口径
+6. “What's included”按用户价值组织，不用 0014/0015/0022 等内部编号做标题。
+7. Verification 写 312 测试、ASan/UBSan/TSan、CI、benchmark **13.4k** 口径
    （含 4 vCPU 环境与“非阈值”说明）。
-6. Limits & non-goals 如实写：国内来源仅牛客、20 条/查询、聚合岗 apply_url
+8. Limits & non-goals 如实写：国内来源仅牛客、20 条/查询、聚合岗 apply_url
    未做、Moka 未验证、无通知/自动投递。
-7. 更新 docs index 与 project-state；写 closeout request。
+9. 更新 docs index 与 project-state；写 closeout request。
 
 ## 3. 非目标
 
-- 不改代码、API、schema、CI workflow、Dockerfile、benchmark 数据或
-  `docs/03`/`docs/04` 契约。
-- 不新增功能、来源、自动投递、通知或产品化内容。
+- 不改核心代码、API、schema、CI workflow、Dockerfile、benchmark 数据或
+  `docs/03`/`docs/04` 契约；两个脚本只放在 `tools/dev/`，不接入生产服务。
+- 不新增产品功能、来源、自动投递、通知或外部依赖。
 - 不重写历史文档/计划；不删除或修改 0022/0023 的 closeout 证据。
-- 不做中文全文的人工“润色到文学级”；只保证准确、独立、可维护。
-- 不提交真实个人数据；截图使用现有合成 data（`example.invalid`、demo 用户）。
-- docs-only，不跑 L4；只跑 L0/链接/静态检查。
+- 不提交真实个人数据；截图与 seed 数据使用合成 `example.invalid`/demo 用户。
+- 不跑 L4；脚本验证用 `bash -n` + isolated demo smoke + L0/链接检查。
 
 ## 4. 改动文件
 
@@ -51,6 +54,9 @@ contract 表和内部运维细节。外部读者无法快速回答“这是什�
 | `README.zh-CN.md` | 中文镜像；独立段落，不在英文 README 混排；顶部语言切换 |
 | `docs/images/web-detail.png` | 从 `/tmp/0022-browser-final/web-detail.png` 复制；配图注“详情页=可解释匹配” |
 | `docs/images/web-status.png` | 从 `/tmp/0022-browser-final/web-status.png` 复制；配图注“状态板=申请追踪” |
+| `tools/dev/demo-up.sh` | 一条命令启动：Docker 检查、缺 `.env` 随机生成密码、compose up、build backend、启动 UI（nginx 不可用回退 `web_static_proxy.py`）、默认 seed、打印 URL |
+| `tools/dev/demo-seed.sh` | 导入 10–20 条示例岗位（含 C++ 后端）；等待 backend、校验 created/updated/rejected/needs_review、`source_url` 幂等 |
+| `docs/examples/demo-jobs.json` | 12 条合成示例岗位；含 C++ 后端、Linux/MySQL、不同城市；`example.invalid` URL；部分带显式 apply_url |
 | `docs/PROJECT_DOCUMENTATION_INDEX.md` | README 描述、README.zh-CN、images 行；0025 active/closeout 行 |
 | `docs/ai/project-state.md` | 0025 active/completed；docs-only L0 证据；语言/截图说明 |
 | `docs/exec-plans/active/0025-readme-and-usage.md` | 本计划 |
@@ -106,7 +112,56 @@ contract 表和内部运维细节。外部读者无法快速回答“这是什�
 switch (`English | 简体中文`). No paragraph mixes English and Chinese beyond
 code/identifiers/URLs.
 
-## 6. Acceptance / verification commands
+## 6. Demo scripts (developer tooling, no core changes)
+
+### `tools/dev/demo-up.sh`
+
+- Check `docker`, `docker compose`, `curl`, `python3`; fail with a clear message.
+- `DEMO_ENV_FILE` default `.env`. If missing, generate a new file with
+  `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, `INTERNAL_API_TOKEN` using
+  `openssl rand -hex 24` (fallback: Python `secrets.token_hex(24)`), plus the
+  existing compose defaults. Never print the secret values; preserve an
+  existing `.env` byte-for-byte.
+- Start the isolated/default compose stack with optional overrides:
+  `DEMO_PROJECT` (default `jobpilot-demo`), `DEMO_API_PORT` (18080),
+  `DEMO_WEB_PORT` (18081), `DEMO_MYSQL_PORT` (13306), `DEMO_REDIS_PORT`
+  (16379), `DEMO_BACKEND_IMAGE` (default local image). `docker compose up -d`
+  MySQL/Redis, build the backend, then start `--profile app`.
+- Try the `web` profile (nginx). If the image is unavailable or the service
+  fails, start `python3 tools/dev/web_static_proxy.py --root web --port
+  "$DEMO_WEB_PORT" --backend "http://127.0.0.1:$DEMO_API_PORT"` in the
+  background (PID/log under `build/`), wait for `/` and `/health`, and print the
+  fallback URL.
+- Unless `--no-seed` is passed, run `tools/dev/demo-seed.sh` after the backend
+  is healthy; print `DEMO_READY url=http://127.0.0.1:<port>` and the `.env`
+  path, never passwords. A failed seed fails the command.
+- `--no-seed` exists for tests/advanced users; the README’s one-command Quick
+  Start uses the default (seed included).
+
+### `tools/dev/demo-seed.sh`
+
+- Source `DEMO_ENV_FILE`/`.env` read-only; require `INTERNAL_API_TOKEN`.
+- Wait for `http://127.0.0.1:${DEMO_API_PORT:-8080}/health`.
+- Import `docs/examples/demo-jobs.json` (12 synthetic jobs, including C++
+  backend roles) through `POST /internal/jobs/import` with the internal token;
+  batch size 1–100; no database writes outside the API.
+- `source_url` is the existing idempotency key, so re-running updates rather
+  than duplicating. Validate `created + updated <= total`, `rejected == 0`,
+  `needs_review == 0`; print `DEMO_SEED_OK total=<n> created=<n> updated=<n>`.
+- Never print the token or password; non-zero exit on any failed assertion.
+
+### One-command README Quick Start
+
+```bash
+./tools/dev/demo-up.sh
+# open the printed http://127.0.0.1:<port>
+# reseed later: ./tools/dev/demo-seed.sh
+```
+
+The no-Docker-Hub fallback is automatic inside `demo-up.sh`; the README still
+documents the explicit `web_static_proxy.py` command for advanced users.
+
+## 7. Acceptance / verification commands
 
 ```bash
 git check-ignore -v docs/images/web-detail.png docs/images/web-status.png || true
@@ -126,6 +181,29 @@ print('README_LINKS_AND_HEADINGS_OK')
 PY
 grep -nE '^#{1,6} .*(0014|0015|0022|0023)' README.md README.zh-CN.md && exit 1 || true
 grep -nE '\b00(1[0-9]|2[0-9])\b' README.md README.zh-CN.md && exit 1 || true
+bash -n tools/dev/demo-up.sh tools/dev/demo-seed.sh
+python3 -m json.tool docs/examples/demo-jobs.json >/dev/null
+python3 - <<'PY'
+import json
+jobs=json.load(open('docs/examples/demo-jobs.json'))['jobs']
+assert 10 <= len(jobs) <= 20, len(jobs)
+assert any('C++' in j.get('title','') for j in jobs)
+assert len({j['source_url'] for j in jobs}) == len(jobs)
+print('DEMO_FIXTURE_OK', len(jobs))
+PY
+# isolated script smoke (override ports/project/env; backend image may be local)
+DEMO_PROJECT=jobpilot-demo-0025 \
+DEMO_ENV_FILE=/tmp/jobpilot-demo-0025.env \
+DEMO_API_PORT=18180 DEMO_WEB_PORT=18181 \
+DEMO_MYSQL_PORT=13326 DEMO_REDIS_PORT=16399 \
+DEMO_BACKEND_IMAGE=jobpilot-backend:verify \
+  tools/dev/demo-up.sh
+curl -fsS http://127.0.0.1:18181/ >/dev/null
+curl -fsS 'http://127.0.0.1:18181/api/v1/jobs?page=1&page_size=20' >/dev/null
+DEMO_PROJECT=jobpilot-demo-0025 DEMO_ENV_FILE=/tmp/jobpilot-demo-0025.env \
+DEMO_API_PORT=18180 DEMO_WEB_PORT=18181 tools/dev/demo-seed.sh
+# teardown the isolated project explicitly (scripts do not remove data volumes)
+docker compose -p jobpilot-demo-0025 down -v
 python3 tools/checks/release_preflight.py      # links; 7/0/1 without actionlint
 git diff --check
 ```
@@ -133,9 +211,9 @@ git diff --check
 - Manually read both READMEs for language separation and no unverifiable claims.
 - Verify screenshot captions mention detail=match and status=tracking.
 - Verify no token/password/personal email/home path/RFC1918 values.
-- **L0**: no L1–L5/L4; docs-only.
+- **L0 + shell smoke**: no L1–L5/L4; scripts are developer tooling, not core code.
 
-## 7. Rollback
+## 8. Rollback
 
 - `git revert` the 0025 docs commit; remove `docs/images/` and
   `README.zh-CN.md` if the commit is not yet merged.
@@ -143,7 +221,7 @@ git diff --check
 - Do not rewrite history/force-push; owner merges via PR; ruleset blocks direct
   main pushes.
 
-## 8. Open questions / decisions
+## 9. Open questions / decisions
 
 1. **Bilingual**: plan chooses English `README.md` + Chinese `README.zh-CN.md`
    (separate), since the user explicitly allowed this and the current README
@@ -156,13 +234,27 @@ git diff --check
    current expectation.
 4. **No stage IDs in README**: remove all 00xx references, including body text;
    internal details stay in docs/exec-plans and project-state.
+5. **One command**: `demo-up.sh` seeds by default, so the README Quick Start is
+   one command; `--no-seed` is the opt-out for advanced/test use. Is that the
+   desired default?
+6. **Passwords**: when `.env` is missing, generate random MySQL/root and
+   internal-token values, write them only to the gitignored `.env`, and never
+   print them. Existing `.env` is preserved byte-for-byte.
+7. **Fallback UI lifecycle**: if nginx is unavailable, `demo-up.sh` starts the
+   Python proxy in the background under `build/` and prints its PID/log path;
+   no automatic `down`, so the user can browse. A separate cleanup command is
+   documented. Acceptable?
+8. **Seed fixture**: 12 synthetic jobs (C++ backend/Linux/MySQL, multiple
+   cities, some explicit `apply_url` on `example.invalid`) are enough for a
+   first-open demo; no real data.
 
-## 9. Progress
+## 10. Progress
 
 ```text
 P0 plan + REQUEST       [x] 本文件；等待 VERDICT-0025-plan
-P1 screenshots + README [ ] 未开始
-P2 README.zh-CN         [ ] 未开始
-P3 index/state          [ ] 未开始
-P4 L0 checks + closeout [ ] 未开始
+P1 demo scripts + seed fixture [ ] 未开始
+P2 screenshots + README + one-command Quick Start [ ] 未开始
+P3 README.zh-CN         [ ] 未开始
+P4 index/state          [ ] 未开始
+P5 L0 + shell smoke + closeout [ ] 未开始
 ```

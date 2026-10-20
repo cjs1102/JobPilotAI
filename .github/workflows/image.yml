@@ -43,5 +43,17 @@ jobs:
       - name: Build the committed image
         run: docker compose --profile app build backend
 
+      # V8: the runtime image must carry MariaDB Connector/C, not Oracle's
+      # libmysqlclient. This is a fact about the built image, not a legal
+      # conclusion; the demo gate below still exercises the real MySQL 8 server.
+      - name: Verify the MariaDB client linkage
+        run: |
+          docker run --rm --entrypoint sh "${JOBPILOT_BACKEND_IMAGE:-jobpilot-backend:local}" -c '
+            set -eu
+            ldd build/presets/release/service/jobpilot_service | grep -q "libmariadb.so.3"
+            ! ldd build/presets/release/service/jobpilot_service | grep -q "libmysqlclient"
+            echo "MARIA_DB_LINK_OK"
+          '
+
       - name: Run the gate against that image
         run: tools/dev/demo-gate.sh

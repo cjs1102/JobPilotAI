@@ -17,6 +17,9 @@ live. It does not restate licence texts that the packages themselves carry.
 Both identifications, and the note that the full licence text stays embedded in
 the source headers, come from
 [`third_party/libbcrypt/PROVENANCE.md`](third_party/libbcrypt/PROVENANCE.md).
+That file also records the 2026-10-20 upstream-resolution attempt (GitHub/TLS
+unavailable from the development host), the explicit “upstream revision
+unresolved” status, and the SHA-256 manifest of the vendored sources.
 
 ## C++ dependencies (Conan)
 
@@ -35,41 +38,32 @@ build bootstraps, so none of them is vendored into this repository.
 
 One dependency is not from Conan: the MySQL **client** library, provided by the
 distribution. The committed `Dockerfile` builds on `ubuntu:24.04` with
-`libmysqlclient-dev` and installs `libmysqlclient21` at run time, i.e. Oracle's
-client (MySQL 8.0.46 where this was checked). **Its licence is GPLv2 with Oracle's
-"FOSS License Exception"** — the distribution package ships that text in
-`/usr/share/doc/libmysqlclient21/copyright` (`License: GPL-2+` for the library
-files; the exception is quoted in its first 25 lines). That is the one term in
-this file of a different kind, so it is named explicitly: the `service/` binary
-and any image built from `Dockerfile` link it and are a combined work with it,
-which is a distribution decision the maintainer has to make.
+`libmariadb-dev` + `libmariadb-dev-compat` and installs `libmariadb3` at run
+time (MariaDB Connector/C). The project needs no source change: CMake resolves
+the same `mysqlclient` pkg-config name through the compat package, and the
+binary carries `NEEDED libmariadb.so.3` (dynamic linking).
 
-**The evaluated alternative is MariaDB Connector/C** (`libmariadb-dev` +
-`libmariadb-dev-compat` to build, `libmariadb3` at run time), whose *client
-library* is **LGPL-2.1-or-later**: the package's own copyright file assigns
-`Files: libmariadb/*` to `License: LGPL-2+`, while the GPL-2 stanzas in that same
-file cover the MariaDB *server* files. The project needs no source change for it —
-CMake resolves the same `mysqlclient` pkg-config name to MariaDB Connector/C
-3.3.19 through the compat package, the binary then carries
-`NEEDED libmariadb.so.3` (dynamic linking, which is the relink condition LGPL-2.1
-asks for), and the Debian-based verification images that contain only
-`libmariadb3` have already passed the real-capture acceptance and the demo gate
-against MySQL 8.0. Switching the committed `Dockerfile` and the CI package lines
-is prepared and recorded in `docs/RELEASE_CHECKLIST.md` §2; a dependency change is
-applied only together with the compatibility evidence recorded there, and none of
-this is a legal conclusion — the maintainer decides.
+The MariaDB Connector/C *client library* is **LGPL-2.1-or-later**: the package's
+own copyright file assigns `Files: libmariadb/*` to `License: LGPL-2+`, while
+the GPL-2 stanzas in that same file cover the MariaDB *server* files. The image
+workflow asserts the `libmariadb.so.3` linkage and the absence of
+`libmysqlclient`, then runs the demo gate against MySQL 8.0. The previous Oracle
+`libmysqlclient21` evidence remains in the release history; it is no longer the
+shipped image. This is a factual provenance/linkage note, **not a legal
+conclusion**; the maintainer decides distribution compliance.
 
 ## Python dependencies
 
 - [`source_adapters/pyproject.toml`](source_adapters/pyproject.toml) and
   [`ai_worker/pyproject.toml`](ai_worker/pyproject.toml) depend on PyYAML (MIT —
-  see the upstream `LICENSE`).
+  see the upstream `LICENSE`). The two per-package `requirements.lock` files pin
+  the exact version and hashes; CI installs them with `--require-hashes`.
 - Everything under [`tools/`](tools/) uses the Python standard library only.
 
 ## Container images
 
-[`docker-compose.yml`](docker-compose.yml) references the official `mysql:8.0`
-and `redis:7` images. They run as separate services and are not linked into this
-codebase; each carries its own licence, and both projects have changed their
-terms across versions, so read the licence that ships with the image tag you
-pin.
+[`docker-compose.yml`](docker-compose.yml) references the official `mysql:8.0`,
+`redis:7` and (opt-in `web` profile) `nginx:1.27-alpine` images. They run as
+separate services and are not linked into this codebase; each carries its own
+licence, and these projects have changed their terms across versions, so read
+the licence that ships with the image tag you pin.

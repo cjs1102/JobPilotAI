@@ -18,7 +18,8 @@ RUN apt-get update \
         build-essential \
         ca-certificates \
         cmake \
-        libmysqlclient-dev \
+        libmariadb-dev \
+        libmariadb-dev-compat \
         pkg-config \
         python3 \
         python3-pip \
@@ -51,13 +52,15 @@ FROM ubuntu:24.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# libmysqlclient21 is the only non-system library the binary links (the Conan
-# dependencies are linked statically); apt pulls its own dependencies.
+# libmariadb3 is the only non-system library the binary links (the Conan
+# dependencies are linked statically); apt pulls its own dependencies. The
+# MariaDB Connector/C client library is LGPL-2.1-or-later and is linked
+# dynamically; see THIRD_PARTY_NOTICES.md for the factual provenance note.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        libmysqlclient21 \
+        libmariadb3 \
     && rm -rf /var/lib/apt/lists/*
 
 # The documented run command starts the service from the repository root: the

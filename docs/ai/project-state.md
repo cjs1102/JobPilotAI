@@ -29,17 +29,19 @@
 > old personal access token are owner actions listed in
 > [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-> **2026-10-20 update — 0019, 0020 and 0021 merged.** The Claude Code takeover
+> **2026-10-20 update — 0019–0022 merged.** The Claude Code takeover
 > verification is recorded in [`CURRENT_STATE.md`](CURRENT_STATE.md). 0018
 > (`nowcoder`) merged at `cc9b333` (PR #1); 0019 (ATS live smoke + sanitizer
 > timeout) merged at `0c24c45` (PR #2) after VERDICT-0019 PASS with conditions;
 > 0020 (`apply_url` end to end) merged at `c07c35a` (PR #3, merge commit) after
 > VERDICT-0020-closeout PASS with conditions; 0021 (docs/03–04 reconciliation)
 > merged at `d75b14e` (PR #4, merge commit) after VERDICT-0021-closeout PASS
-> with conditions. See `## Completed Plan (0020)` and
-> `## Completed Plan (0021)`.
-> Main CI after the 0021 merge: `ci` `39378254785` (5m52s; build 4m21s +
-> suite 1m24s) and `image` `39378254777` (2m32s; container 2m28s), both
+> with conditions; 0022 (minimal local Web UI) merged at `38bd484` (PR #5,
+> merge commit) after VERDICT-0022-closeout PASS with conditions. See
+> `## Completed Plan (0020)`, `## Completed Plan (0021)` and
+> `## Completed Plan (0022)`.
+> Main CI after the 0022 merge: `ci` `39446877179` (5m58s; build 4m26s +
+> suite 1m24s) and `image` `39446876743` (2m58s; container 2m53s), both
 > **completed/success**. The 0019 ASan
 > re-run is **312/312** with 0 sanitizer diagnostics (one isolated
 > review-backfill SKIP); L4 Debug/ASan/UBSan each **312/312**. The 2026-10-19
@@ -47,9 +49,9 @@
 > historical/unverified and is **not** a constant or a coverage promise.
 > TSan is not covered. See `## Completed Plan (0018)` and
 > `## Completed Plan (0019)`.
-> Next stage: **0022 minimal Web UI** (owner route B), approved 2026-10-20 by
-> `VERDICT-0022-plan` PASS with 6 implementation conditions. It is active on
-> `feat/0022-web-ui`; see `## Active Plan (0022)`. No P1/backend/schema change.
+> Next stage: **0023 release readiness** (owner roadmap; 0024 remains owner-only
+> publication). Its plan is under review; no code/config change before
+> `VERDICT-0023-plan`. A history disclosure remains accepted/no-rewrite.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -173,11 +175,12 @@ migration, API behavior or CI change; no L4 and no reuse of 0020 test evidence.
 Conditions: DB-4/H-2 (`user_skills`) deferred; permanent docs checker is a
 follow-up candidate; next stage is owner-specified.
 
-## Active Plan (0022)
+## Completed Plan (0022)
 
-[`active/0022-web-ui.md`](../exec-plans/active/0022-web-ui.md) — approved
-2026-10-20 by `VERDICT-0022-plan` **PASS with 6 conditions**, active on
-`feat/0022-web-ui`. Scope: a native HTML/CSS/JS UI served by nginx
+[`completed/0022-web-ui.md`](../exec-plans/completed/0022-web-ui.md) —
+**merged at `38bd484` via PR #5 (merge commit) after VERDICT-0022-closeout PASS
+with conditions**. Final head `bab3ece`; code head `2abbaa1`. Scope: a native
+HTML/CSS/JS UI served by nginx
 (`nginx:1.27-alpine`) with a same-origin `/api`/`/health` reverse proxy; login/
 register, job list/filters, `rule_v1` match explanations, recommended view,
 detail with `apply_url`/`source_url` links, minimal resume setup (required by
@@ -196,7 +199,12 @@ including `BROWSER_SMOKE_OK` (login → resume → search/detail → favourite �
 status board) and isolated teardown (`WEB_SMOKE_TEARDOWN_OK`); L4 Debug/ASan/
 UBSan each **312/312** (one known review-backfill SKIP), Python 481 + 190 OK,
 backfill scratch 7 passed, 0 sanitizer diagnostics; preflight 7/0/1 and
-`git diff --check` rc=0. Closeout is pending review; no merge or 0023.
+`git diff --check` rc=0. PR CI `ci` `39445774298` (6m19s) included the new
+`Web UI smoke (Python fallback)` step as success; `image` `39445774360` was
+green (2m40s). Main CI after the merge: `ci` `39446877179` (5m58s; build 4m26s
++ suite 1m24s) and `image` `39446876743` (2m58s; container 2m53s), both green.
+Conditions: nginx container path remains environment-limited (digest recorded;
+1.24.0 binary + Firefox UI smoke used); next stage is owner-specified 0023.
 
 ## Current Stage
 
@@ -827,10 +835,14 @@ Performance baseline:
 12. **0021 is merged** at `d75b14e` (PR #4, merge commit) after
     VERDICT-0021-closeout PASS with conditions; main `ci` `39378254785` and
     `image` `39378254777` are both green. The 0021 plan is archived under
-    `completed/`. **0022 minimal Web UI** is the owner-selected next stage
-    (route B), approved by `VERDICT-0022-plan` and active on
-    `feat/0022-web-ui`; implementation is docs/UI/compose only and does not
-    touch P1. Do not start 0023 before the owner’s next instruction.
+    `completed/`.
+13. **0022 is merged** at `38bd484` (PR #5, merge commit) after
+    VERDICT-0022-closeout PASS with conditions; main `ci` `39446877179` and
+    `image` `39446876743` are both green, and the PR CI `Web UI smoke
+    (Python fallback)` step is green (`39445774298`). The 0022 plan is archived
+    under `completed/`. **0023 release readiness** is the owner-selected next
+    stage; its plan is under review. 0024 remains owner-only publication. Do
+    not start 0023 implementation or 0024 before the owner’s next instruction.
 
 Stage numbering (decided 2026-10-08). It supersedes older references inside the
 archived completed plans, which are historical evidence and are never rewritten:

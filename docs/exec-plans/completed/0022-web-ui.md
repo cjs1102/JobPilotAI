@@ -1,7 +1,8 @@
 # ExecPlan 0022 — 最小 Web UI（本地 demo）
 
-> 状态：**ACTIVE（2026-10-20 批准；VERDICT-0022-plan PASS 附 6 条条件）**
+> 状态：**COMPLETED（2026-10-20 合并；VERDICT-0022-closeout PASS 附条件）**
 > 分支：`feat/0022-web-ui`
+> 合并：`38bd484`（PR #5 merge commit）；最终 head `bab3ece`；代码 head `2abbaa1`
 > 基线：`main@70810ca`（0021 post-merge 状态提交；父提交 `d75b14e` 为 PR #4 merge）
 > 时间盒：2–3 个工作日；代码/配置/文档。
 > 批准记录：简历前置/详情 match/nginx 固定 tag/localStorage/截图/L4 六项决议；
@@ -530,7 +531,7 @@ P3 列表/筛选/匹配           [x] 完成（jobs.js + 筛选/分页/match）
 P4 详情/简历/收藏           [x] 完成（detail + resume prerequisite + favourite）
 P5 状态板                   [x] 完成（applications.js + 状态推进/拒绝）
 P6 文档/截图步骤            [x] 完成（README + local-demo + index/project-state）
-P7 smoke + L4 + closeout    [x] 验证完成（nginx/Python/Firefox smoke、L4 312/312 ×3、preflight 7/0/1）；closeout 待评审
+P7 smoke + L4 + closeout    [x] 完成（nginx/Python/Firefox smoke、L4 312/312 ×3、preflight 7/0/1；closeout PASS，PR #5 合并 `38bd484`）
 ```
 
 ## 12. 批准后动作

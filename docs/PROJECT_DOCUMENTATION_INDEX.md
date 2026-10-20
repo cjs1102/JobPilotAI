@@ -35,7 +35,9 @@ Status vocabulary used below:
 | `README.md` | Project README | What the project is, English Quick Start, current capabilities, explicit non-goals, contracts (F13/F14), build/verify commands | Everyone, first file to read | `CURRENT` | whole repo |
 | `AGENTS.md` | Project Guide | Hard constraints (dependency direction, P1 freeze, secrets, JSON/SQL/RAII rules), task routing, verification policy | Every agent/contributor | `CURRENT` | whole repo |
 | `.agents/skills/jobpilot-reactor-review/SKILL.md` | Reactor review skill | Mandatory checklist before touching `backend/{include,src}/jobpilot/{network,http}/` | Anyone changing the network layer | `CURRENT` | `backend/src/network`, `backend/src/http` |
-| `THIRD_PARTY_NOTICES.md` | Third-party notices | Licence of every dependency, verified from the pinned package; the MySQL client question | Maintainer, release reviewer | `CURRENT` | `service/conanfile.txt`, `third_party/`, `Dockerfile` |
+| `SECURITY.md` | Security policy | Supported versions, private reporting, local-demo boundaries, no-secrets policy, A history disclosure (facts only) | Everyone, release reviewer | `CURRENT` (2026-10-20) | `tools/checks/` |
+| `CONTRIBUTING.md` | Contribution guide | Setup, Python lock, branch/PR/review flow, P1 freeze, verification and non-goals | Contributors, agents | `CURRENT` (2026-10-20) | whole repo |
+| `THIRD_PARTY_NOTICES.md` | Third-party notices | Licence of every dependency, verified from the pinned package; MariaDB client and libbcrypt provenance | Maintainer, release reviewer | `CURRENT` | `service/conanfile.txt`, `third_party/`, `Dockerfile` |
 | `LICENSE` | MIT licence | The licence the repository ships | Everyone | `CURRENT` | — |
 | `docs/README.md` | Documentation map | Reading order and the historical/current split | Everyone | `CURRENT` | — |
 
@@ -45,7 +47,7 @@ Status vocabulary used below:
 |---|---|---|---|---|---|
 | `docs/ai/README.md` | AI context router | Which document to read for which task; diff-first reading policy | Agents | `CURRENT` | — |
 | `docs/ai/agent-workflow.md` | Agent workflow and verification rules | Verification levels L1–L5, when a suite may run, harness prerequisites, one review per stage | Agents | `CURRENT` | `build/l4-0017/` (scratch harness) |
-| `docs/ai/project-state.md` | Current project state (929 lines) | Stage-by-stage state, carried-forward items, what is genuinely open | Agents, maintainer | `CURRENT` (updated 2026-10-20) | whole repo |
+| `docs/ai/project-state.md` | Current project state (950 lines) | Stage-by-stage state, carried-forward items, what is genuinely open | Agents, maintainer | `CURRENT` (updated 2026-10-21) | whole repo |
 | `docs/ai/CURRENT_STATE.md` | Handoff verification report (2026-10-19) | Git/CI facts, §23 fact checklist, document-code conflicts, capability-matrix update; 2026-10-20 resolution note | Agents, maintainer, release reviewer | `CURRENT` (dated 2026-10-19; point-in-time report plus dated resolution note) | whole repo |
 | `docs/ai/archive/next-phase-plan-2026-10.md` | Archived next-phase plan | An earlier plan sketch; kept for context | Agents | `REFERENCE` (archived) | — |
 | `docs/ai/references/github_resources.md` | GitHub resource research | 655-line survey used for the open-source plan | Maintainer | `REFERENCE` | — |
@@ -100,6 +102,7 @@ Status vocabulary used below:
 | `docs/exec-plans/completed/0020-apply-url.md` | Completed plan 0020 | Nullable `jobs.apply_url`, import/source-sync/API plumbing, explicit-source-only extraction, additive upgrade + CI forward/backward test; merged at `c07c35a` after VERDICT PASS with conditions | Agents, maintainer | `COMPLETED` (2026-10-20) | `database/`, `service/`, `source_adapters/`, `tools/checks/` |
 | `docs/exec-plans/completed/0021-docs-reconciliation.md` | Completed plan 0021 | `docs/03`–`docs/04` reconciliation of DB-1/2/3 and API-1/2/3/4; dated handoff corrections; docs-only L0; merged at `d75b14e` after VERDICT-0021-closeout PASS | Agents, maintainer | `COMPLETED` (2026-10-20) | `docs/03`, `docs/04`, `docs/CLAUDE_CODE_HANDOFF.md` |
 | `docs/exec-plans/completed/0022-web-ui.md` | Completed plan 0022 | Minimal native Web UI: nginx static + same-origin proxy, auth, jobs/filter/match, detail/apply links, resume prerequisite, favourite and status board; Python fallback + Firefox smoke; merged at `38bd484` | Agents, maintainer | `COMPLETED` (2026-10-20) | `web/`, `docker/nginx/`, `tools/dev/web-smoke.sh` |
+| `docs/exec-plans/active/0023-release-readiness.md` | Active plan 0023 | Release readiness: security/contributing docs, Python locks, MariaDB client image, TSan first run, libbcrypt provenance, benchmark refresh, release-checklist state | Agents, maintainer, release reviewer | `ACTIVE` (2026-10-21, `feat/0023-release-readiness`) | `SECURITY.md`, `CONTRIBUTING.md`, `Dockerfile`, `backend/benchmarks/` |
 | `docs/exec-plans/completed/0001…0017A` | 20 archived plans | The history of every stage, each with its evidence, decisions and L4 results. Notable: `0014` (China sources + manual capture, 1264 lines), `0015`/`0015A` (tailoring, explainable matching, quality gate), `0016` (packaging, demo gate), `0017` (ops hardening, L4), `0017A` (the `published_at` contract gap) | Agents needing the "why" | `HISTORICAL` by definition, but each is the **authority for its stage's decisions** | the module named in each plan |
 
 ## 7. Ingestion, sources and tools

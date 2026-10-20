@@ -45,6 +45,13 @@ tools/dev/demo-gate.sh                  # end-to-end gate: import -> search -> m
   under [`docs/exec-plans/`](docs/exec-plans/); [`docs/README.md`](docs/README.md)
   is a short reading order.
 
+## Community
+
+- Security policy and private reporting: [`SECURITY.md`](SECURITY.md).
+- Build, test, PR and review workflow: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Code of Conduct is deferred until a reporting channel is available; see
+  `CONTRIBUTING.md`.
+
 ## 最小 Web UI（0022）
 
 `web/` is a native HTML/CSS/JS UI with no build step. The optional `web` compose

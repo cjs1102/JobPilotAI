@@ -168,7 +168,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake libmysqlclient-dev default-mysql-client python3 curl
+            cmake libmysqlclient-dev default-mysql-client python3 python3-venv curl
 
       # 0017-A. The tar round trip restores the tree with the permissions it was
       # built with. The test binaries link their Conan dependencies statically,
@@ -235,10 +235,20 @@ jobs:
             --test-dir build/presets/release \
             --map docs/quality/test-merge-map.json
 
+      # 0023: install the exact, hash-pinned Python dependencies instead of
+      # relying on whatever PyYAML the runner image happens to provide.
+      - name: Install locked Python dependencies
+        run: |
+          python3 -m venv /tmp/jobpilot-py
+          /tmp/jobpilot-py/bin/pip install --quiet --require-hashes \
+            -r source_adapters/requirements.lock
+          /tmp/jobpilot-py/bin/pip install --quiet --require-hashes \
+            -r ai_worker/requirements.lock
+
       - name: Python suites
         run: |
-          (cd source_adapters && python3 -m unittest discover -s jobpilot_sources/tests -t .)
-          (cd ai_worker && python3 -m unittest discover -s jobpilot_ai/tests -t .)
+          (cd source_adapters && /tmp/jobpilot-py/bin/python -m unittest discover -s jobpilot_sources/tests -t .)
+          (cd ai_worker && /tmp/jobpilot-py/bin/python -m unittest discover -s jobpilot_ai/tests -t .)
 
       # 0022. The Web UI's static page, same-origin proxy and the full
       # register -> resume -> import -> search/detail -> favourite -> status

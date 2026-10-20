@@ -8,6 +8,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 enable_testing()
 
+# TSan on this kernel needs ASLR disabled for every test binary, including the
+# ones defined later in this file. Set the target-property default before the
+# targets are created; gtest_discover_tests reads it at discovery time.
+if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(CMAKE_CROSSCOMPILING_EMULATOR
+        setarch ${CMAKE_SYSTEM_PROCESSOR} -R)
+endif()
+
 if(PROJECT_IS_TOP_LEVEL)
     add_subdirectory(../backend backend)
 endif()
@@ -447,38 +455,6 @@ target_link_libraries(
         GTest::gtest_main
 )
 
-if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(_jp_service_tsan_launcher
-        setarch
-        ${CMAKE_SYSTEM_PROCESSOR}
-        -R
-    )
-
-    set_target_properties(
-        test_user_dao
-        test_user_service
-        test_user_http
-        test_session_authenticator
-        test_resume_dao
-        test_resume_service
-        test_resume_http
-        test_job_dao
-        test_job_ingestion_dao
-        test_job_ingestion_service
-        test_job_ingestion_http
-        test_job_service
-        test_job_http
-        test_application_dao
-        test_application_service
-        test_application_http
-        PROPERTIES
-            CROSSCOMPILING_EMULATOR
-                "${_jp_service_tsan_launcher}"
-    )
-
-    unset(_jp_service_tsan_launcher)
-endif()
-
 include(GoogleTest)
 
 gtest_discover_tests(
@@ -557,19 +533,6 @@ gtest_discover_tests(
     PROPERTIES
         LABELS "resume;external;integration"
 )
-
-# These two targets are defined after the main CROSSCOMPILING_EMULATOR block
-# above, so they get the TSan launcher here instead: naming a target before
-# add_executable makes every TSan configure fail. Keep the two blocks in sync.
-if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set_target_properties(
-        test_tailor_rule
-        test_resume_artifact_dao
-        PROPERTIES
-            CROSSCOMPILING_EMULATOR
-                "setarch;${CMAKE_SYSTEM_PROCESSOR};-R"
-    )
-endif()
 
 gtest_discover_tests(
     test_job_dao

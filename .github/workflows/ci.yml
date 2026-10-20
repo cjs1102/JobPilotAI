@@ -168,7 +168,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake libmysqlclient-dev default-mysql-client python3
+            cmake libmysqlclient-dev default-mysql-client python3 curl
 
       # 0017-A. The tar round trip restores the tree with the permissions it was
       # built with. The test binaries link their Conan dependencies statically,
@@ -239,3 +239,39 @@ jobs:
         run: |
           (cd source_adapters && python3 -m unittest discover -s jobpilot_sources/tests -t .)
           (cd ai_worker && python3 -m unittest discover -s jobpilot_ai/tests -t .)
+
+      # 0022. The Web UI's static page, same-origin proxy and the full
+      # register -> resume -> import -> search/detail -> favourite -> status
+      # flow. This job has no nginx image (and the dev host cannot pull one), so
+      # the checked-in smoke runner uses the stdlib Python static+proxy fallback
+      # against the release binary and this job's ephemeral MySQL/Redis. The
+      # compose web profile remains the production-shaped path; the fallback
+      # proves the UI resources and all API calls through one origin.
+      - name: Web UI smoke (Python fallback)
+        env:
+          INTERNAL_API_TOKEN: web-smoke-internal-token
+          JOBPILOT_HOST: 127.0.0.1
+          JOBPILOT_PORT: "18080"
+          STORAGE_ROOT: ${{ runner.temp }}/jobpilot-web-smoke-storage
+        run: |
+          set -euo pipefail
+          mkdir -p "$STORAGE_ROOT"
+          build/presets/release/service/jobpilot_service \
+            --config=service/config/config.yaml \
+            > "$RUNNER_TEMP/jobpilot-web-smoke-backend.log" 2>&1 &
+          backend_pid=$!
+          trap 'kill "$backend_pid" 2>/dev/null || true; wait "$backend_pid" 2>/dev/null || true' EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/health >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+            if [ "$attempt" = 30 ]; then
+              cat "$RUNNER_TEMP/jobpilot-web-smoke-backend.log"
+              exit 1
+            fi
+          done
+
+          tools/dev/web-smoke.sh --mode local \
+            --backend-url http://127.0.0.1:18080 --web-port 18081

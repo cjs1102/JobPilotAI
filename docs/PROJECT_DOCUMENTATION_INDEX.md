@@ -45,7 +45,7 @@ Status vocabulary used below:
 |---|---|---|---|---|---|
 | `docs/ai/README.md` | AI context router | Which document to read for which task; diff-first reading policy | Agents | `CURRENT` | — |
 | `docs/ai/agent-workflow.md` | Agent workflow and verification rules | Verification levels L1–L5, when a suite may run, harness prerequisites, one review per stage | Agents | `CURRENT` | `build/l4-0017/` (scratch harness) |
-| `docs/ai/project-state.md` | Current project state (889 lines) | Stage-by-stage state, carried-forward items, what is genuinely open | Agents, maintainer | `CURRENT` (updated 2026-10-20) | whole repo |
+| `docs/ai/project-state.md` | Current project state (907 lines) | Stage-by-stage state, carried-forward items, what is genuinely open | Agents, maintainer | `CURRENT` (updated 2026-10-20) | whole repo |
 | `docs/ai/CURRENT_STATE.md` | Handoff verification report (2026-10-19) | Git/CI facts, §23 fact checklist, document-code conflicts, capability-matrix update; 2026-10-20 resolution note | Agents, maintainer, release reviewer | `CURRENT` (dated 2026-10-19; point-in-time report plus dated resolution note) | whole repo |
 | `docs/ai/archive/next-phase-plan-2026-10.md` | Archived next-phase plan | An earlier plan sketch; kept for context | Agents | `REFERENCE` (archived) | — |
 | `docs/ai/references/github_resources.md` | GitHub resource research | 655-line survey used for the open-source plan | Maintainer | `REFERENCE` | — |
@@ -75,6 +75,7 @@ Status vocabulary used below:
 |---|---|---|---|---|---|
 | `docs/04-api-design.md` | API contract (1428 lines) | Every route, request/response, error codes, internal token contract, public visibility rule (updated 2026-10-11), source-registration contract, reserved-route markers and route counts (2026-10-20) | Anyone changing an API | `CURRENT` | `service/src/*/*_controller.cpp`, `service/src/router.cpp` |
 | `docs/03-database-design.md` | Database contract (834 lines) | Tables, columns, indexes, F13 deadline rule, 0015A quality status, current 13-table DDL, migration notes (§9.4) | Anyone changing the schema | `CURRENT` | `database/schema/0*.sql` |
+| `docs/guides/local-demo.md` | Local Web UI demo guide | Dependencies, nginx/Python-fallback startup, demo flow, resume prerequisite, screenshots, troubleshooting, security boundary | Users, reviewers, maintainers | `CURRENT` (2026-10-20) | `web/`, `docker/nginx/`, `tools/dev/web-smoke.sh` |
 | `database/schema/README.md` | Schema guide | How the schema files are ordered and applied | Anyone touching the DB | `CURRENT` | `database/schema/` |
 | `docs/06-coding-standard.md` | Coding standard | Naming, error handling, SQL, RAII, logging rules | Contributors | `CURRENT` | whole repo |
 | `docs/project-structure.md` | Project structure | Directory/module responsibilities | Contributors | `HISTORICAL` (Superseded banner) | — |
@@ -98,6 +99,7 @@ Status vocabulary used below:
 | `docs/exec-plans/completed/0019-ats-live-smoke-and-asan-timeout.md` | Completed plan 0019 | H-2 ATS live-smoke evidence + sanitizer-aware HTTP test timeout + ASan re-run; merged at `0c24c45` after VERDICT PASS | Agents, maintainer | `COMPLETED` (2026-10-19) | `source_adapters/`, `service/tests/`, `backend/tests/` |
 | `docs/exec-plans/completed/0020-apply-url.md` | Completed plan 0020 | Nullable `jobs.apply_url`, import/source-sync/API plumbing, explicit-source-only extraction, additive upgrade + CI forward/backward test; merged at `c07c35a` after VERDICT PASS with conditions | Agents, maintainer | `COMPLETED` (2026-10-20) | `database/`, `service/`, `source_adapters/`, `tools/checks/` |
 | `docs/exec-plans/completed/0021-docs-reconciliation.md` | Completed plan 0021 | `docs/03`–`docs/04` reconciliation of DB-1/2/3 and API-1/2/3/4; dated handoff corrections; docs-only L0; merged at `d75b14e` after VERDICT-0021-closeout PASS | Agents, maintainer | `COMPLETED` (2026-10-20) | `docs/03`, `docs/04`, `docs/CLAUDE_CODE_HANDOFF.md` |
+| `docs/exec-plans/active/0022-web-ui.md` | Active plan 0022 | Minimal native Web UI: nginx static + same-origin proxy, auth, jobs/filter/match, detail/apply links, resume prerequisite, favourite and status board; Python fallback smoke | Agents, maintainer | `ACTIVE` (2026-10-20, `feat/0022-web-ui`) | `web/`, `docker/nginx/`, `tools/dev/web-smoke.sh` |
 | `docs/exec-plans/completed/0001…0017A` | 20 archived plans | The history of every stage, each with its evidence, decisions and L4 results. Notable: `0014` (China sources + manual capture, 1264 lines), `0015`/`0015A` (tailoring, explainable matching, quality gate), `0016` (packaging, demo gate), `0017` (ops hardening, L4), `0017A` (the `published_at` contract gap) | Agents needing the "why" | `HISTORICAL` by definition, but each is the **authority for its stage's decisions** | the module named in each plan |
 
 ## 7. Ingestion, sources and tools

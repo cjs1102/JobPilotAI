@@ -1,10 +1,15 @@
 # ExecPlan 0022 — 最小 Web UI（本地 demo）
 
-> 状态：**PLANNING（等待 VERDICT-0022-plan；批准前不写任何代码或配置）**
+> 状态：**ACTIVE（2026-10-20 批准；VERDICT-0022-plan PASS 附 6 条条件）**
 > 分支：`feat/0022-web-ui`
 > 基线：`main@70810ca`（0021 post-merge 状态提交；父提交 `d75b14e` 为 PR #4 merge）
 > 时间盒：2–3 个工作日；代码/配置/文档。
-> 批准后按 P0→P7 实施；功能验证用 isolated compose smoke，stage close 按
+> 批准记录：简历前置/详情 match/nginx 固定 tag/localStorage/截图/L4 六项决议；
+> 条件 1：integration CI 增加 web-smoke 步骤（不改触发器），本地无 nginx 镜像时
+> 用 Python 静态+代理回退 runner，closeout 附实际执行输出；条件 2：grep
+> innerHTML + 无 CDN；条件 3：链接仅 http(s)+noopener；条件 4：隔离栈拆除证据；
+> 条件 5：local-demo 文档；条件 6：owner 合并、main 双绿、不得启动 0023。
+> 功能验证用 isolated compose smoke，stage close 按
 > `docs/ai/agent-workflow.md` §2.1 跑一次 **L4**；未获 closeout PASS 前不合并。
 > 路线：owner 已批准 **B：最小 Web UI**；本阶段不启动 0023 / 新来源 / 自动投递。
 
@@ -50,7 +55,8 @@ HTTP 服务没有 static handler；P1 网络/HTTP 层行为冻结，不能为了
 - 不引入 React/Vue/Vite/Webpack/Tailwind 或任何构建步骤。
 - 不宣称生产级认证/HTTPS/多租户；这是本地 demo。
 - 不改 `docs/03` schema；不改 `docs/04` 既有 API 行为；不改 CI workflow。
-- 不做浏览器自动化测试框架；冒烟用 curl + 手工浏览器验收。
+- 不引入浏览器自动化测试框架；提供可选的 geckodriver/Firefox smoke，
+  常规冒烟仍用 curl + 手工浏览器验收。
 
 ## 4. 约束与不变量
 
@@ -444,11 +450,12 @@ docs/ai/project-state.md  # 0022 active/completed evidence
 
 ### P7 — 收尾验证与 REQUEST
 
-- [ ] 运行 `tools/dev/web-smoke.sh`（isolated；若镜像受限，记录 environment-limited）。
-- [ ] 手工浏览器验收（5.6 清单）。
+- [x] 运行 `tools/dev/web-smoke.sh`（isolated，Python fallback 与真实 nginx
+      binary 两种 server 均通过；后续再跑一次 frozen head）。
+- [x] 真实 Firefox/geckodriver browser smoke（登录、简历、搜索/详情、收藏、状态板）。
 - [ ] 跑一次 L4（Debug/ASan/UBSan + Release builds + Python suites）并保存原始日志。
 - [ ] `python3 tools/checks/release_preflight.py`；`git diff --check`。
-- [ ] 写 `REQUEST-0022-closeout.md`（含 smoke 原始输出、手工验收、L4、docs 更新、
+- [ ] 写 `REQUEST-0022-closeout.md`（含 smoke 原始输出、browser smoke、L4、docs 更新、
       回滚）；停止等待 VERDICT。
 - [ ] 不合并、不启动 0023。
 
@@ -515,14 +522,14 @@ git diff --check
 ## 11. 当前进度
 
 ```text
-P0 计划 + REQUEST           [ ] 等待 VERDICT-0022-plan
-P1 托管骨架                 [ ] 未开始
-P2 认证/API client          [ ] 未开始
-P3 列表/筛选/匹配           [ ] 未开始
-P4 详情/简历/收藏           [ ] 未开始
-P5 状态板                   [ ] 未开始
-P6 文档/截图步骤            [ ] 未开始
-P7 smoke + L4 + closeout    [ ] 未开始
+P0 计划 + REQUEST           [x] PASS（VERDICT-0022-plan）
+P1 托管骨架                 [x] 完成（compose web profile + nginx config）
+P2 认证/API client          [x] 完成（api/auth/dom/app）
+P3 列表/筛选/匹配           [x] 完成（jobs.js + 筛选/分页/match）
+P4 详情/简历/收藏           [x] 完成（detail + resume prerequisite + favourite）
+P5 状态板                   [x] 完成（applications.js + 状态推进/拒绝）
+P6 文档/截图步骤            [x] 完成（README + local-demo + index/project-state）
+P7 smoke + L4 + closeout    [ ] 进行中（nginx/Python smoke 已通过；L4/closeout 待跑）
 ```
 
 ## 12. 批准后动作

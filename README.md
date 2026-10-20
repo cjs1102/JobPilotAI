@@ -45,6 +45,37 @@ tools/dev/demo-gate.sh                  # end-to-end gate: import -> search -> m
   under [`docs/exec-plans/`](docs/exec-plans/); [`docs/README.md`](docs/README.md)
   is a short reading order.
 
+## 最小 Web UI（0022）
+
+`web/` is a native HTML/CSS/JS UI with no build step. The optional `web` compose
+profile serves it with nginx and reverse-proxies `/api/*` and `/health` to the
+existing C++ service (same origin, no CORS, P1 untouched):
+
+```bash
+cp .env.example .env
+docker compose up -d
+docker compose --profile app build backend
+docker compose --profile app --profile web up -d
+# open http://127.0.0.1:8081
+```
+
+Flow: register/login → upload a resume (required before favourite) → search or
+recommended jobs → explainable match → detail with original/apply links →
+favourite → application status board. The UI never submits an application; it
+only opens the original page for manual application.
+
+If the host cannot pull `nginx:1.27-alpine`, the documented fallback runner
+serves the same `web/` files and proxies the same paths:
+
+```bash
+python3 tools/dev/web_static_proxy.py \
+  --root web --port 8081 --backend http://127.0.0.1:8080
+```
+
+Full walkthrough, troubleshooting and screenshot steps:
+[`docs/guides/local-demo.md`](docs/guides/local-demo.md). Isolated smoke:
+`tools/dev/web-smoke.sh` (prints `WEB_SMOKE_OK`).
+
 ## 当前能力
 
 ### C++ 服务（`service/`，P1 网络层行为冻结）
@@ -201,7 +232,9 @@ JobPilotAI
 ├── tools/                   # 离线工具：0015 Phase C 只读岗位报表 + 禁止投递路径检查
 ├── database/schema/         # MySQL 初始化脚本
 ├── docs/                    # 03 数据库 / 04 API / ADR / ExecPlan / ai agent 规则
-├── docker/
+│   └── guides/local-demo.md # 0022 本地 Web UI 演示与故障排查
+├── web/                     # 0022 原生 HTML/CSS/JS UI（无构建步骤）
+├── docker/                  # 0022 nginx 静态托管配置
 ├── docker-compose.yml
 ├── CMakeLists.txt           # 统一开发者入口（root preset）
 ├── CMakePresets.json

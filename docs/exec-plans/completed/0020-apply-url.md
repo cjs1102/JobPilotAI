@@ -1,9 +1,14 @@
 # ExecPlan 0020 — `apply_url` 端到端
 
-> 状态：**PLANNING（等待 VERDICT-0020-plan；未获批准前不写任何代码）**
+> 状态：**COMPLETED（2026-10-20 合并；VERDICT-0020-closeout PASS 附条件）**
 > 分支：`feat/0020-apply-url`
+> 合并：`c07c35a`（PR #3 merge commit）；最终 head `e01e283`
 > 基线：`main@1a9a715`（0019 post-merge 状态提交）
 > 时间盒：2–3 个工作日；到点提交收口报告。
+> 收口条件：合并后 main 的 `ci` + `image` 双绿；PR 上 `image` 未触发属预期；
+> DB 测试在无 `MYSQL_PASSWORD` 时以 SetUp exception/SEGFAULT 失败而非可读
+> SKIP，记录为已知非阻塞测试环境行为；下一阶段 0021（docs/03–04 对账）
+> 由 owner 指定，worker 不得自行启动。详见 `VERDICT-0020-closeout.md`。
 > 批准后先更新合同/文档，再按 P0→P5 分阶段实施；每阶段按最小验证级别跑测试。
 
 ## 1. 背景与当前状态

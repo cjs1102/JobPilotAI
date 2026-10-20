@@ -29,14 +29,14 @@
 > old personal access token are owner actions listed in
 > [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-> **2026-10-19 update — 0019 merged; 0020 active.** The Claude Code takeover
+> **2026-10-20 update — 0019 and 0020 merged.** The Claude Code takeover
 > verification is recorded in [`CURRENT_STATE.md`](CURRENT_STATE.md). 0018
 > (`nowcoder`) merged at `cc9b333` (PR #1); 0019 (ATS live smoke + sanitizer
-> timeout) merged at `0c24c45` (PR #2) after VERDICT-0019 PASS with conditions.
-> 0020 (`apply_url` end to end) is active on `feat/0020-apply-url` after
-> VERDICT-0020-plan; see `## Active Plan (0020)`.
-> Main CI after the 0019 merge: `ci` `39205581874` (5m32s; build 4m02s +
-> suite 1m23s) and `image` `39205581917` (3m06s; container 3m01s), both
+> timeout) merged at `0c24c45` (PR #2) after VERDICT-0019 PASS with conditions;
+> 0020 (`apply_url` end to end) merged at `c07c35a` (PR #3, merge commit) after
+> VERDICT-0020-closeout PASS with conditions. See `## Completed Plan (0020)`.
+> Main CI after the 0020 merge: `ci` `39375032387` (4m09s; build 2m38s +
+> suite 1m24s) and `image` `39375032398` (2m48s; container 2m44s), both
 > **completed/success**. The 0019 ASan
 > re-run is **312/312** with 0 sanitizer diagnostics (one isolated
 > review-backfill SKIP); L4 Debug/ASan/UBSan each **312/312**. The 2026-10-19
@@ -44,6 +44,9 @@
 > historical/unverified and is **not** a constant or a coverage promise.
 > TSan is not covered. See `## Completed Plan (0018)` and
 > `## Completed Plan (0019)`.
+> Next stage: **0021 docs/03–04 reconciliation** (owner route C). Its plan is
+> under review; no contract or schema documentation change is made before
+> `VERDICT-0021-plan`.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -118,10 +121,11 @@ timeout + ASan re-run.
   1m23s); `image` `39205581917` completed/success 3m06s (container 3m01s).
 - Next stage: **owner-specified**; the worker must not start one.
 
-## Active Plan (0020)
+## Completed Plan (0020)
 
-[`active/0020-apply-url.md`](../exec-plans/active/0020-apply-url.md) — active on
-`feat/0020-apply-url`; plan approved by `VERDICT-0020-plan.md`. Scope:
+[`completed/0020-apply-url.md`](../exec-plans/completed/0020-apply-url.md) —
+**merged at `c07c35a` via PR #3 (merge commit) after VERDICT-0020-closeout PASS
+with conditions**. Scope:
 nullable `jobs.apply_url`, import/source-sync plumbing (COALESCE), public
 list/recommended/detail field, explicit-source-only extraction, and the
 documented additive upgrade + CI forward/backward test (Option B; no migration
@@ -135,7 +139,19 @@ forward/backward/re-forward/idempotent on a scratch DB; targeted C++ tests are
 `jobpilot_l4_0020_scratch`, 14:12–14:28) is **green**: Debug/ASan/UBSan each
 **312/312**, 0 sanitizer diagnostics, builds all rc=0, Python 481 + 190 OK,
 review isolation dev SKIP / scratch 7, teardown complete. The dev database has
-the upgrade applied. CI/REQUEST for 0020 are pending the owner's PR.
+the upgrade applied. Final head `e01e283`.
+- PR CI `39374045453` completed/success 3m56s (build 2m23s + suite 1m26s);
+  the `Schema upgrade forward/backward test` step completed/success; `image`
+  was not triggered on the PR (no image-path change), which is expected.
+- Main CI after the merge: `ci` `39375032387` completed/success 4m09s
+  (build 2m38s + suite 1m24s); `image` `39375032398` completed/success 2m48s
+  (container 2m44s). Both green.
+- Known non-blocking test-environment behavior (VERDICT-0020-closeout
+  condition 3): DB tests run without `MYSQL_PASSWORD` fail as a SetUp
+  exception/SEGFAULT instead of a readable SKIP. This is recorded for later
+  maintenance and is not a 0020 defect.
+- Next stage: **0021 docs/03–04 reconciliation** (owner route C); plan under
+  review, no contract/schema documentation change before approval.
 
 ## Current Stage
 
@@ -758,6 +774,13 @@ Performance baseline:
     (make the repository public, fill About/description, confirm the newest CI
     runs, rotate the old PAT) collected in
     [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
+
+11. **0020 is merged** at `c07c35a` (PR #3, merge commit) after
+    VERDICT-0020-closeout PASS with conditions; main `ci` `39375032387` and
+    `image` `39375032398` are both green. The 0020 plan is archived under
+    `completed/`. **0021 docs/03–04 reconciliation** is the owner-selected next
+    stage; its plan is under review and no contract/schema documentation change
+    is made before approval. Do not start 0022 (Web UI) or any feature work.
 
 Stage numbering (decided 2026-10-08). It supersedes older references inside the
 archived completed plans, which are historical evidence and are never rewritten:

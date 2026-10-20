@@ -8,6 +8,28 @@ that date; where a fact could not be verified it is marked **UNKNOWN** or
 **Read `docs/PROJECT_DOCUMENTATION_INDEX.md` first for the document map, then this
 file, then `AGENTS.md`, then the section you are about to touch.**
 
+> **Dated corrections (2026-10-20, 0021).** This handoff was written 2026-10-11.
+> The following statements are historical; live facts are in `docs/03` and
+> `docs/04`:
+>
+> - **`apply_url`**: 0020 added `jobs.apply_url VARCHAR(512) NULL` end to end
+>   (merged `c07c35a`); see §3 row 5, §5 row 5, §7 item 2, §9 migration debt,
+>   §11, §21 and §22.
+> - **ATS live smoke**: 0019 recorded 2026-10-19 Greenhouse **232**, Lever
+>   **10**, Ashby **167**, all `board_complete=True`; see §5 row 2 and §20 V5.
+> - **China source**: 0018 registered `nowcoder` (login-free
+>   `/jobs/school/jobs`, `complete=false`, max 20 rows, no pagination); the
+>   manual-only conclusion in §10 is historical. See `docs/04` §5.5.1.
+> - **H-1**: the applications list already returns `company`; only
+>   `source_url` is missing; see §5 row 16.
+> - **Route count**: the live router has **36** registered routes = 27
+>   non-internal (25 business + `/health` + dev-only `/hello`) + 9 internal;
+>   see §12.
+> - **Table name**: `skills`, not `user_skills` (§11; deferred to a later docs
+>   cleanup).
+>
+> Original text is kept below; these dated corrections are authoritative.
+
 ---
 
 ## 1. 项目定位
@@ -133,6 +155,21 @@ Status vocabulary: `DONE` (works, verified) · `PARTIAL` · `FRAMEWORK_ONLY` ·
 | 37 | Branch protection | **NOT_IMPLEMENTED** (owner) | — | — | — | `protected: false` | no guard against force-push to `main` | owner enables |
 | 38 | Secret / history disclosure | **PARTIAL** | — | — | preflight + `tools/checks/history_secret_scan.sh` | tree: 8 pass/0 fail; history: 162 commits, 0 credential shape | history still contains the old personal email, 7 home-path strings and 14 RFC1918 strings | owner accepts or decides on a rewrite (history rewrite is forbidden to agents) |
 
+> **Correction 2026-10-20 (0021), row 5:** the `apply_url` row is historical.
+> 0020 added `jobs.apply_url VARCHAR(512) NULL` end to end (schema,
+> import/source-sync, list/recommended/detail; no index/backfill), merged at
+> `c07c35a`. The row is preserved as the 2026-10-11 snapshot. See `docs/03` §3
+> and `docs/04` §5.
+>
+> **Correction 2026-10-20 (0021), H-1 (row 16):** the applications list already
+> returns `company`; only `source_url` is missing. This half of the row is
+> historical; `docs/04` §6.2 is the live contract.
+>
+> **Correction 2026-10-20 (0021), row 2 (H-3):** the “no live board run” sentence
+> is historical. 0019 recorded the 2026-10-19 dry-run: Greenhouse **232**,
+> Lever **10**, Ashby **167**, all `board_complete=True`; raw log
+> `build/0019/ats-live-smoke.log`.
+
 ## 6. 已完成的重要工作（有证据的）
 
 - 0001–0017A: 20 archived stages, each with evidence in its ExecPlan.
@@ -167,6 +204,10 @@ Status vocabulary: `DONE` (works, verified) · `PARTIAL` · `FRAMEWORK_ONLY` ·
 1. **No web UI** — the most visible product gap. All six user steps work at the
    API level only.
 2. **`apply_url`** — the "actual apply link" half of product goal 3 does not exist.
+
+   > **Correction 2026-10-20 (0021):** 0020 implemented this end to end (merged
+   > `c07c35a`); this item is historical. See `docs/03` §3 and `docs/04` §5.
+
 3. **China source** — none registered; see §10.
 4. **MariaDB client switch** — evidence complete, change unapplied (§5 row 33).
 5. **ASan/UBSan re-run after the review-gate change; TSan never recorded** (§5
@@ -253,6 +294,14 @@ register the id in the four places. Do not claim support before that.
   `reviewed_at`, `review_note`), F13 deadline (`deadline`, `deadline_date_only`),
   `published_at`.
 - **No `apply_url` column.**
+
+  > **Correction 2026-10-20 (0021):** 0020 added
+  > `jobs.apply_url VARCHAR(512) DEFAULT NULL` (no index, no backfill;
+  > `source_url` remains the `uk_source_url` idempotency key), merged at
+  > `c07c35a`. The statement above is the 2026-10-11 snapshot. The upgrade is
+  > `database/upgrades/0020_jobs_apply_url.up.sql`; the CI test is
+  > `tools/checks/test_schema_upgrade.sh`.
+
 - `applications.status`: `0 favourite · 1 pending · 2 applied · 3/4/5 interview ·
   6 offer · 7 rejected`, with a transition machine in
   `service/src/application/application_service.cpp`.
@@ -268,6 +317,12 @@ register the id in the four places. Do not claim support before that.
 
 `docs/04-api-design.md` is the contract. 22 public routes + 8 internal routes
 (`service/src/router.cpp`):
+
+> **Correction 2026-10-20 (0021):** the 22+8 count is historical and incorrect.
+> The live router has **36 registered routes** = **27 non-internal** (25
+> business public + `GET /health` + dev-only `POST /hello`) + **9 internal**.
+> The two AI routes `resume/optimize` and `interview/generate` are reserved
+> contract-only and are **not** registered (404). See `docs/04` §9.
 
 - Public: users (register/login/me/profile/skills), resumes (+ versions, upload,
   artifacts), jobs (search/detail/recommended), applications (+ status,
@@ -425,6 +480,9 @@ explicitly historical).
 **Not blockers**: the `needs_review` sample awaiting a human decision; missing web
 UI; missing China source; Python lock file; TSan; the `apply_url` gap.
 
+> **Correction 2026-10-20 (0021):** the `apply_url` gap is closed by 0020
+> (merged `c07c35a`); the other items remain as written.
+
 ## 22. 建议开发顺序
 
 1. **V7 + V8** (verification/one small change): re-run the L4 matrix; apply the
@@ -434,6 +492,10 @@ UI; missing China source; Python lock file; TSan; the `apply_url` gap.
 3. **`apply_url` end to end** (small schema change + payload + API + rendering):
    the only product goal that is completely absent; do it before the UI so the UI
    has it to show.
+
+   > **Correction 2026-10-20 (0021):** completed by 0020 (merged `c07c35a`).
+   > The next product step is the minimal Web UI; it remains owner-specified.
+
 4. **Minimal local web UI** (list + filters + explainable match + detail with
    "open original page" + favourite + application status board):
    - host it independently (V1 decides), consume the existing API, no new server

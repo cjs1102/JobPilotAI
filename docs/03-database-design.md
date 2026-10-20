@@ -10,7 +10,7 @@
 | 库名 | `jobpilot` |
 | 字符集 | `utf8mb4` |
 | 排序规则 | `utf8mb4_general_ci` |
-| 表数量 | 11 |
+| 表数量 | 13 |
 
 ## 2. ER 关系
 
@@ -27,9 +27,21 @@ erDiagram
     users ||--o{ ai_tasks : "1:N AI任务"
     users ||--o{ interview_records : "1:N 面试记录"
     users ||--o{ notifications : "1:N 通知"
+    jobs ||--o{ job_review_items : "1:N 复核记录"
+    users ||--o{ resume_artifacts : "1:N 定制产物"
+    jobs |o--o{ resume_artifacts : "0..1:N 关联岗位"
+    applications |o--o{ resume_artifacts : "0..1:N 关联投递"
+    resume_versions ||--o{ resume_artifacts : "1:N 派生版本"
 ```
 
 ## 3. 建表 DDL（锁定版）
+
+> 本节是 fresh install 的**当前全量** DDL，镜像 `database/schema/*.sql`。
+> schema 文件是 fresh-install 的基线；若两者不一致，先修本文档并在 closeout
+> 记录漂移，保留 §9/§10 的增量合同用于既有库升级。13 张表：
+> `users`、`profiles`、`skills`、`resumes`、`resume_versions`、`jobs`、
+> `job_requirements`、`job_review_items`、`applications`、`ai_tasks`、
+> `interview_records`、`notifications`、`resume_artifacts`。
 
 ```sql
 CREATE DATABASE IF NOT EXISTS jobpilot
@@ -103,6 +115,30 @@ CREATE TABLE resume_versions (
     KEY idx_resume (resume_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='简历版本';
 
+CREATE TABLE resume_artifacts (
+    id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '产物ID',
+    user_id           BIGINT UNSIGNED NOT NULL COMMENT '所属用户',
+    job_id            BIGINT UNSIGNED DEFAULT NULL COMMENT '关联岗位(可空)',
+    application_id    BIGINT UNSIGNED DEFAULT NULL COMMENT '关联投递(可空)',
+    base_version_id   BIGINT UNSIGNED NOT NULL COMMENT '派生自哪条 resume_versions',
+    artifact_type     VARCHAR(16)  NOT NULL COMMENT '本阶段只用 resume',
+    language          VARCHAR(8)   NOT NULL DEFAULT 'zh',
+    content           MEDIUMTEXT   DEFAULT NULL COMMENT 'ATS 纯文本草稿',
+    file_path         VARCHAR(255) DEFAULT NULL COMMENT '可选渲染产物(本阶段不产生)',
+    content_bytes     INT UNSIGNED DEFAULT NULL COMMENT 'content 的 UTF-8 字节数',
+    generator         VARCHAR(32)  NOT NULL COMMENT 'rule_v1(本阶段唯一)',
+    source_version    VARCHAR(32)  DEFAULT NULL COMMENT 'tailor_rule_v1',
+    fact_check_status TINYINT      NOT NULL DEFAULT 0 COMMENT '0未检查 1通过 2失败',
+    fact_check_report JSON         DEFAULT NULL COMMENT '机械事实门报告',
+    confirmed_at      DATETIME     DEFAULT NULL COMMENT '人工确认时刻(NULL=草稿)',
+    create_time       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_user_job (user_id, job_id),
+    KEY idx_application (application_id),
+    KEY idx_base_version (base_version_id),
+    KEY idx_user_type_created (user_id, artifact_type, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='简历定制产物(草稿/确认)';
+
 -- ============ 岗位域 ============
 
 CREATE TABLE jobs (
@@ -132,6 +168,9 @@ CREATE TABLE jobs (
     job_nature           TINYINT   DEFAULT NULL COMMENT '岗位性质:1校招/2社招/3实习(0014)',
     deadline             DATETIME  DEFAULT NULL COMMENT '投递截止时间(UTC瞬时;格式约定见§9.1,0014)',
     deadline_date_only   TINYINT   DEFAULT NULL COMMENT 'deadline是否仅来源日期:1是/0否/NULL未知(0014)',
+    review_status        TINYINT   NOT NULL DEFAULT 0 COMMENT '0015A 质量状态:0 clean/1 needs_review/2 quarantined',
+    reviewed_at          DATETIME  DEFAULT NULL COMMENT '0015A 最近一次复核时间',
+    review_note          VARCHAR(255) DEFAULT NULL COMMENT '0015A 复核备注',
     create_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_source_url (source_url),
@@ -139,7 +178,9 @@ CREATE TABLE jobs (
     KEY idx_title (title),
     KEY idx_location (location),
     KEY idx_status (status),
-    KEY idx_source_scope_status (source, source_scope, status)
+    KEY idx_source_scope_status (source, source_scope, status),
+    KEY idx_review_status (review_status, id),
+    KEY idx_deadline (deadline)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='岗位';
 
 CREATE TABLE job_requirements (
@@ -151,6 +192,21 @@ CREATE TABLE job_requirements (
     UNIQUE KEY uk_job_skill (job_id, skill),
     KEY idx_job (job_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='岗位技能要求';
+
+CREATE TABLE job_review_items (
+    id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    job_id      BIGINT UNSIGNED NOT NULL COMMENT '岗位ID',
+    reason_code VARCHAR(64)  NOT NULL COMMENT '0015A 稳定机器码',
+    reason_text VARCHAR(255) DEFAULT NULL COMMENT '0015A 人类可读原因',
+    outcome     VARCHAR(24)  NOT NULL COMMENT 'rejected/needs_review/accepted_advisory',
+    resolution  VARCHAR(16)  NOT NULL DEFAULT 'open' COMMENT 'open/approved/fixed/rejected',
+    resolved_by VARCHAR(64)  DEFAULT NULL COMMENT '复核人标签(内部 token 审计用)',
+    resolved_at DATETIME     DEFAULT NULL COMMENT '复核时间',
+    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_job (job_id),
+    KEY idx_reason (reason_code),
+    KEY idx_resolution (resolution)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='0015A 岗位质量异常与复核记录';
 
 -- ============ 投递域 ============
 
@@ -236,7 +292,7 @@ CREATE TABLE notifications (
 | users | 按 email 登录 | `uk_email` |
 | profiles | 按 user 查画像 | `uk_user_id` |
 | applications | 按用户×状态列表 | `idx_user_status` |
-| jobs | 按公司/地点/状态过滤；按来源 scope 观测 | `idx_company` `idx_location` `idx_status` `idx_source_scope_status` |
+| jobs | 按公司/地点/状态过滤；按来源 scope 观测；复核队列/截止时间排序 | `idx_company` `idx_title` `idx_location` `idx_status` `idx_source_scope_status` `idx_review_status` `idx_deadline` |
 | ai_tasks | 用户查任务 + Worker 捞待办 + 租约扫描 | `idx_user_status` `idx_status` `idx_type_status` `idx_status_lease` |
 | notifications | 用户查未读 | `idx_user_status` |
 

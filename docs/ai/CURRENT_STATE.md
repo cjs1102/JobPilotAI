@@ -3,6 +3,15 @@
 > 核验日期：2026-10-19（Asia/Shanghai）
 > 核验基线：`main` @ `928d335`（与 `origin/main` 一致）
 > 核验方式：按 `docs/CLAUDE_CODE_HANDOFF.md` §23 逐项实际运行；本文件是新增未跟踪文件，未修改任何代码、数据库、CI 或既有文档。
+>
+> **Resolution note (2026-10-20, 0021).** DB-1/DB-2/DB-3 and
+> API-1/API-2/API-3/API-4 are fixed in the live contracts (`docs/03`/`docs/04`)
+> and in the handoff’s dated corrections. DB-4/H-2 (`user_skills`) is
+> **deferred** to a later docs cleanup. H-1 is corrected with a dated handoff
+> note; H-3 is resolved by 0019’s ATS live smoke; H-4 is folded into API-4;
+> H-5 is resolved by 0018’s nowcoder source; H-6/H-7/H-8 were consistent.
+> The original findings below are preserved as the 2026-10-19 snapshot; this
+> note does not rewrite them.
 
 ## 背景
 

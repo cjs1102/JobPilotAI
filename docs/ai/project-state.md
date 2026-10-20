@@ -44,9 +44,9 @@
 > historical/unverified and is **not** a constant or a coverage promise.
 > TSan is not covered. See `## Completed Plan (0018)` and
 > `## Completed Plan (0019)`.
-> Next stage: **0021 docs/03–04 reconciliation** (owner route C). Its plan is
-> under review; no contract or schema documentation change is made before
-> `VERDICT-0021-plan`.
+> Next stage: **0021 docs/03–04 reconciliation** (owner route C), approved
+> 2026-10-20 by `VERDICT-0021-plan` PASS with 7 conditions. It is docs-only
+> (L0): no code, schema, API behavior or CI change. Closeout is pending review.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -150,8 +150,21 @@ the upgrade applied. Final head `e01e283`.
   condition 3): DB tests run without `MYSQL_PASSWORD` fail as a SetUp
   exception/SEGFAULT instead of a readable SKIP. This is recorded for later
   maintenance and is not a 0020 defect.
-- Next stage: **0021 docs/03–04 reconciliation** (owner route C); plan under
-  review, no contract/schema documentation change before approval.
+- Next stage: **0021 docs/03–04 reconciliation** (owner route C), approved by
+  `VERDICT-0021-plan`; see `## Active Plan (0021)`. Docs-only L0; no code,
+  schema or API behavior changes.
+
+## Active Plan (0021)
+
+[`active/0021-docs-reconciliation.md`](../exec-plans/active/0021-docs-reconciliation.md)
+— approved 2026-10-20 by `VERDICT-0021-plan` **PASS with 7 conditions**.
+Scope: fix `docs/03` §1/§2/§3 (13 tables, 0015A columns/indexes, two missing
+DDL blocks), fix `docs/04` §7.2/§7.3/§9 (reserved AI routes, 9 internal
+routes, dev-only `/hello`, `{task_id}`→`{id}`, counts), and add dated
+corrections to the handoff plus a resolution note to `CURRENT_STATE.md`.
+**Docs-only L0**: no code, schema, migration, API behavior or CI change; no L4
+and no 0020 test evidence is reused. Closeout pending review; do not merge or
+start 0022 (Web UI) before the owner’s PASS.
 
 ## Current Stage
 

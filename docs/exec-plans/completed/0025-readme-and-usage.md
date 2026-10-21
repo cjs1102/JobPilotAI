@@ -1,8 +1,10 @@
 # ExecPlan 0025 — README and external usage guide
 
-> 状态：**IMPLEMENTATION（closeout pending；计划已由 PR #7 合入）**
-> 分支：`docs/readme-demo`（实施）；计划原始分支 `docs/0025-readme-and-usage`
+> 状态：**COMPLETED（2026-10-21 合并；VERDICT-0025-closeout PASS，附说明）**
+> 分支：`docs/readme-demo`（计划原始分支 `docs/0025-readme-and-usage`）
+> 合并：`01ad46b`（PR #8 merge commit）；最终 head `aff6a07`；code head `97b124b`
 > 基线：`main@7acc58f`（计划 PR #7；0023 merge `539202f`）
+> 合并后 main CI：`ci` `39607961509`（4m01s）与 `image` `39607961464`（2m19s）双绿。
 > 类型：**docs + developer demo tooling**（不碰 core/API/schema/CI）；L0 + shell smoke，不跑 L4；不启动 0024。
 
 ## 1. 背景
@@ -59,7 +61,7 @@ contract 表和内部运维细节。外部读者无法快速回答“这是什�
 | `docs/examples/demo-jobs.json` | 12 条合成示例岗位；含 C++ 后端、Linux/MySQL、不同城市；`example.invalid` URL；部分带显式 apply_url |
 | `docs/PROJECT_DOCUMENTATION_INDEX.md` | README 描述、README.zh-CN、images 行；0025 active/closeout 行 |
 | `docs/ai/project-state.md` | 0025 active/completed；docs-only L0 证据；语言/截图说明 |
-| `docs/exec-plans/active/0025-readme-and-usage.md` | 本计划 |
+| `docs/exec-plans/completed/0025-readme-and-usage.md` | 本计划（合并后归档） |
 
 不改 `.gitignore`（当前未忽略 `*.png`；若实施时发现被忽略，再加
 `!docs/images/*.png` 并说明）。使用 `git check-ignore` 验证。
@@ -256,7 +258,7 @@ P1 demo scripts + seed fixture [x] demo-up.sh / demo-seed.sh / 12-job fixture
 P2 screenshots + README + one-command Quick Start [x] screenshots regenerated; README rewritten
 P3 README.zh-CN         [x] 独立中文镜像
 P4 index/state          [x] docs index + project-state + handoff corrections
-P5 L0 + shell smoke + closeout [x] smoke 完成；REQUEST-0025-closeout 已写；owner PR/merge 待办
+P5 L0 + shell smoke + closeout [x] smoke 完成；VERDICT PASS；PR #8 merged at 01ad46b
 ```
 
 Execution note (2026-10-21): the planned `/tmp/0022-browser-final/*.png`
@@ -270,4 +272,23 @@ down with `down -v`. The capture no-retention check found 0 review items and
 only DAO test fixtures; the raw real-capture file
 `$HOME/capture-acceptance.json` was also deleted, with no copy found under the
 user home or `/tmp`. See `docs/ai/project-state.md` and the handoff
-corrections. Closeout request is written; owner PR/merge remains.
+corrections.
+
+## 11. Post-merge closeout (2026-10-21)
+
+- PR #8 merged at `01ad46b` (Create a merge commit); final head `aff6a07`;
+  code head `97b124b`.
+- `VERDICT-0025-closeout.md`: **PASS** (lightweight closeout, notes accepted).
+  Accepted deviations: screenshots regenerated; nginx container path
+  environment-limited (Python fallback tested); backend image build skipped in
+  the local smoke; no L4 by plan; capture sample had no DB row and the raw file
+  was deleted with a hash record.
+- PR #8 CI on head `aff6a07`: `ci` `39600944962` completed/success (4m06s);
+  `image` `39600944883` completed/success (2m11s).
+- Main CI after merge:
+  - `ci` `39607961509` — completed/success, 4m01s; `clean build` 2m26s,
+    `full test suite (MySQL + Redis)` 1m27s.
+  - `image` `39607961464` — completed/success, 2m19s; `container image and the
+    end-to-end gate` 2m10s.
+- Plan archived under `completed/`; **no plan is active**. 0024 (owner
+  publication) remains owner-only and has not started.

@@ -58,11 +58,14 @@
 > The release-readiness work is merged; A history disclosure remains
 > accepted/no-rewrite. Wait for the owner’s 0024 instruction; do not start it.
 >
-> **2026-10-21 update — 0025 implementation in progress.** The plan-only PR #7
-> merged at `7acc58f`; the docs/tooling implementation is on branch
-> `docs/readme-demo` and is **not merged yet**. The README rewrite, screenshots,
-> one-command demo and the capture no-retention check are recorded in
-> `## Active Plan (0025)` below. 0024 remains owner-only and has not started.
+> **2026-10-21 update — 0025 merged.** Plan-only PR #7 merged at `7acc58f`;
+> implementation PR #8 merged at `01ad46b` (merge commit; final head `aff6a07`,
+> code head `97b124b`) after **VERDICT-0025-closeout PASS** (lightweight
+> closeout, notes accepted). Main CI: `ci` `39607961509` (4m01s; clean build
+> 2m26s + suite 1m27s) and `image` `39607961464` (2m19s; container gate 2m10s),
+> both **completed/success**. The README rewrite, screenshots, one-command demo
+> and capture no-retention check are recorded in `## Completed Plan (0025)`
+> below. **No plan is active**; 0024 remains owner-only and has not started.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -237,12 +240,13 @@ libbcrypt upstream unresolved with SHA-256 manifest. PR image `39461251212`
 passed `Verify the MariaDB client linkage` (`MARIA_DB_LINK_OK`) + demo gate;
 main CI after merge is green (`ci` `39462589981`, `image` `39462589965`).
 
-## Active Plan (0025)
+## Completed Plan (0025)
 
-[`active/0025-readme-and-usage.md`](../exec-plans/active/0025-readme-and-usage.md)
-— plan-only PR #7 merged at `7acc58f`; implementation is in progress on branch
-`docs/readme-demo`, **not yet reviewed or merged**. Scope: external-facing
-English README + separate `README.zh-CN.md`, two UI screenshots, one-command
+[`completed/0025-readme-and-usage.md`](../exec-plans/completed/0025-readme-and-usage.md)
+— **merged at `01ad46b` via PR #8 (merge commit) after VERDICT-0025-closeout
+PASS (lightweight, notes accepted)**. Final head `aff6a07`; code head
+`97b124b`; plan-only PR #7 at `7acc58f`. Scope: external-facing English README
++ separate `README.zh-CN.md`, two UI screenshots, one-command
 `tools/dev/demo-up.sh`/`demo-seed.sh`, 12-job fixture, docs index/state. This is
 docs + developer tooling only: no core/API/schema/CI/P1 change; L0 + shell smoke,
 no L4.
@@ -284,10 +288,17 @@ Evidence collected on the branch (2026-10-21):
   payload. The old handoff statement that the real sample is still
   `resolution=open` now carries dated corrections in §5 row 9 and §7 item 8.
   Raw DB output: `build/0025/capture-retention-check.txt` (ignored).
-
-Remaining for this branch: closeout request, owner-created PR/merge, and the
-post-merge main CI verification. Do not archive the plan or mark this stage
-completed until the owner merges it.
+- **CI evidence**: PR #8 on head `aff6a07` — `ci` `39600944962`
+  completed/success (4m06s), `image` `39600944883` completed/success (2m11s).
+  Main after merge — `ci` `39607961509` completed/success in 4m01s
+  (`clean build` 2m26s, `full test suite (MySQL + Redis)` 1m27s); `image`
+  `39607961464` completed/success in 2m19s (`container image and the end-to-end
+  gate` 2m10s). Both main runs are on merge commit `01ad46b`.
+- **Verdict / accepted deviations**: `VERDICT-0025-closeout.md` PASS, with the
+  regenerated screenshots, environment-limited nginx path, skipped local image
+  build, no-L4 scope, and the capture-file deletion accepted as documented.
+  The plan is archived under `completed/`; **no plan is active**. 0024 remains
+  owner-only and has not started.
 
 ## Current Stage
 
@@ -354,6 +365,9 @@ completed until the owner merges it.
   acceptance in one command and prints the 0014 §19.5 evidence block; and
   `docs/RELEASE_CHECKLIST.md` plus `tools/checks/release_preflight.py` make the
   release gate checkable. Details: `## Completed Plan (0017)` below.
+- **0025 (README and external usage) is complete and archived** (`01ad46b`,
+  PR #8) after VERDICT-0025-closeout PASS; main `ci`/`image` are both green.
+  **No plan is active**; the next stage is owner-only 0024 publication.
 
 The revised architecture direction is:
 [../architecture/open-source-mvp.md](../architecture/open-source-mvp.md).
@@ -987,8 +1001,8 @@ Do not start a new P2 module without its own approved plan.
 ## Key Entry Points
 
 - AI routing: [README.md](README.md)
-- Most recent archived ExecPlan (0016):
-  [../exec-plans/completed/0016-open-source-packaging.md](../exec-plans/completed/0016-open-source-packaging.md)
+- Most recent archived ExecPlan (0025):
+  [../exec-plans/completed/0025-readme-and-usage.md](../exec-plans/completed/0025-readme-and-usage.md)
 - Full historical state:
   [references/project-state-full.md](references/project-state-full.md)
 - Current architecture:

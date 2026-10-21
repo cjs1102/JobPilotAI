@@ -180,7 +180,7 @@ Status vocabulary: `DONE` (works, verified) · `PARTIAL` · `FRAMEWORK_ONLY` ·
 > `1a625a3be8a42008c8def2b31740551c6d12b3bf57bdb001400d6499162f58d0`) was
 > found outside the repository and deleted on 2026-10-21; no remaining copy was
 > found under the user home or `/tmp`. See `docs/ai/project-state.md`
-> `## Active Plan (0025)` and `build/0025/capture-retention-check.txt` (ignored).
+> `## Completed Plan (0025)` and `build/0025/capture-retention-check.txt` (ignored).
 
 ## 6. 已完成的重要工作（有证据的）
 

@@ -290,5 +290,8 @@ corrections.
     `full test suite (MySQL + Redis)` 1m27s.
   - `image` `39607961464` — completed/success, 2m19s; `container image and the
     end-to-end gate` 2m10s.
+- Post-merge state PR #9 merged at `74656c3`; main `ci` `39610108373`
+  completed/success (4m16s; build 2m35s + suite 1m32s) and `image`
+  `39610108577` completed/success (2m17s; container gate 2m13s).
 - Plan archived under `completed/`; **no plan is active**. 0024 (owner
   publication) remains owner-only and has not started.

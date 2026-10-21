@@ -455,6 +455,12 @@ gate and carries two dated evidence blocks (2026-10-11).
 | Actions | `ci` + `image` green at HEAD; artifact retention 24 h |
 | Releases / tags | none |
 | License detection on the repo page | reported as `Other / NOASSERTION`; the file itself is standard MIT — **UNKNOWN** why the private repo does not classify it (verify after publishing) |
+
+> **Correction 2026-10-21 (0026):** the repository is public. The root
+> `LICENSE` was found truncated at 16 lines; the standard MIT text has been
+> restored on `docs/licence-and-state` with the copyright line preserved. This
+> closes V9, subject to the post-merge GitHub license API check (expected
+> `MIT`). The rest of this table is the 2026-10-11 snapshot.
 | Collaborators / external contributions | none; there is no `CONTRIBUTING.md` or `SECURITY.md` yet |
 
 ## 19. 文档索引
@@ -477,6 +483,11 @@ explicitly historical).
 | V7 | ASan/UBSan after `7ba62c8` | the last matrix predates the review-gate change | run the L4 (debug/asan/ubsan) once, exclusively |
 | V8 | Ubuntu 24.04 behaviour of the MariaDB switch | the switch has not been applied | apply it and let the `image` job build/verify on the runner |
 | V9 | Why GitHub's licence detection says `Other` | cosmetic/legal clarity for the public page | check after the repository becomes public |
+
+> **Correction 2026-10-21 (0026):** V9 is closed by the `LICENSE` repair. The
+> truncated 16-line file was replaced with the standard MIT text; after merge,
+> verify the public `GET /repos/cjs1102/JobPilotAI/license` response reports
+> `MIT` and record it in `project-state.md`.
 
 ## 21. 发布阻塞事项
 

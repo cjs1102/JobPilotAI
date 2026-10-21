@@ -66,6 +66,14 @@
 > both **completed/success**. The README rewrite, screenshots, one-command demo
 > and capture no-retention check are recorded in `## Completed Plan (0025)`
 > below. **No plan is active**; 0024 remains owner-only and has not started.
+>
+> **2026-10-21 update — post-merge state PR #9 and LICENSE repair (0026).**
+> PR #9 merged at `74656c3`; main `ci` `39610108373` (4m16s; clean build 2m35s
+> + suite 1m32s) and `image` `39610108577` (2m17s; container gate 2m13s) are
+> both **completed/success**. The repository is now public. V9 (GitHub license
+> detection `Other/NOASSERTION`) is addressed by restoring the standard MIT text
+> on `docs/licence-and-state`; the post-merge GitHub license API check is the
+> final confirmation. See `## Lightweight Task (0026)`.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -299,6 +307,25 @@ Evidence collected on the branch (2026-10-21):
   build, no-L4 scope, and the capture-file deletion accepted as documented.
   The plan is archived under `completed/`; **no plan is active**. 0024 remains
   owner-only and has not started.
+
+## Lightweight Task (0026)
+
+No ExecPlan: supervisor `STATUS-0026-license-and-state.md` defines a docs-only
+fix. The root `LICENSE` was truncated at 16 lines (missing the “permit persons”
+and “IN NO EVENT SHALL” paragraphs). It is restored to the standard MIT text
+with `Copyright (c) 2026 JobPilotAI` preserved.
+
+- **V9**: the GitHub license detection previously reported `Other/NOASSERTION`.
+  The truncated text is the cause addressed here; after the branch merges,
+  GitHub should detect **MIT License**. The final check uses the public
+  `GET /repos/cjs1102/JobPilotAI/license` response and will be recorded in this
+  file.
+- **PR #9 state**: merged at `74656c3`; main `ci` `39610108373`
+  completed/success in 4m16s (`clean build` 2m35s, `full test suite (MySQL +
+  Redis)` 1m32s) and `image` `39610108577` completed/success in 2m17s
+  (`container image and the end-to-end gate` 2m13s).
+- Branch: `docs/licence-and-state`; owner creates/merges the PR. No core, API,
+  schema, CI, or P1 change.
 
 ## Current Stage
 

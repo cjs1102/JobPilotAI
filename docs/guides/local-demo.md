@@ -17,6 +17,16 @@ frontend.
 
 ## 启动（nginx 形态）
 
+一条命令启动（缺少 `.env` 时生成随机密码，构建后端，启动 UI，并默认导入
+12 条示例岗位）：
+
+```bash
+./tools/dev/demo-up.sh
+```
+
+打开脚本打印的 `DEMO_READY` 地址即可；nginx 镜像不可用时脚本会自动回退到
+`web_static_proxy.py`。手动等价步骤：
+
 ```bash
 cp .env.example .env
 # fill MYSQL_ROOT_PASSWORD and MYSQL_PASSWORD
@@ -88,23 +98,23 @@ does not replace nginx in a deployment.
 7. Reload the page: the resume version and applications persist; the token is
    re-validated with `GET /users/me`.
 
-The sample dataset `docs/examples/job-import.json` uses `example.invalid` URLs;
-they are intentionally fake. The UI does not derive an apply URL from
-`source_url`.
+The sample datasets `docs/examples/job-import.json` and
+`docs/examples/demo-jobs.json` use `example.invalid` URLs; they are intentionally
+fake. The UI does not derive an apply URL from `source_url`.
 
 ## 截图步骤（可选）
 
 Use synthetic/demo data only; do not put personal data in a screenshot.
 
 1. Register a demo user, upload a synthetic resume, import
-   `docs/examples/job-import.json` through the internal token or use an
-   existing demo stack.
-2. Capture **岗位列表** with a match score/reason, **岗位详情** with the
-   apply/original links, and **申请状态板** with at least one application.
-3. Suggested filenames: `web-list.png`, `web-detail.png`, `web-status.png`.
-   The repository `.gitignore` ignores `*.png`; 0022 deliberately does **not**
-   add images to the README. Add owner-approved screenshots in a later change if
-   desired.
+   `docs/examples/demo-jobs.json` (or `job-import.json`) through the internal
+   token, or use an existing demo stack.
+2. Capture **岗位详情** with the match explanation and **申请状态板** with at
+   least one application.
+3. The two README screenshots are tracked at `docs/images/web-detail.png` and
+   `docs/images/web-status.png` (1366×682, synthetic data, regenerated with the
+   browser smoke). If you recapture them, keep the same filenames and update the
+   READMEs if the filenames change.
 4. Use the browser/OS screenshot tool; do not include cookies, tokens, email
    addresses, or real resumes.
 

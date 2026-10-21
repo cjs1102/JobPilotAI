@@ -57,6 +57,12 @@
 > Next stage: **0024 owner publication** (owner-only; no worker implementation).
 > The release-readiness work is merged; A history disclosure remains
 > accepted/no-rewrite. Wait for the owner’s 0024 instruction; do not start it.
+>
+> **2026-10-21 update — 0025 implementation in progress.** The plan-only PR #7
+> merged at `7acc58f`; the docs/tooling implementation is on branch
+> `docs/readme-demo` and is **not merged yet**. The README rewrite, screenshots,
+> one-command demo and the capture no-retention check are recorded in
+> `## Active Plan (0025)` below. 0024 remains owner-only and has not started.
 
 Repository files and Git history are the cross-agent fact source. This concise
 state plus the active or most recent ExecPlan should be enough for a new Agent to
@@ -230,6 +236,52 @@ known review-backfill SKIP), scratch backfill 7 passed, 0 sanitizer diagnostics;
 libbcrypt upstream unresolved with SHA-256 manifest. PR image `39461251212`
 passed `Verify the MariaDB client linkage` (`MARIA_DB_LINK_OK`) + demo gate;
 main CI after merge is green (`ci` `39462589981`, `image` `39462589965`).
+
+## Active Plan (0025)
+
+[`active/0025-readme-and-usage.md`](../exec-plans/active/0025-readme-and-usage.md)
+— plan-only PR #7 merged at `7acc58f`; implementation is in progress on branch
+`docs/readme-demo`, **not yet reviewed or merged**. Scope: external-facing
+English README + separate `README.zh-CN.md`, two UI screenshots, one-command
+`tools/dev/demo-up.sh`/`demo-seed.sh`, 12-job fixture, docs index/state. This is
+docs + developer tooling only: no core/API/schema/CI/P1 change; L0 + shell smoke,
+no L4.
+
+Evidence collected on the branch (2026-10-21):
+
+- **Screenshots**: `docs/images/web-detail.png` and `docs/images/web-status.png`,
+  both 1366×682 PNG. The planned `/tmp/0022-browser-final` originals were no
+  longer present, so they were regenerated with
+  `tools/dev/web-smoke.sh --browser firefox` (Python proxy fallback); the exact
+  original images are not recoverable. Both READMEs reference the new files.
+- **README**: `README.md` is English and `README.zh-CN.md` is a separate Chinese
+  mirror; both have the language switch, two screenshots, one-command Quick
+  Start, demo flow, usage, verification, limits and community links. Stage
+  numbers are absent from both bodies.
+- **Demo smoke** (isolated `jobpilot-demo-0025`; env
+  `/tmp/jobpilot-demo-0025.env`, later removed; ports 18180/18181/13326/16399;
+  backend image `jobpilot-backend:verify`, `DEMO_BUILD_BACKEND=0`):
+  `demo-up.sh` produced `DEMO_READY url=http://127.0.0.1:18181`, used the
+  Python proxy fallback because `nginx:1.27-alpine` was unavailable, and seeded
+  `total=12 created=12`. A second run preserved the `.env` byte-for-byte
+  (SHA-256 unchanged) and seeded `total=12 created=0 updated=12`; the page and
+  `GET /api/v1/jobs?page=1&page_size=20` remained reachable with `total=12`.
+  A `C++` keyword request returned 5 jobs. The generated `.env` was mode `0600`;
+  none of its generated secret values appeared in the launcher log.
+  `docker compose ... down -v` removed all containers, volumes and the network;
+  the temporary env file was deleted. Raw logs: `build/0025/` (ignored).
+- **Capture sample / no retention**: the 2026-10-21 query against the dev
+  `jobpilot-mysql` returned `jobs_total=4`, `jobs_review_status_nonzero=0`,
+  `review_items_total=0`, `review_items_open=0`. All four jobs are DAO test
+  fixtures (`source_url` `job-dao-*`, source `manual`, `review_status=0`), not
+  a real capture. No real capture sample is retained in the dev database, so no
+  reject/delete action was applicable. The old handoff statement that the real
+  sample is still `resolution=open` now carries dated corrections in §5 row 9
+  and §7 item 8. Raw output: `build/0025/capture-retention-check.txt` (ignored).
+
+Remaining for this branch: closeout request, owner-created PR/merge, and the
+post-merge main CI verification. Do not archive the plan or mark this stage
+completed until the owner merges it.
 
 ## Current Stage
 

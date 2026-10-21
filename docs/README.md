@@ -5,8 +5,9 @@ the documents below are the contracts and the evidence behind it.
 
 ## To run it
 
-1. [`../README.md`](../README.md) — Quick Start (English) plus the list of what
-   actually works today, and what deliberately does not.
+1. [`../README.md`](../README.md) / [`../README.zh-CN.md`](../README.zh-CN.md) —
+   the one-command local demo, how to use it, what works today, and what
+   deliberately does not.
 2. [`../database/schema/README.md`](../database/schema/README.md) — create a
    database, upgrade an existing one, verify it, and the isolation rule for demo
    and test data.

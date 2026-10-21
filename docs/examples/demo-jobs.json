@@ -1,0 +1,190 @@
+{
+  "jobs": [
+    {
+      "company": "Example Systems",
+      "title": "C++ Backend Engineer",
+      "location": "Shenzhen",
+      "salary_min": 20,
+      "salary_max": 35,
+      "salary_currency": "CNY",
+      "description": "Build Linux backend services for a job platform. Work on HTTP APIs, data ingestion and observability.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-cpp-backend-1",
+      "apply_url": "https://example.invalid/apply/demo-cpp-backend-1",
+      "requirements": [
+        { "skill": "C++", "level": 3 },
+        { "skill": "Linux", "level": 2 }
+      ]
+    },
+    {
+      "company": "Data Platform Labs",
+      "title": "Distributed Systems Engineer",
+      "location": "Shanghai",
+      "salary_min": 25,
+      "salary_max": 40,
+      "salary_currency": "CNY",
+      "description": "Design reliable services for distributed workloads. Focus on correctness, failure handling and data access.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-distributed-2",
+      "requirements": [
+        { "skill": "C++", "level": 3 },
+        { "skill": "MySQL", "level": 2 }
+      ]
+    },
+    {
+      "company": "Northstar Quant",
+      "title": "C++ Trading Systems Engineer",
+      "location": "Beijing",
+      "salary_min": 30,
+      "salary_max": 50,
+      "salary_currency": "CNY",
+      "description": "Low-latency C++ services for market data and order routing. Linux and performance profiling are part of the daily work.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-trading-3",
+      "requirements": [
+        { "skill": "C++", "level": 3 },
+        { "skill": "Linux", "level": 3 }
+      ]
+    },
+    {
+      "company": "Cedar Pay",
+      "title": "Backend Engineer, Payments",
+      "location": "Guangzhou",
+      "salary_min": 18,
+      "salary_max": 30,
+      "salary_currency": "CNY",
+      "description": "Build payment APIs and reconciliation jobs. The team values clear error handling and a small, auditable service surface.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-payments-4",
+      "apply_url": "https://example.invalid/apply/demo-payments-4",
+      "requirements": [
+        { "skill": "C++", "level": 2 },
+        { "skill": "MySQL", "level": 2 },
+        { "skill": "Redis", "level": 1 }
+      ]
+    },
+    {
+      "company": "Orbit Cloud",
+      "title": "Platform Engineer",
+      "location": "Hangzhou",
+      "salary_min": 22,
+      "salary_max": 38,
+      "salary_currency": "CNY",
+      "description": "Own platform services and developer tooling. Experience with Linux, containers and backend APIs is useful.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-platform-5",
+      "requirements": [
+        { "skill": "C++", "level": 2 },
+        { "skill": "Linux", "level": 3 }
+      ]
+    },
+    {
+      "company": "Embedded Works",
+      "title": "Embedded Software Engineer",
+      "location": "Shenzhen",
+      "salary_min": 20,
+      "salary_max": 32,
+      "salary_currency": "CNY",
+      "description": "Develop embedded C/C++ software for connected devices. Work close to hardware, Linux and test automation.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-embedded-6",
+      "requirements": [
+        { "skill": "C++", "level": 2 },
+        { "skill": "Linux", "level": 2 }
+      ]
+    },
+    {
+      "company": "Pixel Forge",
+      "title": "Game Backend Engineer",
+      "location": "Chengdu",
+      "salary_min": 18,
+      "salary_max": 30,
+      "salary_currency": "CNY",
+      "description": "Build game backend services for player state, matchmaking and leaderboards. Redis and latency matter here.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-game-7",
+      "requirements": [
+        { "skill": "C++", "level": 2 },
+        { "skill": "Redis", "level": 2 }
+      ]
+    },
+    {
+      "company": "Meridian Data",
+      "title": "Database Infrastructure Engineer",
+      "location": "Shanghai",
+      "salary_min": 25,
+      "salary_max": 42,
+      "salary_currency": "CNY",
+      "description": "Operate and improve MySQL-backed services. Build safe migrations, query tooling and observability for data paths.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-database-8",
+      "requirements": [
+        { "skill": "C++", "level": 2 },
+        { "skill": "MySQL", "level": 3 },
+        { "skill": "Linux", "level": 2 }
+      ]
+    },
+    {
+      "company": "Packet Harbor",
+      "title": "Network Software Engineer",
+      "location": "Beijing",
+      "salary_min": 24,
+      "salary_max": 40,
+      "salary_currency": "CNY",
+      "description": "Work on TCP services, protocol handling and performance. The role is Linux-heavy and values careful resource ownership.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-network-9",
+      "requirements": [
+        { "skill": "C++", "level": 3 },
+        { "skill": "Linux", "level": 3 }
+      ]
+    },
+    {
+      "company": "Bluefin Robotics",
+      "title": "C++ SDK Engineer",
+      "location": "Shenzhen",
+      "salary_min": 22,
+      "salary_max": 36,
+      "salary_currency": "CNY",
+      "description": "Design a C++ SDK used by robotics integrators. Focus on API stability, documentation and cross-platform builds.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-sdk-10",
+      "requirements": [
+        { "skill": "C++", "level": 3 },
+        { "skill": "Linux", "level": 2 }
+      ]
+    },
+    {
+      "company": "Lumen Labs",
+      "title": "Backend Engineer, Growth",
+      "location": "Beijing",
+      "salary_min": 16,
+      "salary_max": 28,
+      "salary_currency": "CNY",
+      "description": "Build small backend services for growth experiments. Expect rapid iteration, clear metrics and careful data handling.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-growth-11",
+      "apply_url": "https://example.invalid/apply/demo-growth-11",
+      "requirements": [
+        { "skill": "C++", "level": 1 },
+        { "skill": "MySQL", "level": 2 }
+      ]
+    },
+    {
+      "company": "Atlas Commerce",
+      "title": "Site Reliability Engineer",
+      "location": "Hangzhou",
+      "salary_min": 20,
+      "salary_max": 35,
+      "salary_currency": "CNY",
+      "description": "Keep commerce services reliable. Work with Linux, Redis, MySQL and service-level monitoring; C++ debugging is a plus.",
+      "source": "import",
+      "source_url": "https://example.invalid/jobs/demo-sre-12",
+      "requirements": [
+        { "skill": "Linux", "level": 3 },
+        { "skill": "C++", "level": 1 },
+        { "skill": "Redis", "level": 2 }
+      ]
+    }
+  ]
+}

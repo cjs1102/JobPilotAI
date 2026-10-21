@@ -169,6 +169,15 @@ Status vocabulary: `DONE` (works, verified) · `PARTIAL` · `FRAMEWORK_ONLY` ·
 > is historical. 0019 recorded the 2026-10-19 dry-run: Greenhouse **232**,
 > Lever **10**, Ashby **167**, all `board_complete=True`; raw log
 > `build/0019/ats-live-smoke.log`.
+>
+> **Correction 2026-10-21 (0025), row 9:** the “real capture still
+> `resolution=open`” sentence is historical. The 2026-10-21 check of the dev
+> `jobpilot-mysql` database found **0** `job_review_items` (0 open), **0** jobs
+> with `review_status <> 0`, and four jobs that are all DAO test fixtures
+> (`source_url` `job-dao-*`), not the real capture. No real capture sample is
+> retained in the dev database, so no reject/delete action applied. See
+> `docs/ai/project-state.md` `## Active Plan (0025)` and
+> `build/0025/capture-retention-check.txt` (ignored).
 
 ## 6. 已完成的重要工作（有证据的）
 
@@ -217,6 +226,14 @@ Status vocabulary: `DONE` (works, verified) · `PARTIAL` · `FRAMEWORK_ONLY` ·
 8. **The real capture sample is still `resolution=open`** in the review queue: a
    human should decide whether it becomes public (its `company` is the platform
    name and its `description` contains page chrome).
+
+   > **Resolved 2026-10-21 (0025):** the current dev database contains no real
+   > capture sample and no open review item; the four remaining jobs are DAO
+   > test fixtures. Nothing was retained, so there is no sample to reject or
+   > delete. This item is closed for the current environment; if a future real
+   > capture is imported, the no-retention rule still requires an explicit
+   > review decision (reject keeps the row for audit; deleting is a separate
+   > explicit action).
 
 ## 8. 已知 Bug
 

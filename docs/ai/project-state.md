@@ -276,10 +276,10 @@ Evidence collected on the branch (2026-10-21):
   fixtures (`source_url` `job-dao-*`, source `manual`, `review_status=0`), not
   a real capture. No real capture row exists in the dev database, so no
   review-row reject/delete action applied. A raw real-capture file at
-  `/home/dev/capture-acceptance.json` (6846 bytes, SHA-256
+  `$HOME/capture-acceptance.json` (6846 bytes, SHA-256
   `1a625a3be8a42008c8def2b31740551c6d12b3bf57bdb001400d6499162f58d0`) was
   found outside the repository and was **deleted on 2026-10-21**; a search of
-  `/home/dev` and `/tmp` found no remaining copy. Redacted acceptance logs under
+  the user home and `/tmp` found no remaining copy. Redacted acceptance logs under
   `build/0017a/` and `build/capture-0017/` remain as evidence and contain no raw
   payload. The old handoff statement that the real sample is still
   `resolution=open` now carries dated corrections in §5 row 9 and §7 item 8.

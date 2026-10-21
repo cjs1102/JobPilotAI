@@ -176,10 +176,10 @@ Status vocabulary: `DONE` (works, verified) · `PARTIAL` · `FRAMEWORK_ONLY` ·
 > with `review_status <> 0`, and four jobs that are all DAO test fixtures
 > (`source_url` `job-dao-*`), not the real capture. No real capture row exists
 > in the dev database, so no review-row reject/delete action applied. A raw
-> real-capture file at `/home/dev/capture-acceptance.json` (6846 bytes, SHA-256
+> real-capture file at `$HOME/capture-acceptance.json` (6846 bytes, SHA-256
 > `1a625a3be8a42008c8def2b31740551c6d12b3bf57bdb001400d6499162f58d0`) was
 > found outside the repository and deleted on 2026-10-21; no remaining copy was
-> found under `/home/dev` or `/tmp`. See `docs/ai/project-state.md`
+> found under the user home or `/tmp`. See `docs/ai/project-state.md`
 > `## Active Plan (0025)` and `build/0025/capture-retention-check.txt` (ignored).
 
 ## 6. 已完成的重要工作（有证据的）
@@ -233,8 +233,8 @@ Status vocabulary: `DONE` (works, verified) · `PARTIAL` · `FRAMEWORK_ONLY` ·
    > **Resolved 2026-10-21 (0025):** the current dev database contains no real
    > capture row and no open review item; the four remaining jobs are DAO test
    > fixtures. The raw real-capture JSON at
-   > `/home/dev/capture-acceptance.json` was deleted and no copy remains under
-   > `/home/dev` or `/tmp`; no review-row reject/delete applied because no row
+   > `$HOME/capture-acceptance.json` was deleted and no copy remains under the
+   > user home or `/tmp`; no review-row reject/delete applied because no row
    > existed. Redacted acceptance logs remain as evidence. This item is closed
    > for the current environment; if a future real capture is imported, the
    > no-retention rule still requires an explicit review decision (reject keeps

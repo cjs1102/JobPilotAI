@@ -274,10 +274,16 @@ Evidence collected on the branch (2026-10-21):
   `jobpilot-mysql` returned `jobs_total=4`, `jobs_review_status_nonzero=0`,
   `review_items_total=0`, `review_items_open=0`. All four jobs are DAO test
   fixtures (`source_url` `job-dao-*`, source `manual`, `review_status=0`), not
-  a real capture. No real capture sample is retained in the dev database, so no
-  reject/delete action was applicable. The old handoff statement that the real
-  sample is still `resolution=open` now carries dated corrections in §5 row 9
-  and §7 item 8. Raw output: `build/0025/capture-retention-check.txt` (ignored).
+  a real capture. No real capture row exists in the dev database, so no
+  review-row reject/delete action applied. A raw real-capture file at
+  `/home/dev/capture-acceptance.json` (6846 bytes, SHA-256
+  `1a625a3be8a42008c8def2b31740551c6d12b3bf57bdb001400d6499162f58d0`) was
+  found outside the repository and was **deleted on 2026-10-21**; a search of
+  `/home/dev` and `/tmp` found no remaining copy. Redacted acceptance logs under
+  `build/0017a/` and `build/capture-0017/` remain as evidence and contain no raw
+  payload. The old handoff statement that the real sample is still
+  `resolution=open` now carries dated corrections in §5 row 9 and §7 item 8.
+  Raw DB output: `build/0025/capture-retention-check.txt` (ignored).
 
 Remaining for this branch: closeout request, owner-created PR/merge, and the
 post-merge main CI verification. Do not archive the plan or mark this stage

@@ -267,5 +267,7 @@ synthetic UI. The isolated launcher smoke used `jobpilot-demo-0025`, ports
 18180/18181/13326/16399 and `jobpilot-backend:verify`; it printed
 `DEMO_READY`, seeded 12 jobs, preserved `.env` on re-run, and the stack was torn
 down with `down -v`. The capture no-retention check found 0 review items and
-only DAO test fixtures; see `docs/ai/project-state.md` and the handoff
-corrections. Closeout request is the only remaining step.
+only DAO test fixtures; the raw real-capture file
+`/home/dev/capture-acceptance.json` was also deleted, with no copy found under
+`/home/dev` or `/tmp`. See `docs/ai/project-state.md` and the handoff
+corrections. Closeout request is written; owner PR/merge remains.

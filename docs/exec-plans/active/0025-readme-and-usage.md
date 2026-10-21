@@ -256,7 +256,7 @@ P1 demo scripts + seed fixture [x] demo-up.sh / demo-seed.sh / 12-job fixture
 P2 screenshots + README + one-command Quick Start [x] screenshots regenerated; README rewritten
 P3 README.zh-CN         [x] 独立中文镜像
 P4 index/state          [x] docs index + project-state + handoff corrections
-P5 L0 + shell smoke + closeout [~] smoke 完成；REQUEST-0025-closeout 待写
+P5 L0 + shell smoke + closeout [x] smoke 完成；REQUEST-0025-closeout 已写；owner PR/merge 待办
 ```
 
 Execution note (2026-10-21): the planned `/tmp/0022-browser-final/*.png`

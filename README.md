@@ -2,10 +2,11 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-JobPilotAI is a self-hosted job-search workspace: a C++17 backend collects and
-searches public job postings, explains matches deterministically, and tracks
-applications. An optional AI worker provides task-based assistance; the core
-workflow does not require an AI provider or API key.
+JobPilotAI is a self-hosted job-search workspace: Python source adapters collect
+public job postings, a C++17 backend searches and ranks them, explains matches
+deterministically, and tracks applications. An optional AI worker provides
+task-based assistance; the core workflow does not require an AI provider or API
+key.
 
 | Job detail with an explainable match | Application status board |
 |---|---|

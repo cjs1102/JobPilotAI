@@ -1,9 +1,10 @@
 # JobPilotAI Project Documentation Index
 
-Maintained for the Claude Code handoff (2026-10-11). It answers one question per
-document: **what is this, who should read it, and is it still true?** When a
-document disagrees with the code, the row says so and the disagreement is
-recorded in §12 instead of being silently "fixed".
+Maintained for the Claude Code handoff; refreshed 2026-10-21 for the README and
+demo tooling. It answers one question per document: **what is this, who should
+read it, and is it still true?** When a document disagrees with the code, the
+row says so and the disagreement is recorded in §12 instead of being silently
+"fixed".
 
 Status vocabulary used below:
 
@@ -16,7 +17,8 @@ Status vocabulary used below:
 
 ## 0. Reading order for a new contributor or agent
 
-1. `README.md` — what the project is, how to run it.
+1. `README.md` / `README.zh-CN.md` — what the project is, the one-command demo,
+   and how to use it.
 2. `AGENTS.md` — the project's hard constraints, P1 freeze, task routing.
 3. `docs/CLAUDE_CODE_HANDOFF.md` — the current state, gaps and the protocol for
    the first phase (the document you are likely to need next).
@@ -32,7 +34,9 @@ Status vocabulary used below:
 
 | Path | Document | Purpose | Audience | Validity | Related code |
 |---|---|---|---|---|---|
-| `README.md` | Project README | What the project is, English Quick Start, current capabilities, explicit non-goals, contracts (F13/F14), build/verify commands | Everyone, first file to read | `CURRENT` | whole repo |
+| `README.md` | Project README (English) | What the project is, two screenshots, one-command Quick Start, demo flow, usage, verification, limits, community links | Everyone, first file to read | `CURRENT` (2026-10-21) | whole repo |
+| `README.zh-CN.md` | Chinese README | Chinese mirror of the English README with the same sections, screenshots and commands; no mixed-language paragraphs | Chinese-speaking users and contributors | `CURRENT` (2026-10-21) | whole repo |
+| `docs/images/` | README screenshots | `web-detail.png` (explainable match) and `web-status.png` (application board), both 1366×682 from the local UI with synthetic data | Everyone | `CURRENT` (2026-10-21; regenerated with the browser smoke after the temporary originals were removed) | `web/`, `tools/dev/web-smoke.sh` |
 | `AGENTS.md` | Project Guide | Hard constraints (dependency direction, P1 freeze, secrets, JSON/SQL/RAII rules), task routing, verification policy | Every agent/contributor | `CURRENT` | whole repo |
 | `.agents/skills/jobpilot-reactor-review/SKILL.md` | Reactor review skill | Mandatory checklist before touching `backend/{include,src}/jobpilot/{network,http}/` | Anyone changing the network layer | `CURRENT` | `backend/src/network`, `backend/src/http` |
 | `SECURITY.md` | Security policy | Supported versions, private reporting, local-demo boundaries, no-secrets policy, A history disclosure (facts only) | Everyone, release reviewer | `CURRENT` (2026-10-20) | `tools/checks/` |
@@ -47,7 +51,7 @@ Status vocabulary used below:
 |---|---|---|---|---|---|
 | `docs/ai/README.md` | AI context router | Which document to read for which task; diff-first reading policy | Agents | `CURRENT` | — |
 | `docs/ai/agent-workflow.md` | Agent workflow and verification rules | Verification levels L1–L5, when a suite may run, harness prerequisites, one review per stage | Agents | `CURRENT` | `build/l4-0017/` (scratch harness) |
-| `docs/ai/project-state.md` | Current project state (959 lines) | Stage-by-stage state, carried-forward items, what is genuinely open | Agents, maintainer | `CURRENT` (updated 2026-10-21) | whole repo |
+| `docs/ai/project-state.md` | Current project state (1017 lines) | Stage-by-stage state, carried-forward items, what is genuinely open | Agents, maintainer | `CURRENT` (updated 2026-10-21) | whole repo |
 | `docs/ai/CURRENT_STATE.md` | Handoff verification report (2026-10-19) | Git/CI facts, §23 fact checklist, document-code conflicts, capability-matrix update; 2026-10-20 resolution note | Agents, maintainer, release reviewer | `CURRENT` (dated 2026-10-19; point-in-time report plus dated resolution note) | whole repo |
 | `docs/ai/archive/next-phase-plan-2026-10.md` | Archived next-phase plan | An earlier plan sketch; kept for context | Agents | `REFERENCE` (archived) | — |
 | `docs/ai/references/github_resources.md` | GitHub resource research | 655-line survey used for the open-source plan | Maintainer | `REFERENCE` | — |
@@ -77,7 +81,7 @@ Status vocabulary used below:
 |---|---|---|---|---|---|
 | `docs/04-api-design.md` | API contract (1428 lines) | Every route, request/response, error codes, internal token contract, public visibility rule (updated 2026-10-11), source-registration contract, reserved-route markers and route counts (2026-10-20) | Anyone changing an API | `CURRENT` | `service/src/*/*_controller.cpp`, `service/src/router.cpp` |
 | `docs/03-database-design.md` | Database contract (834 lines) | Tables, columns, indexes, F13 deadline rule, 0015A quality status, current 13-table DDL, migration notes (§9.4) | Anyone changing the schema | `CURRENT` | `database/schema/0*.sql` |
-| `docs/guides/local-demo.md` | Local Web UI demo guide | Dependencies, nginx/Python-fallback startup, demo flow, resume prerequisite, screenshots, troubleshooting, security boundary | Users, reviewers, maintainers | `CURRENT` (2026-10-20) | `web/`, `docker/nginx/`, `tools/dev/web-smoke.sh` |
+| `docs/guides/local-demo.md` | Local Web UI demo guide | Dependencies, one-command launcher, nginx/Python-fallback startup, demo flow, resume prerequisite, screenshots, troubleshooting, security boundary | Users, reviewers, maintainers | `CURRENT` (2026-10-21) | `web/`, `docker/nginx/`, `tools/dev/demo-up.sh`, `tools/dev/web-smoke.sh` |
 | `database/schema/README.md` | Schema guide | How the schema files are ordered and applied | Anyone touching the DB | `CURRENT` | `database/schema/` |
 | `docs/06-coding-standard.md` | Coding standard | Naming, error handling, SQL, RAII, logging rules | Contributors | `CURRENT` | whole repo |
 | `docs/project-structure.md` | Project structure | Directory/module responsibilities | Contributors | `HISTORICAL` (Superseded banner) | — |
@@ -90,7 +94,7 @@ Status vocabulary used below:
 | `docs/quality/test-overlap-audit.md` | Test overlap audit (0017-B) | Proof that the suite has no mergeable duplicate case; the 66 evaluated pairs; counts block read by the guard | Maintainer | `CURRENT` | `service/tests/`, `tools/checks/test_coverage_map.py` |
 | `docs/benchmarks/README.md` | Benchmark baseline | Recorded performance numbers and how to re-run them | Maintainer | `REFERENCE` (numbers age) | `build/` presets |
 | `docs/RELEASE_CHECKLIST.md` | Release checklist (333 lines) | The gate: automated checks, licence, secrets, publish-safety review, owner actions, dated evidence blocks | Release owner | `CURRENT` (dated blocks, refreshed 2026-10-11) | whole repo |
-| `docs/examples/` | Example payloads | Synthetic fixtures used in docs | Contributors | `CURRENT` | — |
+| `docs/examples/` | Example payloads | Synthetic fixtures used in docs, including `demo-jobs.json` (12 synthetic jobs imported by the one-command demo) | Contributors | `CURRENT` (2026-10-21) | — |
 
 ## 6. Execution plans
 
@@ -103,6 +107,7 @@ Status vocabulary used below:
 | `docs/exec-plans/completed/0021-docs-reconciliation.md` | Completed plan 0021 | `docs/03`–`docs/04` reconciliation of DB-1/2/3 and API-1/2/3/4; dated handoff corrections; docs-only L0; merged at `d75b14e` after VERDICT-0021-closeout PASS | Agents, maintainer | `COMPLETED` (2026-10-20) | `docs/03`, `docs/04`, `docs/CLAUDE_CODE_HANDOFF.md` |
 | `docs/exec-plans/completed/0022-web-ui.md` | Completed plan 0022 | Minimal native Web UI: nginx static + same-origin proxy, auth, jobs/filter/match, detail/apply links, resume prerequisite, favourite and status board; Python fallback + Firefox smoke; merged at `38bd484` | Agents, maintainer | `COMPLETED` (2026-10-20) | `web/`, `docker/nginx/`, `tools/dev/web-smoke.sh` |
 | `docs/exec-plans/completed/0023-release-readiness.md` | Completed plan 0023 | Release readiness: security/contributing docs, Python locks, MariaDB client image, TSan first run, libbcrypt provenance, benchmark refresh, release-checklist state; merged at `539202f` after the exclusive benchmark rework | Agents, maintainer, release reviewer | `COMPLETED` (2026-10-21) | `SECURITY.md`, `CONTRIBUTING.md`, `Dockerfile`, `backend/benchmarks/` |
+| `docs/exec-plans/active/0025-readme-and-usage.md` | Active plan 0025 | External-facing English README plus a separate Chinese mirror, two real UI screenshots, one-command demo launcher/seed, 12-job fixture, docs index/state; L0 + shell smoke, no L4 | Agents, maintainer, release reviewer | `ACTIVE` (implementation on `docs/readme-demo`; closeout pending) | `README.md`, `README.zh-CN.md`, `tools/dev/demo-up.sh`, `tools/dev/demo-seed.sh` |
 | `docs/exec-plans/completed/0001…0017A` | 20 archived plans | The history of every stage, each with its evidence, decisions and L4 results. Notable: `0014` (China sources + manual capture, 1264 lines), `0015`/`0015A` (tailoring, explainable matching, quality gate), `0016` (packaging, demo gate), `0017` (ops hardening, L4), `0017A` (the `published_at` contract gap) | Agents needing the "why" | `HISTORICAL` by definition, but each is the **authority for its stage's decisions** | the module named in each plan |
 
 ## 7. Ingestion, sources and tools
@@ -142,10 +147,11 @@ Status vocabulary used below:
 
 | Path | Why it is needed | Suggested content |
 |---|---|---|
-| `SECURITY.md` | Anything that becomes public needs a disclosure channel | Supported versions, how to report privately, no-secrets policy |
-| `CONTRIBUTING.md` | External contributors need the rules — today they live inside `AGENTS.md`, which is agent-oriented | Build/verify commands, commit style, PR expectations, the P1 freeze |
-| `CODE_OF_CONDUCT.md` | Optional for a small project; conventional for public repos | Standard contributor covenant |
-| `docs/guides/` | Installation and local walkthroughs have no current home; `docs/08` is superseded and `README` is a Quick Start only | `local-demo.md`, `installation.md`, `web-ui.md` (future) |
+| `CODE_OF_CONDUCT.md` | Optional for a small project; conventional for public repos | Standard contributor covenant; deferred until a reporting channel exists |
+
+`SECURITY.md`, `CONTRIBUTING.md` and `docs/guides/local-demo.md` were added after
+this section was first written; they are tracked in §1 and §4 and are no longer
+missing.
 
 ## 11. Handoff documents added on 2026-10-11
 

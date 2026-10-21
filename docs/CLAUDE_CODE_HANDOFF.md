@@ -169,6 +169,18 @@ Status vocabulary: `DONE` (works, verified) · `PARTIAL` · `FRAMEWORK_ONLY` ·
 > is historical. 0019 recorded the 2026-10-19 dry-run: Greenhouse **232**,
 > Lever **10**, Ashby **167**, all `board_complete=True`; raw log
 > `build/0019/ats-live-smoke.log`.
+>
+> **Correction 2026-10-21 (0025), row 9:** the “real capture still
+> `resolution=open`” sentence is historical. The 2026-10-21 check of the dev
+> `jobpilot-mysql` database found **0** `job_review_items` (0 open), **0** jobs
+> with `review_status <> 0`, and four jobs that are all DAO test fixtures
+> (`source_url` `job-dao-*`), not the real capture. No real capture row exists
+> in the dev database, so no review-row reject/delete action applied. A raw
+> real-capture file at `$HOME/capture-acceptance.json` (6846 bytes, SHA-256
+> `1a625a3be8a42008c8def2b31740551c6d12b3bf57bdb001400d6499162f58d0`) was
+> found outside the repository and deleted on 2026-10-21; no remaining copy was
+> found under the user home or `/tmp`. See `docs/ai/project-state.md`
+> `## Active Plan (0025)` and `build/0025/capture-retention-check.txt` (ignored).
 
 ## 6. 已完成的重要工作（有证据的）
 
@@ -217,6 +229,16 @@ Status vocabulary: `DONE` (works, verified) · `PARTIAL` · `FRAMEWORK_ONLY` ·
 8. **The real capture sample is still `resolution=open`** in the review queue: a
    human should decide whether it becomes public (its `company` is the platform
    name and its `description` contains page chrome).
+
+   > **Resolved 2026-10-21 (0025):** the current dev database contains no real
+   > capture row and no open review item; the four remaining jobs are DAO test
+   > fixtures. The raw real-capture JSON at
+   > `$HOME/capture-acceptance.json` was deleted and no copy remains under the
+   > user home or `/tmp`; no review-row reject/delete applied because no row
+   > existed. Redacted acceptance logs remain as evidence. This item is closed
+   > for the current environment; if a future real capture is imported, the
+   > no-retention rule still requires an explicit review decision (reject keeps
+   > the row for audit; deleting is a separate explicit action).
 
 ## 8. 已知 Bug
 

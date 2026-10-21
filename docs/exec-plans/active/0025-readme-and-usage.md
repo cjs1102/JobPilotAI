@@ -1,8 +1,8 @@
 # ExecPlan 0025 — README and external usage guide
 
-> 状态：**PLANNING（等待 VERDICT-0025-plan；批准前不改 README/图片/既有文档）**
-> 分支：`docs/0025-readme-and-usage`
-> 基线：`main@f788b06`（0023 merged；PR #6 `539202f`）
+> 状态：**IMPLEMENTATION（closeout pending；计划已由 PR #7 合入）**
+> 分支：`docs/readme-demo`（实施）；计划原始分支 `docs/0025-readme-and-usage`
+> 基线：`main@7acc58f`（计划 PR #7；0023 merge `539202f`）
 > 类型：**docs + developer demo tooling**（不碰 core/API/schema/CI）；L0 + shell smoke，不跑 L4；不启动 0024。
 
 ## 1. 背景
@@ -251,10 +251,23 @@ git diff --check
 ## 10. Progress
 
 ```text
-P0 plan + REQUEST       [x] 本文件；等待 VERDICT-0025-plan
-P1 demo scripts + seed fixture [ ] 未开始
-P2 screenshots + README + one-command Quick Start [ ] 未开始
-P3 README.zh-CN         [ ] 未开始
-P4 index/state          [ ] 未开始
-P5 L0 + shell smoke + closeout [ ] 未开始
+P0 plan + REQUEST       [x] 本文件；plan-only PR #7 merged at 7acc58f
+P1 demo scripts + seed fixture [x] demo-up.sh / demo-seed.sh / 12-job fixture
+P2 screenshots + README + one-command Quick Start [x] screenshots regenerated; README rewritten
+P3 README.zh-CN         [x] 独立中文镜像
+P4 index/state          [x] docs index + project-state + handoff corrections
+P5 L0 + shell smoke + closeout [x] smoke 完成；REQUEST-0025-closeout 已写；owner PR/merge 待办
 ```
+
+Execution note (2026-10-21): the planned `/tmp/0022-browser-final/*.png`
+originals were missing, so both screenshots were regenerated with
+`tools/dev/web-smoke.sh --browser firefox` (Python proxy fallback). The exact
+originals are not recoverable; the new files are 1366×682 and use the same
+synthetic UI. The isolated launcher smoke used `jobpilot-demo-0025`, ports
+18180/18181/13326/16399 and `jobpilot-backend:verify`; it printed
+`DEMO_READY`, seeded 12 jobs, preserved `.env` on re-run, and the stack was torn
+down with `down -v`. The capture no-retention check found 0 review items and
+only DAO test fixtures; the raw real-capture file
+`$HOME/capture-acceptance.json` was also deleted, with no copy found under the
+user home or `/tmp`. See `docs/ai/project-state.md` and the handoff
+corrections. Closeout request is written; owner PR/merge remains.

@@ -642,6 +642,9 @@ namespace jobpilot::service
         ASSERT_TRUE(missingResume->hasJson);
         EXPECT_EQ(missingResume->statusCode, 400);
         EXPECT_EQ(missingResume->jsonBody["code"], 10001);
+        EXPECT_EQ(
+            missingResume->jsonBody["data"]["field"],
+            "resume_id");
 
         // Missing / inactive job -> 40001 with the 404 mapping.
         const auto unknownJob =

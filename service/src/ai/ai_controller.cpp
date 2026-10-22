@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 
 #include "jobpilot/error.h"
+#include "jobpilot/service/request_validation.h"
 #include "jobpilot/service/auth/session_authenticator.h"
 
 namespace jobpilot::service
@@ -334,14 +335,23 @@ namespace jobpilot::service
         std::uint64_t jobId = 0;
         std::uint64_t resumeId = 0;
 
-        if (!ReadPositiveUnsigned(body, "job_id", &jobId) ||
-            !ReadPositiveUnsigned(body, "resume_id", &resumeId))
+        if (!ReadPositiveUnsigned(body, "job_id", &jobId))
         {
             WriteResponse(
                 &response,
                 request.KeepAlive(),
                 ErrorCode::kInvalidParam,
-                nullptr);
+                ParamError("job_id"));
+            return;
+        }
+
+        if (!ReadPositiveUnsigned(body, "resume_id", &resumeId))
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInvalidParam,
+                ParamError("resume_id"));
             return;
         }
 

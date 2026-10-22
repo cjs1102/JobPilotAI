@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 
 #include "jobpilot/error.h"
+#include "jobpilot/service/request_validation.h"
 
 namespace jobpilot::service
 {
@@ -509,8 +510,17 @@ namespace jobpilot::service
         std::uint64_t jobId = 0;
         std::uint64_t resumeVersionId = 0;
 
-        if (!TryGetUint64(body, "job_id", &jobId) ||
-            !TryGetUint64(
+        if (!TryGetUint64(body, "job_id", &jobId))
+        {
+            WriteResponse(
+                &response,
+                request.KeepAlive(),
+                ErrorCode::kInvalidParam,
+                ParamError("job_id"));
+            return;
+        }
+
+        if (!TryGetUint64(
                 body,
                 "resume_version_id",
                 &resumeVersionId))
@@ -519,7 +529,7 @@ namespace jobpilot::service
                 &response,
                 request.KeepAlive(),
                 ErrorCode::kInvalidParam,
-                nullptr);
+                ParamError("resume_version_id"));
             return;
         }
 

@@ -38,9 +38,9 @@ Merged in PR #13 at `c20795d` (head `621437a`). Four defects fixed:
 - **Non-UTF-8 input**: a strict UTF-8 validator rejects multipart title/filename,
   txt/md bodies, and public JSON writes with `400/10001` before any write.
   Internal import/source-sync/review endpoints were intentionally left out.
-- **Field-aware parameter errors**: `https://`-safe additive `data.field` for
-  resume `title`/`file`, application `resume_version_id`, and AI `resume_id`;
-  `code`/`message`/status unchanged.
+- **Field-aware parameter errors**: backward-compatible additive `data.field`
+  for resume `title`/`file`, application `resume_version_id`, and AI
+  `resume_id`; `code`/`message`/status unchanged.
 
 Tests moved **312 → 321**. `docs/quality/test-merge-map.json` counts and the
 renamed ranking case were updated. Main CI after the merge: `ci`

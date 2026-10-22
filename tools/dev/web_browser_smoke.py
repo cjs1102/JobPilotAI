@@ -153,6 +153,12 @@ class Driver:
         with open(path, "wb") as handle:
             handle.write(base64.b64decode(value))
 
+    def scroll_into_view(self, element_id):
+        self._request("POST", self._session("/execute/sync"), {
+            "script": "arguments[0].scrollIntoView({block: 'center'});",
+            "args": [{"element-6066-11e4-a52e-4f735466cecf": element_id}],
+        })
+
 
 def wait_for(predicate, description, timeout=20.0):
     deadline = time.time() + timeout
@@ -199,9 +205,34 @@ def upload_resume(driver, web_url, resume_file):
     wait_text(driver, "当前简历版本 id", timeout=30)
 
 
-def search_and_open(driver, web_url, keyword, expected_title):
+def capture_missing_skills_card(driver, screenshot_dir=None):
+    card = wait_for(
+        lambda: driver.find_xpath(
+            "//article[contains(@class,'job-card')][contains(., '缺少技能')]"
+        ),
+        "a job card with missing skills",
+        timeout=25,
+    )
+    if screenshot_dir:
+        os.makedirs(screenshot_dir, exist_ok=True)
+        driver.scroll_into_view(card)
+        time.sleep(0.5)
+        driver.screenshot(os.path.join(screenshot_dir, "web-jobs.png"))
+    card_text = driver.text(card)
+    for label in ("缺少技能", "命中技能"):
+        count = card_text.count(label)
+        if count > 1:
+            raise WebDriverError(
+                "%s appears %d times in one job card; expected at most once"
+                % (label, count)
+            )
+    return card
+
+
+def search_and_open(driver, web_url, keyword, expected_title, screenshot_dir=None):
     driver.navigate(web_url + "/#/jobs")
     wait_text(driver, "岗位列表")
+    capture_missing_skills_card(driver, screenshot_dir)
     keyword_input = driver.find("#keyword")
     driver.send_keys(keyword_input, keyword)
     driver.click(driver.find_xpath("//form[contains(@class,'filters')]//button[@type='submit']"))
@@ -209,9 +240,6 @@ def search_and_open(driver, web_url, keyword, expected_title):
         lambda: expected_title in driver.body_text(),
         "job row %r" % expected_title,
         timeout=25,
-    )
-    card = driver.find_xpath(
-        "//article[contains(@class,'job-card')][contains(., '%s')]" % expected_title
     )
     driver.click(driver.find_xpath(
         "//article[contains(@class,'job-card')][contains(., '%s')]"
@@ -222,7 +250,7 @@ def search_and_open(driver, web_url, keyword, expected_title):
     body = driver.body_text()
     if "未提供链接" not in body:
         raise WebDriverError("expected the audit sample to have no apply_url")
-    return card
+    return None
 
 
 def favourite(driver, web_url, expected_title):
@@ -276,7 +304,7 @@ def main(argv=None):
     try:
         login(driver, args.web_url, args.email, args.password)
         upload_resume(driver, args.web_url, resume_file)
-        search_and_open(driver, args.web_url, args.keyword, args.expected_title)
+        search_and_open(driver, args.web_url, args.keyword, args.expected_title, args.screenshot_dir)
         if args.screenshot_dir:
             os.makedirs(args.screenshot_dir, exist_ok=True)
             driver.screenshot(os.path.join(args.screenshot_dir, "web-detail.png"))

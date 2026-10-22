@@ -92,9 +92,15 @@ namespace jobpilot::service
             if (!profile.has_value() &&
                 skills.empty())
             {
+                // A new account without a profile or skills is a normal
+                // state, not a bad request. Return an empty page so the UI can
+                // render its onboarding state without a spurious 400.
+                RankedJobPage empty;
+                empty.page = page;
+                empty.pageSize = pageSize;
                 return ServiceResult<RankedJobPage>{
-                    ErrorCode::kInvalidParam,
-                    {}};
+                    ErrorCode::kSuccess,
+                    empty};
             }
 
             RankedJobPage result;

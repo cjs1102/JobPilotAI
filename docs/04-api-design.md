@@ -99,6 +99,12 @@ AI 接口均为异步：发起返回 `task_id`，客户端轮询 `GET /api/v1/ai
 | 60001 | internal error | 服务端内部错误 |
 | 60002 | database error | 数据库错误 |
 
+**Field-aware parameter errors (2026-10-22).** `10001` may carry an additive
+`data` object naming the rejected field, for example
+`{"code":10001,"message":"invalid parameter","data":{"field":"title"}}`.
+`code`, `message`, and the HTTP status are unchanged; existing clients may
+ignore `data`. Raw JSON bodies that are not valid UTF-8 use `"field":"body"`.
+
 ---
 
 ## 3. 用户接口
@@ -221,8 +227,13 @@ POST /api/v1/resumes/upload
 
 | 字段 | 说明 |
 |---|---|
-| file | 文件（PDF/TXT/MD） |
-| title | 简历名称，如 "C++后端版" |
+| file | 文件（PDF/TXT/MD），必填 |
+| title | 简历名称，如 "C++后端版"，必填；UTF-8 |
+
+`title`/`filename` and the text body of `.txt`/`.md` files must be valid UTF-8.
+Invalid input returns `400` with `code=10001` and, for these fields,
+`data.field` set to `title` or `file`; no file or database row is written.
+PDF bytes remain binary and are not UTF-8-validated.
 
 ```json
 {
@@ -296,7 +307,8 @@ POST /api/v1/resumes/{id}/versions
 ```
 
 `content` 为空或全空白 → `400`（`content` 为空串）／`text_status = "text_empty"`（全空白）；
-不带 `content` 键 → `400`。语义见 §4.1 的状态表。
+不带 `content` 键 → `400`（`data.field=content`）。`content` 必须是合法 UTF-8；否则
+返回 `400`/`10001` 且不写入任何版本。语义见 §4.1 的状态表。
 
 ### 4.4 简历版本列表
 
@@ -609,6 +621,8 @@ Authorization: Bearer <token>
   `posted_within_days`，响应条目同样带 `freshness` 等 0012 字段。
 - 推荐条目与 5.1 同形，因此也包含 `source_url` 与 0020 的 `apply_url`
   （string|null，始终存在）。
+- **新用户没有画像且没有技能时不是错误**：返回 `200` +
+  `data.list=[]`、`data.total=0`（并回显 `page`/`page_size`），不再返回 `10001`。
 
 ### 5.4 岗位内部导入
 
@@ -978,7 +992,8 @@ POST /api/v1/applications
 ```
 
 `resume_version_id` 为必填项，且对应版本必须属于当前登录用户；`job_id`
-必须对应启用中的岗位。重复投递返回 `40004`。
+必须对应启用中的岗位。重复投递返回 `40004`。缺少或类型错误时返回
+`400`/`10001`，并在 `data.field` 指明 `job_id` 或 `resume_version_id`。
 
 ### 6.2 投递列表
 
@@ -1064,6 +1079,9 @@ POST /api/v1/ai/match
   "data": { "task_id": 1024 }
 }
 ```
+
+`job_id` 与 `resume_id` 都是必填的正整数。缺少或类型错误时返回
+`400`/`10001`，并在 `data.field` 指明 `job_id` 或 `resume_id`。
 
 ### 7.2 简历优化 / 面试题生成
 

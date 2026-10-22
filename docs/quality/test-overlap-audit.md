@@ -9,11 +9,11 @@ in CI.
 The audit classified every candidate pair by assertion target and concluded that
 no test case is removable:
 
-- 312 CTest cases before and after the audit; 0 removed.
+- 321 CTest cases before and after the audit (312 at audit time; 9 added by 0028); 0 removed.
 - 66 candidate pairs evaluated; 47 recorded only; 20-pair cap respected.
 - No survivor is missing, no removed case is still live, and the live CTest list
   still matches the map.
 
 The complete historical report and its negative controls remain in Git history.
 
-<!-- audit-counts: {"before":312,"after":312,"removed":0,"survivors":0,"candidates_evaluated":66,"candidate_pairs_unordered":50,"record_only":47,"cap":20} -->
+<!-- audit-counts: {"before":321,"after":321,"removed":0,"survivors":0,"candidates_evaluated":66,"candidate_pairs_unordered":50,"record_only":47,"cap":20} -->

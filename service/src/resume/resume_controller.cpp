@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 
 #include "jobpilot/error.h"
+#include "jobpilot/service/request_validation.h"
 #include "jobpilot/http/multipart_form_data_parser.h"
 
 namespace jobpilot::service
@@ -449,6 +450,18 @@ namespace jobpilot::service
             jobpilot::core::HttpResponse *response,
             Json *body)
         {
+            if (!jobpilot::core::IsValidUtf8(
+                    request.Body()))
+            {
+                WriteResponse(
+                    response,
+                    request.KeepAlive(),
+                    ErrorCode::kInvalidParam,
+                    ParamError("body"));
+
+                return false;
+            }
+
             try
             {
                 *body = Json::parse(
@@ -471,7 +484,20 @@ namespace jobpilot::service
                     response,
                     request.KeepAlive(),
                     ErrorCode::kInvalidParam,
-                    nullptr);
+                    ParamError("body"));
+
+                return false;
+            }
+
+            std::string invalidField;
+
+            if (!ValidateJsonUtf8(*body, &invalidField))
+            {
+                WriteResponse(
+                    response,
+                    request.KeepAlive(),
+                    ErrorCode::kInvalidParam,
+                    ParamError(invalidField));
 
                 return false;
             }
@@ -521,7 +547,7 @@ namespace jobpilot::service
                             response,
                             request.KeepAlive(),
                             ErrorCode::kInvalidParam,
-                            nullptr);
+                            ParamError("title"));
 
                         return std::nullopt;
                     }
@@ -536,7 +562,7 @@ namespace jobpilot::service
                             response,
                             request.KeepAlive(),
                             ErrorCode::kInvalidParam,
-                            nullptr);
+                            ParamError("file"));
 
                         return std::nullopt;
                     }
@@ -545,15 +571,48 @@ namespace jobpilot::service
                 }
             }
 
-            if (title == nullptr ||
-                file == nullptr ||
+            if (title == nullptr)
+            {
+                WriteResponse(
+                    response,
+                    request.KeepAlive(),
+                    ErrorCode::kInvalidParam,
+                    ParamError("title"));
+
+                return std::nullopt;
+            }
+
+            if (file == nullptr ||
                 !file->filename.has_value())
             {
                 WriteResponse(
                     response,
                     request.KeepAlive(),
                     ErrorCode::kInvalidParam,
-                    nullptr);
+                    ParamError("file"));
+
+                return std::nullopt;
+            }
+
+            if (!jobpilot::core::IsValidUtf8(title->body))
+            {
+                WriteResponse(
+                    response,
+                    request.KeepAlive(),
+                    ErrorCode::kInvalidParam,
+                    ParamError("title"));
+
+                return std::nullopt;
+            }
+
+            if (!jobpilot::core::IsValidUtf8(
+                    file->filename.value()))
+            {
+                WriteResponse(
+                    response,
+                    request.KeepAlive(),
+                    ErrorCode::kInvalidParam,
+                    ParamError("file"));
 
                 return std::nullopt;
             }
@@ -756,7 +815,7 @@ namespace jobpilot::service
                 &response,
                 request.KeepAlive(),
                 ErrorCode::kInvalidParam,
-                nullptr);
+                ParamError("content"));
 
             return;
         }

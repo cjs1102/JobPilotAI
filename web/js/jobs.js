@@ -84,8 +84,6 @@ function textField(id, label, value, attrs = {}) {
 function matchesBlock(job) {
   const hasScore = typeof job.score === "number";
   const reasons = Array.isArray(job.reasons) ? job.reasons : [];
-  const matched = Array.isArray(job.matched_skills) ? job.matched_skills : [];
-  const missing = Array.isArray(job.missing_skills) ? job.missing_skills : [];
   const breakers = Array.isArray(job.deal_breakers) ? job.deal_breakers : [];
 
   if (!hasScore && reasons.length === 0 && breakers.length === 0) {
@@ -109,17 +107,6 @@ function matchesBlock(job) {
   }
   if (badges.childNodes.length > 0) {
     block.appendChild(badges);
-  }
-
-  if (matched.length > 0) {
-    block.appendChild(el("div", { class: "small" },
-      el("span", { class: "muted" }, "命中技能："),
-      matched.join("、")));
-  }
-  if (missing.length > 0) {
-    block.appendChild(el("div", { class: "small" },
-      el("span", { class: "muted" }, "缺少技能："),
-      missing.join("、")));
   }
 
   if (reasons.length > 0) {

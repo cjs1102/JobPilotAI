@@ -666,6 +666,26 @@ namespace jobpilot::service
         // JOB_PUBLIC_INCLUDE_NEEDS_REVIEW=1 the same request is accepted. That is
         // asserted in the service-level test, which can inject the flag.
 
+        const nlohmann::json missingResumeField{
+            {"job_id", jobId}};
+        const std::optional<HttpResponseData> missingResumeFieldError =
+            SendRequest(
+                "POST",
+                "/api/v1/applications",
+                missingResumeField.dump(),
+                authorization);
+
+        ASSERT_TRUE(missingResumeFieldError.has_value());
+        ASSERT_TRUE(missingResumeFieldError->hasJson);
+        EXPECT_EQ(missingResumeFieldError->statusCode, 400);
+        EXPECT_EQ(
+            missingResumeFieldError->jsonBody["code"],
+            10001);
+        EXPECT_EQ(
+            missingResumeFieldError
+                ->jsonBody["data"]["field"],
+            "resume_version_id");
+
         const nlohmann::json missingResume{
             {"job_id", jobId},
             {"resume_version_id", 999999999ULL}};

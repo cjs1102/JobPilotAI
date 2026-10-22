@@ -791,6 +791,184 @@ namespace jobpilot::service
         EXPECT_EQ(unsupported->jsonBody["code"], 10001);
     }
 
+    TEST_F(ResumeHttpTest, RejectsInvalidUtf8BeforeWriting)
+    {
+        const auto user =
+            RegisterAndLogin("resume-http-utf8");
+        const std::string authorization =
+            "Bearer " + user.second;
+
+        const auto countResumes = [&]()
+        {
+            const jobpilot::core::Result result =
+                pool->Query(
+                    "SELECT COUNT(*) FROM resumes WHERE user_id = ?",
+                    {user.first});
+            return result.value(0, 0).value();
+        };
+
+        const auto countVersions = [&]()
+        {
+            const jobpilot::core::Result result =
+                pool->Query(
+                    "SELECT COUNT(*) FROM resume_versions "
+                    "WHERE resume_id IN (SELECT id FROM resumes WHERE user_id = ?)",
+                    {user.first});
+            return result.value(0, 0).value();
+        };
+
+        const std::string beforeResumes = countResumes();
+        const std::string beforeVersions = countVersions();
+
+        const std::string invalidTitle(
+            "\xBA\xF3\xBB\xD8\xB0\xE6",
+            6);
+        const std::optional<HttpResponseData> badTitle =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/upload",
+                MakeMultipart(
+                    invalidTitle,
+                    "resume.txt",
+                    "text/plain",
+                    "valid body"),
+                authorization,
+                "multipart/form-data; boundary=" +
+                    std::string(kBoundary));
+
+        ASSERT_TRUE(badTitle.has_value());
+        ASSERT_TRUE(badTitle->hasJson);
+        EXPECT_EQ(badTitle->statusCode, 400);
+        EXPECT_EQ(badTitle->jsonBody["code"], 10001);
+        EXPECT_EQ(
+            badTitle->jsonBody["data"]["field"],
+            "title");
+        EXPECT_EQ(countResumes(), beforeResumes);
+        EXPECT_EQ(countVersions(), beforeVersions);
+
+        const std::optional<HttpResponseData> badFile =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/upload",
+                MakeMultipart(
+                    "valid title",
+                    "resume.txt",
+                    "text/plain",
+                    std::string(1, static_cast<char>(0xFF))),
+                authorization,
+                "multipart/form-data; boundary=" +
+                    std::string(kBoundary));
+
+        ASSERT_TRUE(badFile.has_value());
+        ASSERT_TRUE(badFile->hasJson);
+        EXPECT_EQ(badFile->statusCode, 400);
+        EXPECT_EQ(badFile->jsonBody["code"], 10001);
+        EXPECT_EQ(countResumes(), beforeResumes);
+        EXPECT_EQ(countVersions(), beforeVersions);
+
+        const std::string chineseTitle = u8"中文简历";
+        const std::optional<HttpResponseData> goodUpload =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/upload",
+                MakeMultipart(
+                    chineseTitle,
+                    "resume.txt",
+                    "text/plain",
+                    "hello"),
+                authorization,
+                "multipart/form-data; boundary=" +
+                    std::string(kBoundary));
+
+        ASSERT_TRUE(goodUpload.has_value());
+        ASSERT_TRUE(goodUpload->hasJson);
+        ASSERT_EQ(goodUpload->statusCode, 200);
+        const std::uint64_t resumeId =
+            goodUpload->jsonBody["data"]["resume_id"]
+                .get<std::uint64_t>();
+
+        const std::string beforeBadContent = countVersions();
+        std::string invalidJson = "{\"content\":\"";
+        invalidJson.push_back(static_cast<char>(0xFF));
+        invalidJson += "\"}";
+
+        const std::optional<HttpResponseData> badContent =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/" +
+                    std::to_string(resumeId) +
+                    "/versions",
+                invalidJson,
+                authorization,
+                "application/json");
+
+        ASSERT_TRUE(badContent.has_value());
+        ASSERT_TRUE(badContent->hasJson);
+        EXPECT_EQ(badContent->statusCode, 400);
+        EXPECT_EQ(badContent->jsonBody["code"], 10001);
+        EXPECT_EQ(countVersions(), beforeBadContent);
+    }
+
+    TEST_F(ResumeHttpTest, NamesMissingMultipartFields)
+    {
+        const auto user =
+            RegisterAndLogin("resume-http-fields");
+        const std::string authorization =
+            "Bearer " + user.second;
+
+        std::string missingTitle =
+            "--" + std::string(kBoundary) +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"file\"; "
+            "filename=\"resume.txt\"\r\n"
+            "Content-Type: text/plain\r\n"
+            "\r\n"
+            "hello"
+            "\r\n--" + std::string(kBoundary) + "--\r\n";
+
+        const std::optional<HttpResponseData> noTitle =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/upload",
+                missingTitle,
+                authorization,
+                "multipart/form-data; boundary=" +
+                    std::string(kBoundary));
+
+        ASSERT_TRUE(noTitle.has_value());
+        ASSERT_TRUE(noTitle->hasJson);
+        EXPECT_EQ(noTitle->statusCode, 400);
+        EXPECT_EQ(noTitle->jsonBody["code"], 10001);
+        EXPECT_EQ(
+            noTitle->jsonBody["data"]["field"],
+            "title");
+
+        std::string missingFile =
+            "--" + std::string(kBoundary) +
+            "\r\n"
+            "Content-Disposition: form-data; name=\"title\"\r\n"
+            "\r\n"
+            "C++ resume"
+            "\r\n--" + std::string(kBoundary) + "--\r\n";
+
+        const std::optional<HttpResponseData> noFile =
+            SendRequest(
+                "POST",
+                "/api/v1/resumes/upload",
+                missingFile,
+                authorization,
+                "multipart/form-data; boundary=" +
+                    std::string(kBoundary));
+
+        ASSERT_TRUE(noFile.has_value());
+        ASSERT_TRUE(noFile->hasJson);
+        EXPECT_EQ(noFile->statusCode, 400);
+        EXPECT_EQ(noFile->jsonBody["code"], 10001);
+        EXPECT_EQ(
+            noFile->jsonBody["data"]["field"],
+            "file");
+    }
+
     TEST_F(ResumeHttpTest, EnforcesCrossUserIsolation)
     {
         const auto firstUser =

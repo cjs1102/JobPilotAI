@@ -78,14 +78,14 @@ python3 tools/checks/release_preflight.py            # release commit: clean tre
 python3 tools/checks/release_preflight.py --allow-dirty   # preparation only
 ```
 
-- `test_coverage_map.py` (0017-B) is the executable half of
-  [`test-overlap-audit.md`](test-overlap-audit.md). That audit proved no test case
+- `test_coverage_map.py` is the executable guard behind
+  [`test-overlap-audit.md`](test-overlap-audit.md). The audit proved no test case
   is removable (k = 0, 66 candidates, each failing a clause of the strict merge
   rule), so the map is empty; the checker fails when a removed name is still
   live, a survivor is absent, the counts drift from the live `ctest -N` list, or
-  the report's `audit-counts` marker disagrees with the map, and the negative
-  controls in report §7.2 show each of those exits non-zero. It runs in the CI
-  `integration` job right after the suite.
+  the summary's `audit-counts` marker disagrees with the map. It runs in the CI
+  `integration` job right after the suite. The long report and negative controls
+  are in Git history; the public tree keeps the summary and machine map.
 - `release_preflight.py` (0017-D, extended in 0017A) is the automated half of
   [`../RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md): licence, the
   `service/conanfile.txt` dependency list against `THIRD_PARTY_NOTICES.md`, secret
@@ -154,13 +154,11 @@ INTERNAL_API_TOKEN=dummy python3 -m jobpilot_sources sync \
   --config /path/to/live-config.yaml --dry-run
 ```
 
-**Recorded-result status (2026-10-19):** `docs/ai/project-state.md` records
-"Greenhouse 217 / Lever 10 / Ashby 160", but no raw command/date/response
-evidence exists in the repository (the handoff says no live board run was
-recorded). Those counts are **unverified**; do not cite them as release
-evidence. A separate follow-up (proposed 0019) must re-run the smoke and record
-the raw output, or keep the unverified label. The 0018 nowcoder live smoke is
-separate and its evidence is in the 0018 ExecPlan.
+**Recorded-result status (2026-10-19):** the 0019 dry-run recorded
+Greenhouse **232**, Lever **10**, and Ashby **167**, all `board_complete=True`.
+Those are a dated live snapshot, not a constant or coverage promise; the raw log
+was a local build artifact and is not in the public tree. Do not present the
+older 217/10/160 values as current.
 
 ## ASan
 

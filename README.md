@@ -1,25 +1,100 @@
 # JobPilotAI
 
+**A self-hosted, compliance-first job-search workspace: collect public postings,
+understand your match, and track applications — without auto-submitting them.**
+
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-JobPilotAI is a self-hosted job-search workspace: Python source adapters collect
-public job postings, a C++17 backend searches and ranks them, explains matches
-deterministically, and tracks applications. An optional AI worker provides
-task-based assistance; the core workflow does not require an AI provider or API
-key.
+[![CI](https://github.com/cjs1102/JobPilotAI/actions/workflows/ci.yml/badge.svg)](https://github.com/cjs1102/JobPilotAI/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/cjs1102/JobPilotAI?display_name=tag)](https://github.com/cjs1102/JobPilotAI/releases/tag/v0.1.0)
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](CMakePresets.json)
+[![C++ tests](https://img.shields.io/badge/tests-312%20C%2B%2B-brightgreen.svg)](docs/quality/README.md)
 
-| Job detail with an explainable match | Application status board |
-|---|---|
-| ![Job detail showing a rule-based match score and reasons](docs/images/web-detail.png) | ![Application status board with a resume upload and tracked applications](docs/images/web-status.png) |
+![Job detail with an explainable rule-based match](docs/images/web-detail.png)
 
-The screenshots show the local Web UI with synthetic demo data. The current UI
-labels are in Chinese.
+*Job detail with a deterministic match score, matched skills, reasons, and
+deal-breakers. The current UI labels are Chinese.*
+
+<details>
+<summary>Application status board</summary>
+
+![Application status board with tracked applications](docs/images/web-status.png)
+
+*Favourites and application states stay in one local board; the actual
+application opens on the original page.*
+
+</details>
+
+## Why
+
+Job boards are good at listing jobs and bad at telling you why one is worth your
+time. JobPilotAI turns public postings into a searchable workspace, explains the
+match with a deterministic `rule_v1` model, and keeps the application state in
+one place.
+
+It deliberately stops before the submit button. Matching is explainable, resume
+tailoring is a draft with a fact-check gate, and the actual application opens in
+the original page for a human to review. It is **not** a bot that mass-applies.
+
+## Contents
+
+[Why](#why) · [Features](#features) · [Architecture](#architecture) ·
+[Quick Start](#quick-start-english) · [Usage](#usage) ·
+[Verification](#verification) · [Documentation](#documentation) ·
+[Roadmap](#roadmap) · [Non-goals](#non-goals) ·
+[Contributing](#contributing) · [Security](#security) · [License](#license) · [Acknowledgements](#acknowledgements)
+
+## Features
+
+- **Collect public jobs** through Greenhouse, Lever, Ashby, and nowcoder
+  adapters, plus manual capture and JSON import.
+- **Search and filter** by keyword, salary, skill, location, education,
+  job nature, deadline, and sort order.
+- **Explain every match** with a score, matched/missing skills, additive
+  reasons, deal-breakers, and deadline urgency.
+- **Draft a resume** with source annotations and a mechanical fact gate before
+  confirmation.
+- **Track applications** through a validated state machine and a local status
+  board.
+- **Run locally** with a native HTML/CSS/JS UI; nginx is optional and a Python
+  stdlib proxy is the fallback.
+- **Keep AI optional**: the deterministic path works without a provider key;
+  the Python AI worker adds task-based assistance.
+
+## Architecture
+
+`backend/` is `jobpilot_core` (network/HTTP, config, logging, MySQL, Redis).
+`service/` is the business layer and the runnable entry, split into controllers,
+services, and DAOs. Python tools are kept outside the C++ service.
+
+```text
+JobPilotAI/
+├── backend/          # jobpilot_core: network/HTTP, config, logging, DB, cache
+├── service/          # business layer + runnable service + C++ tests
+├── source_adapters/  # public-source adapters and manual capture (Python)
+├── ai_worker/        # optional AI task worker (Python)
+├── web/              # native HTML/CSS/JS UI, no build step
+├── database/schema/  # MySQL 8 schema and additive migrations
+├── docker/           # nginx static-host config
+├── docs/             # contracts, ADRs, quality, guides, stage index
+└── tools/            # demo, release, and verification tools
+```
+
+Request path:
+
+```text
+Browser -> nginx (or web_static_proxy.py) -> Router -> Controller -> Service -> DAO -> MySQL
+                                                                  \-> Redis (sessions)
+```
+
+The C++ service speaks HTTP/1.1 over an epoll-based Reactor. P1 network/HTTP is
+behaviorally frozen; changes there need an explicitly approved correctness plan.
 
 ## Quick Start (English)
 
-Prerequisites: Docker Engine with Compose v2, `curl`, and Python 3. The first
-run builds the backend image, so Docker must be able to pull its base images and
-complete that build.
+Prerequisites: Docker Engine with Compose v2, `curl`, and Python 3. The first run
+builds the backend image and pulls MySQL 8 and Redis 7.
 
 ```bash
 git clone https://github.com/cjs1102/JobPilotAI.git
@@ -27,223 +102,118 @@ cd JobPilotAI
 ./tools/dev/demo-up.sh
 ```
 
-The launcher:
+The launcher creates a `.env` with random secrets only when the file is missing
+(mode `0600`, values never printed), starts the stack, serves the UI, and imports
+12 synthetic jobs. A successful run prints:
 
-- checks Docker, Compose, `curl`, and Python;
-- creates a `.env` with random MySQL and internal-token secrets only when
-  `.env` is missing, writes it with mode `0600`, and never prints the secret
-  values; an existing `.env` is left untouched;
-- starts MySQL 8 and Redis 7, builds and starts the backend, and serves the Web
-  UI on port `8081` — through nginx when `nginx:1.27-alpine` is available, or
-  through the bundled Python static/proxy server otherwise;
-- imports 12 synthetic jobs by default and prints a line such as
-  `DEMO_READY url=http://127.0.0.1:8081`.
+```text
+DEMO_READY url=http://127.0.0.1:8081
+```
 
-Open the printed URL. The default backend is on `http://127.0.0.1:8080`. To
-start without the sample jobs, pass `--no-seed`. Ports and the Compose project
-name can be overridden with `DEMO_API_PORT`, `DEMO_WEB_PORT`,
-`DEMO_MYSQL_PORT`, `DEMO_REDIS_PORT`, and `DEMO_PROJECT`.
-
-Stop the stack with:
+Open that URL. The API is on `http://127.0.0.1:8080` by default. Stop the stack
+with:
 
 ```bash
 docker compose --env-file .env -p jobpilot-demo --profile app --profile web down
 ```
 
-Add `-v` only if you also want to delete the demo database and uploaded files.
+If `nginx:1.27-alpine` is unavailable, `demo-up.sh` automatically uses the
+Python static/proxy server. Pass `--no-seed` to skip the sample jobs. Full
+troubleshooting is in [`docs/guides/local-demo.md`](docs/guides/local-demo.md).
 
 ### Build from source (optional)
 
-The one-command demo uses the containerized backend. To build and run the C++
-service directly, install a C++17 toolchain, CMake, `pkg-config`, and the MySQL
-client development files, then:
+The demo uses the containerized backend. To build the C++ service directly,
+install a C++17 toolchain, CMake, `pkg-config`, and the MySQL client development
+files, then:
 
 ```bash
-tools/dev/bootstrap.sh          # resolves the pinned Conan graph
+tools/dev/bootstrap.sh          # resolve the pinned Conan graph
 cmake --preset release
 cmake --build --preset release -j"$(nproc)"
 ```
 
-See [`docs/quality/README.md`](docs/quality/README.md) for presets, test levels,
-and sanitizer runs. The binary is
-`build/presets/release/service/jobpilot_service`.
+The binary is `build/presets/release/service/jobpilot_service`. See
+[`docs/quality/README.md`](docs/quality/README.md) for presets and test levels.
 
-### Manual setup and the nginx fallback
+## Usage
 
-If you prefer to manage the services yourself:
+1. Register a local account; the demo uses HTTP and browser `localStorage`.
+2. Upload a PDF/TXT/Markdown resume before favouriting a job.
+3. Search `C++`, open the recommended view, and use the filters.
+4. Read the score, matched/missing skills, `reasons`, and `deal_breakers`.
+5. Favourite a job and move it through the status board.
+6. Open the apply link or original announcement and apply manually.
 
-```bash
-cp .env.example .env          # set MYSQL_ROOT_PASSWORD and MYSQL_PASSWORD
-docker compose up -d          # MySQL + Redis
-docker compose --profile app build backend
-docker compose --profile app --profile web up -d
-```
-
-If `nginx:1.27-alpine` cannot be pulled, the same `web/` files can be served by
-the Python standard-library runner:
-
-```bash
-python3 tools/dev/web_static_proxy.py \
-  --root web --port 8081 --backend http://127.0.0.1:8080
-```
-
-`tools/dev/demo-up.sh` performs this fallback automatically. See the
-[local demo guide](docs/guides/local-demo.md) for troubleshooting.
-
-## Try the demo
-
-1. Register a local account.
-2. Open the application status board, go to resume setup, and upload a PDF, TXT,
-   or Markdown resume. A resume version is required before a job can be
-   favourited.
-3. Open the jobs view and search for `C++`; try the location, salary, education,
-   job-nature, and sort filters.
-4. Open a result and read the match score, matched and missing skills,
-   `reasons`, and `deal_breakers`. Matching is deterministic and needs no AI
-   key.
-5. Favourite the job. On the status board, move it through the application state
-   machine (favourite, to apply, applied, written test, interviews, offer) or
-   mark it rejected.
-6. Use the apply-link button when an apply URL exists, otherwise use the
-   original-announcement button. These links open the original page in a new
-   tab; JobPilotAI does not fill in or submit an application.
-
-The demo user, resume, and jobs are local fixtures. Do not use real credentials
-or personal resumes in a shared environment.
-
-## How to use
-
-### Collect or import jobs
-
-JobPilotAI reads public, login-free sources through Python source adapters:
-Greenhouse, Lever, Ashby, and nowcoder for China campus listings. Adapters
-publish observations through the token-protected internal API and never write
-to the database directly. A manual-capture bookmarklet is available for pages
-behind a login wall; it reads the page the user already has open and does not
-send credentials or make network requests. A manual import endpoint also
-accepts a JSON batch.
-
-The source adapters are documented in
-[`source_adapters/README.md`](source_adapters/README.md), including the source
-register, robots handling, and per-source limits. Treat a `complete=false`
-observation as a bounded sample, not a full crawl.
-
-### Search, filter, and rank
-
-The public job list supports pagination, keyword search, salary and skill
-filters, location and education filters, deadline filters, and sorting. Signed-in
-users can request the recommended view. Only jobs that passed the intake quality
-gate are visible publicly; rows that need review stay behind the internal
-review surface.
-
-### Read the match explanation
-
-`rule_v1` is a deterministic ranking and explanation model. It returns a score,
-matched and missing skills, additive `reasons`, `deal_breakers`, and deadline
-urgency. There is no hidden LLM step in this path. The AI task pipeline is
-optional and cannot overwrite the deterministic score.
-
-### Prepare a resume draft
-
-The resume tailor produces a deterministic plain-text ATS draft with source
-annotations for each factual claim; unknown facts remain explicit placeholders.
-A mechanical fact gate must pass before a draft can be confirmed. This is a
-draft workflow, not an automatic application generator.
-
-### Track applications and apply manually
-
-Favourites and application status changes are recorded in the local database.
-The backend enforces the status state machine. When it is time to apply, open
-the original posting or the explicit apply link and complete the application in
-the browser. There is no auto-submit, form-filling, or notification path.
-
-All demo data stays in local Docker volumes. Network access happens only when
-you run a source adapter or configure an optional AI provider.
-
-## What's included
-
-- **Source ingestion** — public ATS adapters, a nowcoder campus source, manual
-  capture, JSON import, source observations, freshness, and an intake quality
-  gate.
-- **Search and ranking** — keyword and structured filters, stable pagination, a
-  recommended view, and deterministic `rule_v1` scoring.
-- **Explainable matching** — scores, matched and missing skills, reasons,
-  deal-breakers, and deadline urgency on the job list and detail pages.
-- **Resume tailoring** — deterministic ATS drafts with source annotations and a
-  fact-check gate.
-- **Application tracking** — favourites, a validated status state machine,
-  statistics, and a local status board.
-- **Local Web UI** — native HTML/CSS/JavaScript with no build step, same-origin
-  `/api` and `/health` proxying, and a stdlib fallback when nginx is unavailable.
-- **Optional AI worker** — a Python worker for task-based assistance; the core
-  product degrades gracefully without a provider key.
-- **Operational tooling** — Docker Compose, a committed container image
-  definition, CI, sanitizer presets, benchmark harnesses, a release preflight,
-  and a check that no submission path exists.
+The demo data is synthetic and stays in local Docker volumes. No application is
+submitted by JobPilotAI.
 
 ## Verification
 
-The release-readiness baseline recorded on 2026-10-21:
-
-- **312 C++ tests** through CTest. The Debug, ASan, and UBSan runs each
-  completed `312/312` with zero failures and zero sanitizer diagnostics. One
-  review-backfill test is skipped on the developer database and passes on the
-  isolated scratch database.
-- **TSan**: 52/52 harness tests and 17/17 external-runtime tests, with zero
-  diagnostics. TSan does not cover the entire suite.
-- **Python**: 481 source-adapter tests and 190 AI-worker tests pass in their
-  pinned environment.
-- **CI**: the `ci` and `image` workflows were green on `main` after the
-  release-readiness merge. The image workflow builds the committed Dockerfile
-  and runs an end-to-end demo gate.
-- **Benchmark** on a 4-vCPU host: 13.4–16.1k requests/second on `/health` and
-  180–194 requests/second on the database-backed jobs endpoint. These are
-  host-specific measurements, not a service-level objective or a pass/fail
-  threshold. Environment and raw results are in
-  [`docs/benchmarks/README.md`](docs/benchmarks/README.md).
-
-## Limits and non-goals
-
-- **China source coverage is narrow.** nowcoder is the only registered China
-  campus source. It reads a bounded login-free list: at most 20 rows per query,
-  no pagination, and always `complete=false`. Other China sources are not
-  registered.
-- **Some postings have no apply URL.** Greenhouse and nowcoder aggregated rows
-  do not expose a source-provided `apply_url`; the UI falls back to the original
-  announcement. It never derives or guesses an apply URL. Moka has not been
-  verified and is not registered.
-- **Login walls are not bypassed.** There is no automatic login, CAPTCHA
-  bypass, cookie or user-agent spoofing, or proxy pool. Login-walled jobs use
-  manual capture only.
-- **No automatic application.** There is no auto-apply, auto-submit, form
-  filling, or notification path. There is also no general-purpose crawler,
-  message queue, API gateway, or SaaS RBAC.
-- **Deadlines are display-only.** An expired deadline does not automatically
-  close a job.
-- **The UI is a local demo.** Authentication uses HTTP and browser
-  `localStorage`, not production authentication or TLS.
-- **No legal conclusion.** Source terms, robots directives, and data-use rules
-  remain the operator's responsibility.
+- **312 C++ tests**; Debug, ASan, and UBSan each completed `312/312` with zero
+  failures and zero sanitizer diagnostics (one review-backfill skip on the
+  developer database; it passes on the isolated scratch database).
+- **TSan**: 52/52 harness tests and 17/17 external-runtime tests, zero
+  diagnostics. TSan does not cover the full suite.
+- **Python**: 481 source-adapter tests and 190 AI-worker tests pass in the pinned
+  environment.
+- **Data model**: 13 MySQL tables; **36 routes** (27 non-internal, 9 internal).
+- **Benchmark** (4 vCPU VMware, Release): **13,421.82 req/s** at 2 threads / 32
+  connections, p99 **7.17 ms**. This is a dated, host-specific number, not a
+  threshold.
+- **Latest main CI** (`3b4c60b`): `ci` `39625131378` and `image` `39625131650`
+  completed successfully.
 
 ## Documentation
 
-- [Documentation map](docs/README.md) and
-  [project documentation index](docs/PROJECT_DOCUMENTATION_INDEX.md)
-- [Local Web UI guide](docs/guides/local-demo.md)
-- [Architecture](docs/architecture/open-source-mvp.md) and
-  [architecture decisions](docs/adr/README.md)
-- [API contract](docs/04-api-design.md) and
-  [database contract](docs/03-database-design.md)
-- [Source adapters](source_adapters/README.md) and
-  [benchmarks](docs/benchmarks/README.md)
+| Topic | Document |
+|---|---|
+| Start here | [`docs/README.md`](docs/README.md) |
+| Overview, requirements, architecture | [`docs/00-project-overview.md`](docs/00-project-overview.md), [`docs/01-requirements.md`](docs/01-requirements.md), [`docs/02-system-architecture.md`](docs/02-system-architecture.md) |
+| Database and API contracts | [`docs/03-database-design.md`](docs/03-database-design.md), [`docs/04-api-design.md`](docs/04-api-design.md) |
+| Architecture decisions | [`docs/adr/README.md`](docs/adr/README.md) |
+| Coding and verification | [`docs/06-coding-standard.md`](docs/06-coding-standard.md), [`docs/quality/README.md`](docs/quality/README.md) |
+| Local demo and troubleshooting | [`docs/guides/local-demo.md`](docs/guides/local-demo.md) |
+| Benchmarks | [`docs/benchmarks/README.md`](docs/benchmarks/README.md) |
+| Stage history | [`docs/exec-plans/README.md`](docs/exec-plans/README.md) |
+| Document inventory | [`docs/PROJECT_DOCUMENTATION_INDEX.md`](docs/PROJECT_DOCUMENTATION_INDEX.md) |
 
-## Contributing and security
+## Roadmap
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request. Report
-security issues privately as described in [`SECURITY.md`](SECURITY.md); do not
-open a public issue for a vulnerability. A code of conduct is deferred until a
-reporting channel is available.
+These are directions, not commitments; all are **not started**.
+
+- Verify and register additional China sources (Moka is currently unverified).
+- Add provider-backed resume wording behind the existing fact gate.
+- Add local notifications for deadlines and status changes.
+- Harden the demo UI for production authentication and TLS.
+
+## Non-goals
+
+- Automatic application, form filling, or auto-submit.
+- Login-wall, CAPTCHA, cookie/UA, or proxy-pool bypass.
+- A general-purpose crawler, message queue, API gateway, or multi-tenant SaaS.
+- A promise of complete source coverage; some sources are intentionally bounded.
+
+## Contributing
+
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request. Work on
+a branch, include the relevant tests or a documented verification gap, and keep
+the P1 freeze in mind. The stage history is indexed in
+[`docs/exec-plans/README.md`](docs/exec-plans/README.md).
+
+## Security
+
+Report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md).
+Do not open a public issue for a security report. The local demo is not a
+production deployment: it uses HTTP and browser storage, and should not hold
+real credentials or personal resumes.
 
 ## License
 
 MIT. See [`LICENSE`](LICENSE) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+## Acknowledgements
+
+Built with libbcrypt, nlohmann/json, hiredis, spdlog, yaml-cpp, GoogleTest, and
+Conan. Third-party licences and provenance are recorded in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/cjs1102/JobPilotAI?display_name=tag)](https://github.com/cjs1102/JobPilotAI/releases/tag/v0.1.0)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](CMakePresets.json)
-[![C++ tests](https://img.shields.io/badge/tests-312%20C%2B%2B-brightgreen.svg)](docs/quality/README.md)
+[![C++ tests](https://img.shields.io/badge/tests-321%20C%2B%2B-brightgreen.svg)](docs/quality/README.md)
 
 ![带可解释规则匹配的岗位详情](docs/images/web-detail.png)
 
@@ -135,16 +135,18 @@ cmake --build --preset release -j"$(nproc)"
 
 ## 验证
 
-- **312 个 C++ 测试**；Debug、ASan、UBSan 各完成 `312/312`，无失败且没有
-  Sanitizer 诊断（开发数据库上有一个复核回填测试跳过；隔离临时库上通过）。
+- **321 个 C++ 测试**；Debug 全量完成 `321/321`，无失败且没有 Sanitizer
+  诊断（开发数据库上有一个复核回填测试跳过；隔离临时库上通过）。最近一次
+  完整 ASan/UBSan 矩阵是在新增 9 个测试之前的 `312/312`；受影响的 14 个测试
+  在两种 Sanitizer 下均通过。
 - **TSan**：测试框架 52/52，外部运行时 17/17，无诊断。TSan 不覆盖完整测试集。
 - **Python**：来源适配器 481 个测试、AI Worker 190 个测试，在固定依赖环境中
   全部通过。
 - **数据模型**：13 张 MySQL 表；**36 条路由**（27 条非内部，9 条内部）。
 - **基准测试**（4 vCPU VMware，Release）：2 线程 / 32 连接下 **13,421.82
   请求/秒**，p99 **7.17 ms**。这是特定日期的特定主机测量值，不是阈值。
-- **最新 main CI**（`3b4c60b`）：`ci` `39625131378` 与 `image` `39625131650`
-  均成功。
+- **最新 main CI**（`c20795d`）：`ci` `39814999026`（11m55s）与 `image`
+  `39814999046`（12m08s）均成功。
 
 ## 文档
 

@@ -1,12 +1,57 @@
 # JobPilotAI Current Project State
 
-> Snapshot: **2026-10-22**. `main = 3b4c60b`; the repository is public and
-> `v0.1.0` is tagged. Stages 0001–0026 are complete. **No code plan is active**;
-> the current change is the docs-only repository-hygiene PR (0027).
+> Snapshot: **2026-10-23**. `main = c20795d`; the repository is public and
+> `v0.1.0` is tagged. Stages 0001–0028 are complete. **No code plan is active**;
+> the current change is the docs-only status update (0029).
 
 This file is the concise live state. Stage bodies and long evidence are in Git
 history; the stage index is [`../exec-plans/README.md`](../exec-plans/README.md).
 Repository files and Git history are authoritative over chat history.
+
+## Recent stage closeout (2026-10-22/23)
+
+### 0027 — repository hygiene and README
+
+Merged in PR #12 at `dac3490`. Removed 37 files: the obsolete deployment and
+execution guides, the handoff/current-state copies, the archived next-phase
+plan and full-state copy, 27 completed plan bodies, and four internal AI-skill
+files. `docs/` dropped from about 1.9 MB to 760 KB. The English README was
+rewritten and `README.zh-CN.md` mirrored its structure; the docs index, map, and
+`AGENTS.md` references were updated.
+
+**Deviation from the supervisor instruction (evidence-backed):**
+`docs/quality/test-merge-map.json` and `docs/quality/test-overlap-audit.md` were
+kept (the report reduced to a short summary). The CI `Coverage map guard` reads
+both files; deleting them would fail `full test suite`. The 0028 first CI run
+demonstrated exactly that failure. `docs/exec-plans/README.md` was retained as
+the stage index.
+
+### 0028 — usability defect fixes
+
+Merged in PR #13 at `c20795d` (head `621437a`). Four defects fixed:
+
+- **New-user recommendations**: no profile/skills now returns `200` with an
+  empty page (was `10001`), echoing `page`/`page_size`.
+- **Duplicate skill rows**: the job card keeps the `reasons` list and no longer
+  renders `matched_skills`/`missing_skills` twice; optional Firefox DOM
+  assertion covers it.
+- **Non-UTF-8 input**: a strict UTF-8 validator rejects multipart title/filename,
+  txt/md bodies, and public JSON writes with `400/10001` before any write.
+  Internal import/source-sync/review endpoints were intentionally left out.
+- **Field-aware parameter errors**: backward-compatible additive `data.field`
+  for resume `title`/`file`, application `resume_version_id`, and AI
+  `resume_id`; `code`/`message`/status unchanged.
+
+Tests moved **312 → 321**. `docs/quality/test-merge-map.json` counts and the
+renamed ranking case were updated. Main CI after the merge: `ci`
+`39814999026` (11m55s; build 6m37s + suite 1m18s) and `image` `39814999046`
+(12m08s; container gate 1m54s), both green. PR CI on `621437a` was also green
+(`ci` `39811899272`, `image` `39811899278`).
+
+**Lesson:** any test addition or rename must include
+`python3 tools/checks/test_coverage_map.py --test-dir build/presets/<preset>
+--map docs/quality/test-merge-map.json`; the first 0028 CI run failed only on
+this guard.
 
 ## Current capabilities
 
@@ -55,18 +100,20 @@ internal). `docs/03` and `docs/04` are the contracts.
 
 ## Verification baseline
 
-- **312 C++ tests**; Debug, ASan, and UBSan each completed `312/312` with zero
-  failures and zero sanitizer diagnostics; one review-backfill test is skipped
-  on the developer database and passes on the isolated scratch database.
+- **321 C++ tests**; the full Debug suite completed `321/321` with zero
+  failures and zero sanitizer diagnostics (one review-backfill test is skipped
+  on the developer database and passes on the isolated scratch database). The
+  last full ASan/UBSan matrix was `312/312` before the nine 0028 tests; the 14
+  affected 0028 tests pass under both sanitizers.
 - **TSan**: 52/52 harness tests and 17/17 external-runtime tests, zero
   diagnostics.
 - **Python**: 481 source-adapter tests and 190 AI-worker tests pass in the
   pinned environment.
 - **Benchmark** (4 vCPU VMware, Release): **13,421.82 req/s** at 2 threads / 32
   connections, p99 **7.17 ms**; this is a dated, host-specific measurement.
-- **Latest main CI** (`3b4c60b`): `ci` `39625131378` completed/success (4m22s;
-  build 2m40s + suite 1m35s); `image` `39625131650` completed/success (2m11s;
-  container gate 2m07s).
+- **Latest main CI** (`c20795d`): `ci` `39814999026` completed/success
+  (11m55s; build 6m37s + suite 1m18s); `image` `39814999046`
+  completed/success (12m08s; container gate 1m54s).
 - **License**: `LICENSE` is the standard MIT text; the public GitHub license API
   returns `spdx_id=MIT` (V9 closed).
 
@@ -86,6 +133,18 @@ internal). `docs/03` and `docs/04` are the contracts.
   full matrix unless relevant files or the environment changed.
 - Update this file when a stage closes; do not reconstruct long stage evidence
   here.
+- Any test addition/rename must run the coverage-map guard before pushing.
+
+## Carried forward
+
+- UTF-8 boundary validation for internal import/source-sync/review endpoints
+  (intentionally out of 0028).
+- `data.field` adoption in the remaining parameter-error paths.
+- `tools/dev/demo-up.sh`: when Docker Hub is unreachable, check for a local
+  nginx image first or bound the pull attempt (currently about a two-minute
+  wait before the Python fallback).
+- The browser DOM duplicate assertion stays in the optional Firefox smoke and
+  is not a CI dependency.
 
 ## Reading order
 

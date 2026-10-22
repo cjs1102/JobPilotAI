@@ -9,7 +9,7 @@ understand your match, and track applications — without auto-submitting them.*
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/cjs1102/JobPilotAI?display_name=tag)](https://github.com/cjs1102/JobPilotAI/releases/tag/v0.1.0)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](CMakePresets.json)
-[![C++ tests](https://img.shields.io/badge/tests-312%20C%2B%2B-brightgreen.svg)](docs/quality/README.md)
+[![C++ tests](https://img.shields.io/badge/tests-321%20C%2B%2B-brightgreen.svg)](docs/quality/README.md)
 
 ![Job detail with an explainable rule-based match](docs/images/web-detail.png)
 
@@ -150,9 +150,11 @@ submitted by JobPilotAI.
 
 ## Verification
 
-- **312 C++ tests**; Debug, ASan, and UBSan each completed `312/312` with zero
+- **321 C++ tests**; the full Debug suite completed `321/321` with zero
   failures and zero sanitizer diagnostics (one review-backfill skip on the
-  developer database; it passes on the isolated scratch database).
+  developer database; it passes on the isolated scratch database). The last
+  full ASan/UBSan matrix was `312/312` before the latest nine tests; the 14
+  affected tests pass under both sanitizers.
 - **TSan**: 52/52 harness tests and 17/17 external-runtime tests, zero
   diagnostics. TSan does not cover the full suite.
 - **Python**: 481 source-adapter tests and 190 AI-worker tests pass in the pinned
@@ -161,8 +163,8 @@ submitted by JobPilotAI.
 - **Benchmark** (4 vCPU VMware, Release): **13,421.82 req/s** at 2 threads / 32
   connections, p99 **7.17 ms**. This is a dated, host-specific number, not a
   threshold.
-- **Latest main CI** (`3b4c60b`): `ci` `39625131378` and `image` `39625131650`
-  completed successfully.
+- **Latest main CI** (`c20795d`): `ci` `39814999026` (11m55s) and `image`
+  `39814999046` (12m08s) completed successfully.
 
 ## Documentation
 

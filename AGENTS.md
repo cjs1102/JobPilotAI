@@ -8,10 +8,10 @@ runnable entry; `backend/` is `jobpilot_core` (network/HTTP, config, logging,
 MySQL, Redis); `source_adapters/` and `ai_worker/` are optional Python tools;
 `web/` is the native local UI.
 
-Current phase: stages 0001–0026 are complete, `v0.1.0` is tagged, and the
-repository is public. There is **no active code plan**. A docs-only repository
-hygiene/README change may be in progress; check
-`docs/ai/project-state.md` before starting work.
+Current phase: stages 0001–0028 are complete, `v0.1.0` is tagged, and the
+repository is public. There is **no active code plan**. A docs-only status
+update (0029) may be in progress; check `docs/ai/project-state.md` before
+starting work.
 
 Product direction: China-first public sources plus manual capture, campus focus,
 company career pages, and **never auto-submit**. P1 network/HTTP remains

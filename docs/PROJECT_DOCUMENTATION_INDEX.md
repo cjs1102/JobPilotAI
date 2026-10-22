@@ -1,6 +1,6 @@
 # JobPilotAI Project Documentation Index
 
-Refreshed 2026-10-22 for the public repository. It answers one question per
+Refreshed 2026-10-23 for the public repository. It answers one question per
 document: **what is this, who should read it, and is it still true?** The live
 project state is [`ai/project-state.md`](ai/project-state.md).
 

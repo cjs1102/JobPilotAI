@@ -39,11 +39,13 @@ local changes did not get a plan.
 | 0022 | Minimal Web UI | completed | `38bd484` (PR #5) | Native local UI with nginx/Python fallback and status board. |
 | 0023 | Release readiness | completed | `539202f` (PR #6) | Security/contributing docs, locks, MariaDB, TSan, benchmark. |
 | 0025 | README and external usage | completed | `01ad46b` (PR #8) | English/Chinese README, screenshots, and one-command demo. |
+| 0028 | Usability defect fixes | completed | `c20795d` (PR #13) | Empty recommendations for new users, one skill row, UTF-8 boundaries, field-aware errors. |
 
 - **0024** was an owner-only publication step, not a worker plan.
 - **0026** was a lightweight LICENSE repair, recorded in
   [`../ai/project-state.md`](../ai/project-state.md).
-- **0027** is the current docs-only hygiene and README restructure PR.
+- **0027** (repository hygiene and README) merged as PR #12 at `dac3490`.
+- **0029** is the current docs-only status update; no active code plan.
 
 ## Protocol
 

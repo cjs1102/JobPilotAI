@@ -105,6 +105,7 @@ add_library(jobpilot_core STATIC
     src/core/core.cpp
     src/core/logger.cpp
     src/core/thread_pool.cpp
+    src/core/utf8.cpp
     src/network/channel.cpp
     src/network/epoll_poller.cpp
     src/network/event_loop.cpp
@@ -149,6 +150,16 @@ add_executable(test_config
 )
 
 target_link_libraries(test_config
+    PRIVATE
+        jobpilot_core
+        GTest::gtest_main
+)
+
+add_executable(test_utf8
+    tests/test_utf8.cpp
+)
+
+target_link_libraries(test_utf8
     PRIVATE
         jobpilot_core
         GTest::gtest_main
@@ -518,6 +529,7 @@ if(JP_ENABLE_TSAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     set_target_properties(
         test_config
+        test_utf8
         test_logger
         test_http_correctness
         test_schema
@@ -552,6 +564,7 @@ endif()
 include(GoogleTest)
 
 gtest_discover_tests(test_config)
+gtest_discover_tests(test_utf8)
 gtest_discover_tests(test_logger)
 gtest_discover_tests(test_sql_result)
 gtest_discover_tests(test_http_correctness)

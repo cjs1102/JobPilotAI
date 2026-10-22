@@ -8,6 +8,7 @@
 #include <string>
 
 #include "jobpilot/core/logger.h"
+#include "jobpilot/core/utf8.h"
 #include "jobpilot/database/mysql_pool.h"
 #include "jobpilot/storage/file_storage.h"
 
@@ -133,6 +134,8 @@ namespace jobpilot::service
 
         if (upload.title.empty() ||
             upload.title.size() > kMaxTitleBytes ||
+            !jobpilot::core::IsValidUtf8(upload.title) ||
+            !jobpilot::core::IsValidUtf8(upload.filename) ||
             !extension.has_value() ||
             !IsSupportedExtension(extension.value()) ||
             upload.bytes.empty() ||
@@ -150,6 +153,17 @@ namespace jobpilot::service
                 ? std::nullopt
                 : std::optional<std::string>(
                       std::string(upload.bytes));
+
+        // Text resume bytes are persisted as version content. Validate them
+        // before the temp file or transaction is created so an invalid client
+        // value cannot surface as a database error.
+        if (content.has_value() &&
+            !jobpilot::core::IsValidUtf8(content.value()))
+        {
+            return ServiceResult<ResumeUploadResult>{
+                ErrorCode::kInvalidParam,
+                {}};
+        }
 
         UploadStage stage = UploadStage::kStorage;
         bool tempCreated = false;

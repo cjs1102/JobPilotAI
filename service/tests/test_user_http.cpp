@@ -868,6 +868,39 @@ namespace jobpilot::service
         EXPECT_EQ(profileResult->statusCode, 400);
         EXPECT_EQ(profileResult->jsonBody["code"], 10001);
 
+        // Invalid UTF-8 is rejected before the JSON parser or any write.
+        std::string invalidUtf8 = "{\"target_position\":\"";
+        invalidUtf8.push_back(static_cast<char>(0xFF));
+        invalidUtf8 += "\"}";
+
+        const jobpilot::core::Result profilesBefore =
+            pool->Query(
+                "SELECT COUNT(*) FROM profiles WHERE user_id = ?",
+                {user.first});
+
+        const std::optional<HttpResponseData> invalidUtf8Result =
+            SendRequest(
+                "PUT",
+                "/api/v1/users/profile",
+                invalidUtf8,
+                authorization);
+
+        ASSERT_TRUE(invalidUtf8Result.has_value());
+        ASSERT_TRUE(invalidUtf8Result->hasJson);
+        EXPECT_EQ(invalidUtf8Result->statusCode, 400);
+        EXPECT_EQ(invalidUtf8Result->jsonBody["code"], 10001);
+        EXPECT_EQ(
+            invalidUtf8Result->jsonBody["data"]["field"],
+            "body");
+
+        const jobpilot::core::Result profilesAfter =
+            pool->Query(
+                "SELECT COUNT(*) FROM profiles WHERE user_id = ?",
+                {user.first});
+        EXPECT_EQ(
+            profilesAfter.value(0, 0).value(),
+            profilesBefore.value(0, 0).value());
+
         // 0015 A2: enum/range bounds for the candidate keys -> 400.
         const nlohmann::json candidateCases[] = {
             nlohmann::json{{"education_level", 6}},

@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "jobpilot/error.h"
+#include "jobpilot/service/request_validation.h"
 
 namespace jobpilot::service
 {
@@ -216,6 +217,18 @@ namespace jobpilot::service
             jobpilot::core::HttpResponse *response,
             Json *body)
         {
+            if (!jobpilot::core::IsValidUtf8(
+                    request.Body()))
+            {
+                WriteResponse(
+                    response,
+                    request.KeepAlive(),
+                    ErrorCode::kInvalidParam,
+                    ParamError("body"));
+
+                return false;
+            }
+
             try
             {
                 *body = Json::parse(
@@ -238,7 +251,20 @@ namespace jobpilot::service
                     response,
                     request.KeepAlive(),
                     ErrorCode::kInvalidParam,
-                    nullptr);
+                    ParamError("body"));
+
+                return false;
+            }
+
+            std::string invalidField;
+
+            if (!ValidateJsonUtf8(*body, &invalidField))
+            {
+                WriteResponse(
+                    response,
+                    request.KeepAlive(),
+                    ErrorCode::kInvalidParam,
+                    ParamError(invalidField));
 
                 return false;
             }

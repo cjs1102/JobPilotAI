@@ -141,9 +141,9 @@ labelled explicitly in the report.
 - Commit after each verified slice, one line, Conventional Commit subject
   (`feat(ai): ...`, `docs(api): ...`, `test(job): ...`).
 - Run `git diff --check` before committing. Never push unverified code.
-- Update `docs/ai/project-state.md` and the active ExecPlan's progress section
-  as steps land; archive the plan under `docs/exec-plans/completed/` only after
-  its verification level has run.
+- Update `docs/ai/project-state.md` as steps land. Record a completed stage in
+  `docs/exec-plans/README.md` only after its verification level has run; keep
+  plan bodies in Git history.
 - Contract changes (`docs/03`, `docs/04`) must be made in the contract document
   first and reviewed before code depends on them.
 

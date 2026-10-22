@@ -333,7 +333,7 @@ CREATE TABLE notifications (
 `database/schema/03_job.sql`（新库由初始化脚本直接创建）。
 
 对齐来源：
-[`exec-plans/completed/0012-job-source-adapter-freshness.md`](exec-plans/completed/0012-job-source-adapter-freshness.md) §8
+[`exec-plans/README.md`](exec-plans/README.md) 的 0012 行
 与 [`adr/0010-job-freshness-and-lifecycle.md`](adr/0010-job-freshness-and-lifecycle.md)。
 
 ### 7.1 `jobs` 新增列（已落地）
@@ -403,7 +403,7 @@ ALTER TABLE jobs
 Step 1 落地：列与索引已写入 §3 建表 DDL 与 `database/schema/05_ai.sql`。
 
 对齐来源：
-[`exec-plans/completed/0013-ai-matching.md`](exec-plans/completed/0013-ai-matching.md) §5.1
+[`exec-plans/README.md`](exec-plans/README.md) 的 0013 行
 与 [`adr/0009-ai-pipeline-and-provider-strategy.md`](adr/0009-ai-pipeline-and-provider-strategy.md)。
 
 ### 8.1 `ai_tasks` 新增列（已落地）
@@ -452,9 +452,8 @@ ALTER TABLE ai_tasks
 `database/schema/03_job.sql`（新库由初始化脚本直接创建）。
 
 对齐来源：
-[`exec-plans/completed/0014-china-campus-sources-and-manual-capture.md`](exec-plans/completed/0014-china-campus-sources-and-manual-capture.md)
-§5.1/§9 Step 4/§15.4（F13/F14 已决定；该计划已于 2026-10-09 归档，Step 5 环境受限
-并结转）与
+[`exec-plans/README.md`](exec-plans/README.md) 的 0014 行
+（F13/F14 已决定；Step 5 环境受限并结转）与
 [`adr/0011-china-first-sourcing-and-compliance.md`](adr/0011-china-first-sourcing-and-compliance.md) §4。
 
 ### 9.1 `deadline` 格式与时区约定（唯一权威，四端一致）

@@ -14,7 +14,7 @@ Companion artifacts: [`test-merge-map.json`](test-merge-map.json) (machine-reada
 checker). The map cannot drift from this report: the checker reads the counts block below and
 the live `ctest -N` list and fails when any of the three disagree.
 
-<!-- audit-counts: {"before":312,"after":312,"removed":0,"survivors":0,"candidates_evaluated":66,"candidate_pairs_unordered":50,"record_only":47,"cap":20} -->
+<!-- audit-counts: {"before":321,"after":321,"removed":0,"survivors":0,"candidates_evaluated":66,"candidate_pairs_unordered":50,"record_only":47,"cap":20} -->
 
 ## 1. Verdict
 
@@ -22,7 +22,7 @@ the live `ctest -N` list and fails when any of the three disagree.
 |---|---|
 | CTest cases before the audit | **312** (309 at audit time; see the 2026-10-11 note) |
 | CTest cases removed by this audit (k) | **0** |
-| CTest cases after the audit | **312** (nothing removed) |
+| CTest cases after the audit | **321** (312 audit-time + 9 tests added by 0028; nothing removed) |
 
 > **2026-10-11:** three cases were added by the `needs_review` visibility fix
 > (`JobDaoTest.PublicDetailHidesQueuedRowsWhileReviewStillReadsThem`,
@@ -31,6 +31,11 @@ the live `ctest -N` list and fails when any of the three disagree.
 > `ctest -N` count moved 309 → 312 and this block follows it. The audit itself is
 > unchanged: k = 0 removals, the same 66 evaluated pairs, the same rule. The
 > transcript below is the audit-time snapshot and is deliberately left as it was.
+>
+> **2026-10-23:** 0028 added 9 tests (6 UTF-8 unit cases plus 3 HTTP cases),
+> moving the live count 312 → 321 with no removals. The map/report counts are
+> updated to 321; the original 66 evaluated pairs and k = 0 conclusion remain
+> unchanged.
 | Candidates mechanically/manually evaluated | 66 directed (50 unordered pairs) |
 | Candidates passing all clauses of the hard merge rule | 0 |
 | Candidates reported as NOT PROVEN | 1 (§4, loop-iteration equivalence) |

@@ -8,8 +8,8 @@
   "removed": [],
   "survivors": [],
   "counts": {
-    "before": 312,
-    "after": 312,
+    "before": 321,
+    "after": 321,
     "removed": 0,
     "survivors": 0,
     "candidates_evaluated": 66,
@@ -593,7 +593,7 @@
       "evidence": "A-only assertion not present in B: EXPECT_EQ( service.BuildTaskInput(\"\", 1).code, ErrorCode::kInvalidParam)"
     },
     {
-      "removed": "JobRankingServiceTest.RequiresUsableProfileOrSkills",
+      "removed": "JobRankingServiceTest.ReturnsEmptyPageWithoutProfileOrSkills",
       "survivor": "JobRankingServiceTest.SortsPaginatesAndReportsTruncation",
       "binary": "test_job_ranking_service",
       "file": "service/tests/test_job_ranking_service.cpp",
@@ -605,7 +605,7 @@
       ],
       "rule_failure": "assertions_not_contained",
       "reason": "the removed case asserts at least one target the survivor never asserts",
-      "evidence": "A-only assertion not present in B: EXPECT_EQ( service.RankJobs(1, {}, 1, 20).code, ErrorCode::kInvalidParam)"
+      "evidence": "A-only assertions not present in B: EXPECT_EQ(result.code, ErrorCode::kSuccess) and EXPECT_TRUE(result.value.list.empty())"
     },
     {
       "removed": "MatchResultJsonTest.IsDeterministicForTheSameInput",

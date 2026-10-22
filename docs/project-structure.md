@@ -326,9 +326,8 @@ ai ──内部HTTP──► service
 
 # 10. 分阶段构建计划
 
-> ⚠️ **本节已废弃（Superseded）**：执行分期以现行 ExecPlan
-> （[exec-plans/](exec-plans/README.md)）为准；`08-execution-guide.md` 自身亦为
-> Historical / Superseded，不作为当前 MVP 实现依据。下表 A-F 分期为历史版本，
+> ⚠️ **本节已废弃（Superseded）**：执行分期以[阶段索引](exec-plans/README.md)为准；本节的原始分期仅作
+> 历史参考，不作为当前 MVP 实现依据。下表 A-F 分期为历史版本，
 > 保留仅作参考，请勿按此执行。
 
 > 详细排期、止损线与验收见 **[05-development-plan.md](05-development-plan.md)**（诚实分阶段版，按学生业余时间估算，约 26 周）。本节为目录视角的填充顺序。

@@ -78,13 +78,11 @@ flowchart LR
 | 04 | [api-design](04-api-design.md) | 接口设计 |
 | 05 | [development-plan](05-development-plan.md) | 开发计划（诚实分阶段） |
 | 06 | [coding-standard](06-coding-standard.md) | 代码规范 |
-| 07 | [deployment](07-deployment.md) | 部署文档 |
-| **08** | **[execution-guide](08-execution-guide.md)** | **执行手册（Historical / Superseded，不作为当前 MVP 实现依据）** |
-| - | [adr/](adr/README.md) | 架构决策记录 0001-0006 |
+| - | [adr/](adr/README.md) | 架构决策记录 0001-0011 |
 
 ## 开发原则（防止中途大改）
 
-1. **文档先行**：现行规范以 `AGENTS.md`、活动 ExecPlan、`docs/architecture/open-source-mvp.md`、`docs/adr/`（ADR-0007 ~ ADR-0010）与 `docs/03`/`04`/`06` 为准；本目录旧文档为 Historical / Superseded，不作为当前 MVP 实现依据
+1. **文档先行**：现行规范以 `AGENTS.md`、[阶段索引](exec-plans/README.md)、`docs/architecture/open-source-mvp.md`、`docs/adr/`（ADR-0007 ~ ADR-0011）与 `docs/03`/`04`/`06` 为准；本目录旧文档为 Historical / Superseded，不作为当前 MVP 实现依据
 2. **契约锁定**：`03` 表结构、`04` API 契约为硬约束，前端/后端/AI 三方以此为准
 3. **顺序即优先级**：按 [05-development-plan.md](05-development-plan.md) 阶段推进，每阶段可演示
 4. **止损优先**：卡点按止损线处理，不做无边界扩展

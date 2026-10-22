@@ -5,8 +5,8 @@ from the C++ internal API, optionally calls an OpenAI-compatible provider, and
 merges **strictly validated, evidence-bound** output onto the deterministic
 `match_rule_v1` baseline. The worker never touches business tables and never
 recomputes the score
-([ADR-0009](../docs/adr/0009-ai-pipeline-and-provider-strategy.md),
-[ExecPlan 0013](../docs/exec-plans/completed/0013-ai-matching.md)).
+([ADR-0009](../docs/adr/0009-ai-pipeline-and-provider-strategy.md);
+see the stage index in [`docs/exec-plans/README.md`](../docs/exec-plans/README.md)).
 
 ## Guarantees
 

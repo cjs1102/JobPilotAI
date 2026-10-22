@@ -234,7 +234,7 @@ namespace jobpilot::service
             0.0);
     }
 
-    TEST(JobRankingServiceTest, RequiresUsableProfileOrSkills)
+    TEST(JobRankingServiceTest, ReturnsEmptyPageWithoutProfileOrSkills)
     {
         FakeJobRankingDao dao;
         FakeProfileReader reader;
@@ -244,9 +244,16 @@ namespace jobpilot::service
             reader,
             authenticator);
 
-        EXPECT_EQ(
-            service.RankJobs(1, {}, 1, 20).code,
-            ErrorCode::kInvalidParam);
+        const ServiceResult<RankedJobPage> result =
+            service.RankJobs(1, {}, 3, 5);
+
+        ASSERT_EQ(result.code, ErrorCode::kSuccess);
+        EXPECT_TRUE(result.value.list.empty());
+        EXPECT_EQ(result.value.total, 0U);
+        EXPECT_EQ(result.value.rankedTotal, 0U);
+        EXPECT_FALSE(result.value.truncated);
+        EXPECT_EQ(result.value.page, 3U);
+        EXPECT_EQ(result.value.pageSize, 5U);
     }
 
 } // namespace jobpilot::service

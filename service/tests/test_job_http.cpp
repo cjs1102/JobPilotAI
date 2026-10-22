@@ -363,6 +363,21 @@ namespace jobpilot::service
                     "job-http-token");
             sessions->Set(token, userId);
 
+            emptyEmail =
+                jobpilot::test::UniqueEmail(
+                    "job-http-empty-user");
+            const std::optional<std::uint64_t> createdEmptyUser =
+                userDao->CreateUser(
+                    "job-http-empty-user",
+                    emptyEmail,
+                    "hash");
+            ASSERT_TRUE(createdEmptyUser.has_value());
+            emptyUserId = createdEmptyUser.value();
+            emptyToken =
+                jobpilot::test::UniqueJobToken(
+                    "job-http-empty-token");
+            sessions->Set(emptyToken, emptyUserId);
+
             UserProfile profile;
             profile.userId = userId;
             profile.targetPosition = "C++";
@@ -482,9 +497,13 @@ namespace jobpilot::service
                 pool.get(),
                 queuedId);
             sessions->Remove(token);
+            sessions->Remove(emptyToken);
             jobpilot::test::CleanupUser(
                 pool.get(),
                 email);
+            jobpilot::test::CleanupUser(
+                pool.get(),
+                emptyEmail);
         }
 
         ServerState state;
@@ -515,6 +534,9 @@ namespace jobpilot::service
         std::string email;
         std::string token;
         std::uint64_t userId = 0;
+        std::string emptyEmail;
+        std::string emptyToken;
+        std::uint64_t emptyUserId = 0;
     };
 
     TEST_F(JobHttpTest, SearchesWithPaginationAndPercentDecoding)
@@ -987,6 +1009,30 @@ namespace jobpilot::service
         ASSERT_TRUE(badStrict.has_value());
         ASSERT_TRUE(badStrict->hasJson);
         EXPECT_EQ(badStrict->statusCode, 400);
+    }
+
+    TEST_F(JobHttpTest, ReturnsEmptyRecommendationsForNewUser)
+    {
+        const std::optional<HttpResponseData> response =
+            SendRequest(
+                "/api/v1/jobs/recommended?page=1&page_size=5",
+                "Bearer " + emptyToken);
+
+        ASSERT_TRUE(response.has_value());
+        ASSERT_TRUE(response->hasJson);
+        EXPECT_EQ(response->statusCode, 200);
+        EXPECT_EQ(response->jsonBody["code"], 0);
+        EXPECT_TRUE(
+            response->jsonBody["data"]["list"].empty());
+        EXPECT_EQ(
+            response->jsonBody["data"]["total"],
+            0);
+        EXPECT_EQ(
+            response->jsonBody["data"]["page"],
+            1);
+        EXPECT_EQ(
+            response->jsonBody["data"]["page_size"],
+            5);
     }
 
     TEST_F(JobHttpTest, ReturnsDeterministicRecommendations)

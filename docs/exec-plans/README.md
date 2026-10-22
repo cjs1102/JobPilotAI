@@ -45,7 +45,7 @@ local changes did not get a plan.
 - **0026** was a lightweight LICENSE repair, recorded in
   [`../ai/project-state.md`](../ai/project-state.md).
 - **0027** (repository hygiene and README) merged as PR #12 at `dac3490`.
-- **0029** is the current docs-only status update; no active code plan.
+- **0029** (status update) merged as PR #14 at `aed4abb`; no active code plan.
 
 ## Protocol
 

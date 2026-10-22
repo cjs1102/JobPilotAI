@@ -163,8 +163,8 @@ submitted by JobPilotAI.
 - **Benchmark** (4 vCPU VMware, Release): **13,421.82 req/s** at 2 threads / 32
   connections, p99 **7.17 ms**. This is a dated, host-specific number, not a
   threshold.
-- **Latest main CI** (`c20795d`): `ci` `39814999026` (11m55s) and `image`
-  `39814999046` (12m08s) completed successfully.
+- **Latest main CI** (`aed4abb`): `ci` `39818983565` (6m12s) and `image`
+  `39818983370` (2m14s) completed successfully.
 
 ## Documentation
 

@@ -1,8 +1,8 @@
 # JobPilotAI Current Project State
 
-> Snapshot: **2026-10-23**. `main = c20795d`; the repository is public and
-> `v0.1.0` is tagged. Stages 0001–0028 are complete. **No code plan is active**;
-> the current change is the docs-only status update (0029).
+> Snapshot: **2026-10-23**. `main = aed4abb`; the repository is public and
+> `v0.1.0` is tagged. Stages 0001–0029 are complete. **No code plan or docs
+> change is active**; the next work is owner-directed.
 
 This file is the concise live state. Stage bodies and long evidence are in Git
 history; the stage index is [`../exec-plans/README.md`](../exec-plans/README.md).
@@ -52,6 +52,14 @@ renamed ranking case were updated. Main CI after the merge: `ci`
 `python3 tools/checks/test_coverage_map.py --test-dir build/presets/<preset>
 --map docs/quality/test-merge-map.json`; the first 0028 CI run failed only on
 this guard.
+
+### 0029 — status update
+
+Merged in PR #14 at `aed4abb`. Documented the 0027/0028 closeout, the UTF-8 and
+field-aware error changes, the 312 → 321 test move, the coverage-map lesson, and
+the carried-forward items. No code, test, or CI behavior changed. Main CI on
+`aed4abb`: `ci` `39818983565` (6m12s; build 4m33s + suite 1m32s) and `image`
+`39818983370` (2m14s; container gate 2m10s), both green.
 
 ## Current capabilities
 
@@ -111,9 +119,9 @@ internal). `docs/03` and `docs/04` are the contracts.
   pinned environment.
 - **Benchmark** (4 vCPU VMware, Release): **13,421.82 req/s** at 2 threads / 32
   connections, p99 **7.17 ms**; this is a dated, host-specific measurement.
-- **Latest main CI** (`c20795d`): `ci` `39814999026` completed/success
-  (11m55s; build 6m37s + suite 1m18s); `image` `39814999046`
-  completed/success (12m08s; container gate 1m54s).
+- **Latest main CI** (`aed4abb`): `ci` `39818983565` completed/success
+  (6m12s; build 4m33s + suite 1m32s); `image` `39818983370`
+  completed/success (2m14s; container gate 2m10s).
 - **License**: `LICENSE` is the standard MIT text; the public GitHub license API
   returns `spdx_id=MIT` (V9 closed).
 
